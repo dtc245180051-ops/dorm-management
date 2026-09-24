@@ -1,21 +1,7 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
-from dotenv import load_dotenv
-import os
+"""
+Database module compatibility forwarder.
+Canonical database configuration has been moved to app.core.database.
+"""
+from app.core.database import Base, SessionLocal, engine, get_db
 
-load_dotenv()
-
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-class Base(DeclarativeBase):
-    pass
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+__all__ = ["Base", "SessionLocal", "engine", "get_db"]
