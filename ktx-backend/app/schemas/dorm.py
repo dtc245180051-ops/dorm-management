@@ -31,7 +31,8 @@ class PhongBase(BaseModel):
     so_phong: str = Field(..., max_length=20, description="Số phòng (ví dụ: 101, 102)")
     suc_chua: int = Field(default=4, ge=1, le=16, description="Sức chứa (số lượng giường)")
     loai_phong: str = Field(..., max_length=50, description="Loại phòng (ví dụ: Phòng tiêu chuẩn, Phòng dịch vụ)")
-    hinh_anh: Optional[str] = Field(default=None, max_length=255, description="Hình ảnh phòng")
+    gia_tien_nam: Optional[float] = Field(default=None, description="Giá tiền / năm (VNĐ)")
+    hinh_anh: Optional[str] = Field(default=None, max_length=1000, description="Hình ảnh phòng")
     ma_tang: str = Field(..., max_length=20, description="Mã tầng trực thuộc")
 
 
@@ -43,7 +44,8 @@ class PhongUpdate(BaseModel):
     so_phong: Optional[str] = Field(default=None, max_length=20)
     suc_chua: Optional[int] = Field(default=None, ge=1, le=16)
     loai_phong: Optional[str] = Field(default=None, max_length=50)
-    hinh_anh: Optional[str] = Field(default=None, max_length=255)
+    gia_tien_nam: Optional[float] = Field(default=None)
+    hinh_anh: Optional[str] = Field(default=None, max_length=1000)
     ma_tang: Optional[str] = Field(default=None, max_length=20)
 
 
@@ -52,6 +54,7 @@ class PhongResponse(BaseModel):
     so_phong: str
     suc_chua: int
     loai_phong: str
+    gia_tien_nam: Optional[float] = None
     hinh_anh: Optional[str] = None
     ma_tang: str
     giuongs: List[GiuongResponse] = []
@@ -65,6 +68,7 @@ class RoomAvailableResponse(BaseModel):
     so_phong: str
     loai_phong: str
     suc_chua: int
+    gia_tien_nam: Optional[float] = None
     hinh_anh: Optional[str] = None
     ma_tang: str
     so_tang: Optional[int] = None
@@ -97,7 +101,9 @@ class TangResponse(BaseModel):
 
 # ----------------- ToaNha Schemas -----------------
 class ToaNhaBase(BaseModel):
-    ten_toa: str = Field(..., min_length=1, max_length=50, description="Tên tòa nhà (ví dụ: Tòa A, Tòa B)")
+    ten_toa: str = Field(..., min_length=1, max_length=50, description="Tên tòa nhà (ví dụ: Tòa A1, Tòa B2)")
+    gioi_tinh: Optional[str] = Field(default="Nam & Nữ", max_length=20, description="Phân loại tòa (Nam, Nữ, Nam & Nữ)")
+    so_tang: int = Field(default=5, ge=1, le=50, description="Tổng số tầng của tòa nhà")
 
 
 class ToaNhaCreate(ToaNhaBase):
@@ -107,6 +113,8 @@ class ToaNhaCreate(ToaNhaBase):
 class ToaNhaResponse(BaseModel):
     ma_toa: str
     ten_toa: str
+    gioi_tinh: Optional[str] = "Nam & Nữ"
+    so_tang: int = 5
     tangs: List[TangResponse] = []
 
     model_config = ConfigDict(from_attributes=True)

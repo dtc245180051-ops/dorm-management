@@ -139,6 +139,18 @@ export const dormService = {
     return res.data;
   },
 
+  // Tải lên hình ảnh phòng từ máy tính
+  uploadRoomImage: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await api.post('/rooms/upload-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return res.data;
+  },
+
   // Giường
   updateBedStatus: async (ma_giuong, trang_thai) => {
     const res = await api.put(`/rooms/beds/${ma_giuong}/status`, {

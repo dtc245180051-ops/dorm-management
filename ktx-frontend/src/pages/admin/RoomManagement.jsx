@@ -58,21 +58,19 @@ export default function RoomManagement({ searchTerm = '' }) {
     fetchData();
   }, []);
 
-  // Default display buildings if API returns fewer
+  // Danh sách tòa nhà hiển thị
   const displayedBuildings = useMemo(() => {
-    const defaultList = [
-      { ma_toa: 'A1', ten_toa: 'Tòa A1' },
-      { ma_toa: 'A2', ten_toa: 'Tòa A2' },
-      { ma_toa: 'A3', ten_toa: 'Tòa A3' },
-      { ma_toa: 'A4', ten_toa: 'Tòa A4' },
-      { ma_toa: 'A5', ten_toa: 'Tòa A5' },
-      { ma_toa: 'A6', ten_toa: 'Tòa A6' },
-    ];
-
-    if (!buildings || buildings.length === 0) return defaultList;
-
-    const apiMap = new Map(buildings.map((b) => [b.ma_toa, b]));
-    return defaultList.map((item) => apiMap.get(item.ma_toa) || item);
+    if (!buildings || buildings.length === 0) {
+      return [
+        { ma_toa: 'A1', ten_toa: 'Tòa A1', gioi_tinh: 'Nam' },
+        { ma_toa: 'A2', ten_toa: 'Tòa A2', gioi_tinh: 'Nam' },
+        { ma_toa: 'A3', ten_toa: 'Tòa A3', gioi_tinh: 'Nữ' },
+        { ma_toa: 'A4', ten_toa: 'Tòa A4', gioi_tinh: 'Nữ' },
+        { ma_toa: 'A5', ten_toa: 'Tòa A5', gioi_tinh: 'Nam' },
+        { ma_toa: 'A6', ten_toa: 'Tòa A6', gioi_tinh: 'Nữ' },
+      ];
+    }
+    return buildings;
   }, [buildings]);
 
   // Extract rooms for current active building
@@ -233,6 +231,14 @@ export default function RoomManagement({ searchTerm = '' }) {
       <div className="flex items-center gap-3 overflow-x-auto pb-3 mb-3 scrollbar-none">
         {displayedBuildings.map((building) => {
           const isActive = activeBuilding === building.ma_toa;
+          const rawName = building.ten_toa || building.ma_toa;
+          const displayName = rawName.startsWith('Tòa ') ? rawName : `Tòa ${rawName}`;
+          const isFemale =
+            (building.gioi_tinh || '').toLowerCase().includes('nữ') ||
+            (building.gioi_tinh || '').toLowerCase().includes('nu');
+          const isMale =
+            (building.gioi_tinh || '').toLowerCase().includes('nam') && !isFemale;
+
           return (
             <button
               key={building.ma_toa}
@@ -241,13 +247,35 @@ export default function RoomManagement({ searchTerm = '' }) {
                 setActiveBuilding(building.ma_toa);
                 setActiveRoomFilter('all');
               }}
-              className={`px-6 py-2 rounded-full text-sm transition-all duration-150 whitespace-nowrap cursor-pointer shadow-2xs ${
+              className={`px-5 py-2 rounded-full text-sm transition-all duration-150 whitespace-nowrap cursor-pointer shadow-2xs flex items-center gap-2 ${
                 isActive
                   ? 'bg-sky-200 text-sky-900 font-bold border border-sky-300'
                   : 'bg-white text-slate-700 hover:bg-slate-100 font-medium border border-slate-300'
               }`}
             >
-              {building.ten_toa}
+              <span>{displayName}</span>
+              {isMale && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
+                    isActive
+                      ? 'bg-blue-100/90 text-blue-900'
+                      : 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                  }`}
+                >
+                  Nam
+                </span>
+              )}
+              {isFemale && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
+                    isActive
+                      ? 'bg-rose-100/90 text-rose-900'
+                      : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                  }`}
+                >
+                  Nữ
+                </span>
+              )}
             </button>
           );
         })}
@@ -289,13 +317,14 @@ export default function RoomManagement({ searchTerm = '' }) {
       {/* Main Room Table Card (Nền trắng bo góc nổi trên khối xám) */}
       <div className="bg-white rounded-2xl border border-slate-200/70 shadow-xs overflow-hidden">
         {/* Table Header Row (Light Blue Header) */}
-        <div className="bg-[#dbeafe]/80 border-b border-sky-200/60 px-8 py-4 grid grid-cols-12 items-center text-slate-900 font-bold text-sm select-none">
-          <div className="col-span-2 lg:col-span-1">Phòng</div>
-          <div className="col-span-2 lg:col-span-2">Hình ảnh</div>
-          <div className="col-span-2 lg:col-span-2">Sức chứa</div>
-          <div className="col-span-2 lg:col-span-2">Loại phòng</div>
-          <div className="col-span-3 lg:col-span-3">Giường</div>
-          <div className="col-span-1 lg:col-span-2 text-right"></div>
+        <div className="bg-[#dbeafe]/80 border-b border-sky-200/60 px-8 py-4 grid grid-cols-12 items-center text-slate-900 font-bold text-sm select-none gap-2">
+          <div className="col-span-1">Phòng</div>
+          <div className="col-span-2">Hình ảnh</div>
+          <div className="col-span-1">Sức chứa</div>
+          <div className="col-span-2">Loại phòng</div>
+          <div className="col-span-2">Giá tiền / năm</div>
+          <div className="col-span-3">Giường</div>
+          <div className="col-span-1 text-right"></div>
         </div>
 
         {/* Loading state */}
@@ -347,18 +376,21 @@ export default function RoomManagement({ searchTerm = '' }) {
                   ? '/images/rooms/phong-dich-vu.jpg'
                   : '/images/rooms/phong-tieu-chuan.jpg');
 
+              // Giá tiền / năm
+              const roomPrice = Number(room.gia_tien_nam) || (isService ? 9600000 : 4800000);
+
               return (
                 <div
                   key={room.ma_phong}
-                  className="px-8 py-4 grid grid-cols-12 items-center hover:bg-slate-50/60 transition-colors"
+                  className="px-8 py-4 grid grid-cols-12 items-center hover:bg-slate-50/60 transition-colors gap-2"
                 >
                   {/* Cột 1: Phòng (Số phòng) */}
-                  <div className="col-span-2 lg:col-span-1 font-bold text-slate-800 text-base">
+                  <div className="col-span-1 font-bold text-slate-800 text-base">
                     {room.so_phong}
                   </div>
 
                   {/* Cột 2: Hình ảnh (Bên phải của cột phòng) */}
-                  <div className="col-span-2 lg:col-span-2 flex items-center">
+                  <div className="col-span-2 flex items-center">
                     <div
                       onClick={() =>
                         setPreviewImage({
@@ -388,12 +420,12 @@ export default function RoomManagement({ searchTerm = '' }) {
                   </div>
 
                   {/* Cột 3: Sức chứa (Sửa từ cột Loại phòng cũ) */}
-                  <div className="col-span-2 lg:col-span-2 font-medium text-slate-800 text-sm">
+                  <div className="col-span-1 font-semibold text-slate-800 text-sm">
                     {capacity} người
                   </div>
 
                   {/* Cột 4: Loại phòng (Phòng tiêu chuẩn / Phòng dịch vụ) */}
-                  <div className="col-span-2 lg:col-span-2">
+                  <div className="col-span-2">
                     {isService ? (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
@@ -407,8 +439,18 @@ export default function RoomManagement({ searchTerm = '' }) {
                     )}
                   </div>
 
-                  {/* Cột 5: Giường (Số lượng ô vuông đúng bằng sức chứa của phòng) */}
-                  <div className="col-span-3 lg:col-span-3 flex items-center gap-2 flex-wrap">
+                  {/* Cột 5: Giá tiền / năm */}
+                  <div className="col-span-2">
+                    <div className="text-slate-900 font-bold text-sm tracking-tight">
+                      {roomPrice.toLocaleString('vi-VN')} đ
+                    </div>
+                    <div className="text-[11px] text-slate-400 font-medium">
+                      ~{Math.round(roomPrice / 12).toLocaleString('vi-VN')} đ/tháng
+                    </div>
+                  </div>
+
+                  {/* Cột 6: Giường (Số lượng ô vuông đúng bằng sức chứa của phòng) */}
+                  <div className="col-span-3 flex items-center gap-1.5 flex-wrap">
                     {displayBeds.map((bed, idx) => {
                       const isFree = bed.trang_thai === 'TRONG';
                       return (
@@ -429,15 +471,15 @@ export default function RoomManagement({ searchTerm = '' }) {
                     })}
                   </div>
 
-                  {/* Cột 6: Hành động */}
-                  <div className="col-span-1 lg:col-span-2 text-right">
+                  {/* Cột 7: Hành động */}
+                  <div className="col-span-1 text-right">
                     <button
                       type="button"
                       onClick={() => {
                         setSelectedRoom(room);
                         setIsDetailModalOpen(true);
                       }}
-                      className="text-sky-600 underline font-medium hover:text-sky-800 text-sm transition cursor-pointer"
+                      className="text-sky-600 underline font-semibold hover:text-sky-800 text-xs transition cursor-pointer whitespace-nowrap"
                     >
                       xem chi tiết
                     </button>
@@ -510,8 +552,11 @@ export default function RoomManagement({ searchTerm = '' }) {
         onClose={() => setIsAddModalOpen(false)}
         buildings={displayedBuildings}
         activeBuildingId={activeBuilding}
-        onRoomAdded={() => {
+        onRoomAdded={(newBuildingId) => {
           fetchData();
+          if (newBuildingId) {
+            setActiveBuilding(newBuildingId);
+          }
           showToast('Đã thêm phòng mới thành công!');
         }}
       />

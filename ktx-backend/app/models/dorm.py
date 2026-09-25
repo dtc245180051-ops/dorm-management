@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy import Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -23,6 +23,16 @@ class ToaNha(Base):
         unique=True,
         nullable=False,
     )
+    gioi_tinh: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        default="Nam & Nữ",
+    )
+    so_tang: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=5,
+    )
 
     # Quan hệ 1-N với Tang
     tangs: Mapped[List["Tang"]] = relationship(
@@ -32,7 +42,7 @@ class ToaNha(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<ToaNha(ma_toa='{self.ma_toa}', ten_toa='{self.ten_toa}')>"
+        return f"<ToaNha(ma_toa='{self.ma_toa}', ten_toa='{self.ten_toa}', gioi_tinh='{self.gioi_tinh}', so_tang={self.so_tang})>"
 
 
 class Tang(Base):
@@ -88,6 +98,11 @@ class Phong(Base):
     loai_phong: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
+    )
+    gia_tien_nam: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        default=None,
     )
     hinh_anh: Mapped[Optional[str]] = mapped_column(
         String(255),

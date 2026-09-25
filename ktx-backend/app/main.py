@@ -1,5 +1,7 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app import models
 from app.core.config import settings
@@ -13,6 +15,12 @@ app = FastAPI(
     version="1.0.0",
     description="Hệ thống quản lý Ký túc xá - API Backend với xác thực JWT, phân quyền RBAC & Quản lý cơ sở vật chất KTX",
 )
+
+# Thư mục chứa tệp tải lên (uploads)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
+os.makedirs(os.path.join(UPLOADS_DIR, "rooms"), exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 # Cấu hình CORS cho phép Frontend truy cập
 origins = [

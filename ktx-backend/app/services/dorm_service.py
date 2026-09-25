@@ -21,26 +21,45 @@ from app.schemas.dorm import (
 # QUẢN LÝ TÒA NHÀ (TOA NHA)
 # ==============================================================================
 def create_building(db: Session, building_in: ToaNhaCreate) -> ToaNha:
-    """Tạo tòa nhà mới."""
+    """Tạo tòa nhà mới, tự động chuẩn hóa tên tòa và mã tòa, hỗ trợ phân loại nam/nữ."""
+    raw_name = building_in.ten_toa.strip()
+
+    # Chuẩn hóa tên hiển thị: nếu chưa có chữ 'Tòa' thì tự động thêm
+    if raw_name.lower().startswith("tòa ") or raw_name.lower().startswith("toa "):
+        ten_toa = raw_name
+        base_code = raw_name.split(" ", 1)[1].strip().upper()
+    else:
+        ten_toa = f"Tòa {raw_name}"
+        base_code = raw_name.strip().upper()
+
+    # Mã tòa: nếu người dùng không truyền thì lấy chính tên tòa vừa nhập (ví dụ: A7, B2)
+    ma_toa = building_in.ma_toa.strip().upper() if building_in.ma_toa else base_code
+
+    # Phân loại giới tính tòa: Nam, Nữ, Nam & Nữ
+    gioi_tinh = building_in.gioi_tinh or "Nam & Nữ"
+
+    # Số tầng của tòa nhà (mặc định 5 tầng nếu không nhập hoặc không hợp lệ)
+    so_tang = getattr(building_in, 'so_tang', 5) or 5
+    if so_tang <= 0:
+        so_tang = 5
+
+    # Kiểm tra mã tòa đã tồn tại chưa
+    existing_code = db.query(ToaNha).filter(ToaNha.ma_toa == ma_toa).first()
+    if existing_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Mã tòa nhà '{ma_toa}' đã tồn tại.",
+        )
+
     # Kiểm tra tên tòa nhà đã tồn tại chưa
-    existing = db.query(ToaNha).filter(ToaNha.ten_toa == building_in.ten_toa).first()
+    existing = db.query(ToaNha).filter(ToaNha.ten_toa == ten_toa).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Tên tòa nhà '{building_in.ten_toa}' đã tồn tại.",
+            detail=f"Tên tòa nhà '{ten_toa}' đã tồn tại.",
         )
 
-    # Sinh mã tòa nếu chưa có
-    ma_toa = building_in.ma_toa
-    if not ma_toa:
-        cleaned_name = "".join(c for c in building_in.ten_toa if c.isalnum() or c == "_").upper()
-        ma_toa = f"TOA_{cleaned_name}"[:10]
-
-    # Đảm bảo mã tòa là duy nhất
-    if db.query(ToaNha).filter(ToaNha.ma_toa == ma_toa).first():
-        ma_toa = f"T_{uuid.uuid4().hex[:8].upper()}"
-
-    building = ToaNha(ma_toa=ma_toa, ten_toa=building_in.ten_toa)
+    building = ToaNha(ma_toa=ma_toa, ten_toa=ten_toa, gioi_tinh=gioi_tinh, so_tang=so_tang)
     db.add(building)
     db.commit()
     db.refresh(building)
@@ -112,6 +131,14 @@ def create_floor(db: Session, floor_in: TangCreate) -> Tang:
             detail=f"Không tìm thấy tòa nhà có mã '{floor_in.ma_toa}'.",
         )
 
+    # Kiểm tra số tầng có vượt quá tổng số tầng của tòa nhà không
+    max_floors = building.so_tang or 5
+    if floor_in.so_tang > max_floors:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Tòa nhà '{building.ten_toa}' chỉ có tối đa {max_floors} tầng. Không thể thêm tầng {floor_in.so_tang}.",
+        )
+
     # Kiểm tra tầng đã tồn tại trong tòa này chưa
     existing = (
         db.query(Tang)
@@ -181,6 +208,7 @@ def create_room(db: Session, room_in: PhongCreate) -> Phong:
         so_phong=room_in.so_phong,
         suc_chua=room_in.suc_chua,
         loai_phong=room_in.loai_phong,
+        gia_tien_nam=room_in.gia_tien_nam,
         hinh_anh=room_in.hinh_anh,
         ma_tang=room_in.ma_tang,
     )
@@ -346,6 +374,7 @@ def get_available_beds(
                     so_phong=room.so_phong,
                     loai_phong=room.loai_phong,
                     suc_chua=room.suc_chua,
+                    gia_tien_nam=room.gia_tien_nam,
                     hinh_anh=room.hinh_anh,
                     ma_tang=room.ma_tang,
                     so_tang=room.tang.so_tang if room.tang else None,
