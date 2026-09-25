@@ -95,6 +95,16 @@ export const dormService = {
     return res.data;
   },
 
+  getBuildingDetail: async (ma_toa) => {
+    const res = await api.get(`/rooms/buildings/${ma_toa}`);
+    return res.data;
+  },
+
+  updateBuilding: async (ma_toa, data) => {
+    const res = await api.put(`/rooms/buildings/${ma_toa}`, data);
+    return res.data;
+  },
+
   deleteBuilding: async (ma_toa) => {
     const res = await api.delete(`/rooms/buildings/${ma_toa}`);
     return res.data;

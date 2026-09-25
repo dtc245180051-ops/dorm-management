@@ -13,6 +13,7 @@ import { dormService } from '../../services/api';
 import AddRoomModal from '../../components/room/AddRoomModal';
 import RoomDetailModal from '../../components/room/RoomDetailModal';
 import RoomDetailPage from './RoomDetailPage';
+import BuildingDetailPage from '../../components/room/BuildingDetailPage';
 
 export default function RoomManagement({ searchTerm = '' }) {
   // States
@@ -24,6 +25,9 @@ export default function RoomManagement({ searchTerm = '' }) {
 
   // Xem trang chi tiết phòng (theo mẫu mockup iDORM)
   const [viewingRoomDetail, setViewingRoomDetail] = useState(null);
+
+  // Xem trang chi tiết tòa nhà (Tích hợp xem từng tầng, sửa, xóa tòa)
+  const [viewingBuildingDetail, setViewingBuildingDetail] = useState(null);
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -131,6 +135,47 @@ export default function RoomManagement({ searchTerm = '' }) {
       return true;
     });
   }, [currentBuildingRooms, searchTerm, activeRoomFilter, filterMode]);
+
+  // Tòa nhà đang chọn hiện tại
+  const currentActiveBuildingData = useMemo(() => {
+    return (
+      buildings.find((b) => b.ma_toa === activeBuilding) ||
+      displayedBuildings.find((b) => b.ma_toa === activeBuilding) ||
+      null
+    );
+  }, [buildings, displayedBuildings, activeBuilding]);
+
+  // Nếu đang xem chi tiết tòa nhà (Tích hợp xem từng tầng, sửa, xóa tòa)
+  if (viewingBuildingDetail) {
+    return (
+      <BuildingDetailPage
+        building={viewingBuildingDetail}
+        buildingId={viewingBuildingDetail?.ma_toa}
+        onBack={() => {
+          setViewingBuildingDetail(null);
+          fetchData();
+        }}
+        onBuildingUpdated={(updatedBuilding) => {
+          setViewingBuildingDetail(updatedBuilding);
+          fetchData();
+          showToast(`Cập nhật thông tin tòa ${updatedBuilding.ten_toa} thành công`);
+        }}
+        onBuildingDeleted={(deletedBuildingId) => {
+          setViewingBuildingDetail(null);
+          fetchData();
+          setActiveBuilding('');
+          showToast(`Đã xóa tòa nhà thành công`);
+        }}
+        onOpenAddRoom={(buildingId, floorNum) => {
+          setIsAddModalOpen(true);
+        }}
+        onSelectRoom={(roomData) => {
+          setViewingBuildingDetail(null);
+          setViewingRoomDetail(roomData);
+        }}
+      />
+    );
+  }
 
   // Nếu đang xem chi tiết phòng (theo mẫu mockup iDORM)
   if (viewingRoomDetail) {
@@ -254,58 +299,73 @@ export default function RoomManagement({ searchTerm = '' }) {
         </div>
       </div>
 
-      {/* Row 1: Building Pills (Tòa A1, Tòa A2...) */}
-      <div className="flex items-center gap-3 overflow-x-auto pb-3 mb-3 scrollbar-none">
-        {displayedBuildings.map((building) => {
-          const isActive = activeBuilding === building.ma_toa;
-          const rawName = building.ten_toa || building.ma_toa;
-          const displayName = rawName.startsWith('Tòa ') ? rawName : `Tòa ${rawName}`;
-          const isFemale =
-            (building.gioi_tinh || '').toLowerCase().includes('nữ') ||
-            (building.gioi_tinh || '').toLowerCase().includes('nu');
-          const isMale =
-            (building.gioi_tinh || '').toLowerCase().includes('nam') && !isFemale;
+      {/* Row 1: Building Pills (Tòa A1, Tòa A2...) + Nút Chi tiết Tòa */}
+      <div className="flex items-center justify-between gap-3 pb-3 mb-3">
+        <div className="flex items-center gap-3 overflow-x-auto scrollbar-none flex-1">
+          {displayedBuildings.map((building) => {
+            const isActive = activeBuilding === building.ma_toa;
+            const rawName = building.ten_toa || building.ma_toa;
+            const displayName = rawName.startsWith('Tòa ') ? rawName : `Tòa ${rawName}`;
+            const isFemale =
+              (building.gioi_tinh || '').toLowerCase().includes('nữ') ||
+              (building.gioi_tinh || '').toLowerCase().includes('nu');
+            const isMale =
+              (building.gioi_tinh || '').toLowerCase().includes('nam') && !isFemale;
 
-          return (
-            <button
-              key={building.ma_toa}
-              type="button"
-              onClick={() => {
-                setActiveBuilding(building.ma_toa);
-                setActiveRoomFilter('all');
-              }}
-              className={`px-5 py-2 rounded-full text-sm transition-all duration-150 whitespace-nowrap cursor-pointer shadow-2xs flex items-center gap-2 ${
-                isActive
-                  ? 'bg-sky-200 text-sky-900 font-bold border border-sky-300'
-                  : 'bg-white text-slate-700 hover:bg-slate-100 font-medium border border-slate-300'
-              }`}
-            >
-              <span>{displayName}</span>
-              {isMale && (
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
-                    isActive
-                      ? 'bg-blue-100/90 text-blue-900'
-                      : 'bg-blue-50 text-blue-700 border border-blue-200/60'
-                  }`}
-                >
-                  Nam
-                </span>
-              )}
-              {isFemale && (
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
-                    isActive
-                      ? 'bg-rose-100/90 text-rose-900'
-                      : 'bg-rose-50 text-rose-700 border border-rose-200/60'
-                  }`}
-                >
-                  Nữ
-                </span>
-              )}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={building.ma_toa}
+                type="button"
+                onClick={() => {
+                  setActiveBuilding(building.ma_toa);
+                  setActiveRoomFilter('all');
+                }}
+                className={`px-5 py-2 rounded-full text-sm transition-all duration-150 whitespace-nowrap cursor-pointer shadow-2xs flex items-center gap-2 ${
+                  isActive
+                    ? 'bg-sky-200 text-sky-900 font-bold border border-sky-300'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 font-medium border border-slate-300'
+                }`}
+              >
+                <span>{displayName}</span>
+                {isMale && (
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
+                      isActive
+                        ? 'bg-blue-100/90 text-blue-900'
+                        : 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                    }`}
+                  >
+                    Nam
+                  </span>
+                )}
+                {isFemale && (
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
+                      isActive
+                        ? 'bg-rose-100/90 text-rose-900'
+                        : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                    }`}
+                  >
+                    Nữ
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Nút Chi tiết Tòa đang chọn */}
+        {currentActiveBuildingData && (
+          <button
+            type="button"
+            onClick={() => setViewingBuildingDetail(currentActiveBuildingData)}
+            className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 hover:text-blue-600 border border-slate-300 hover:border-blue-400 rounded-full text-xs font-bold transition shadow-2xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+            title={`Xem chi tiết tất cả các tầng, chỉnh sửa hoặc xóa ${currentActiveBuildingData.ten_toa || activeBuilding}`}
+          >
+            <Building2 className="w-4 h-4 text-blue-600" />
+            <span>Chi tiết {currentActiveBuildingData.ten_toa || `Tòa ${activeBuilding}`}</span>
+          </button>
+        )}
       </div>
 
       {/* Row 2: Room Pills (Phòng 101, Phòng 102...) */}
@@ -580,8 +640,8 @@ export default function RoomManagement({ searchTerm = '' }) {
         onClose={() => setIsAddModalOpen(false)}
         buildings={displayedBuildings}
         activeBuildingId={activeBuilding}
-        onRoomAdded={(newBuildingId) => {
-          fetchData();
+        onRoomAdded={async (newBuildingId) => {
+          await fetchData();
           if (newBuildingId) {
             setActiveBuilding(newBuildingId);
           }

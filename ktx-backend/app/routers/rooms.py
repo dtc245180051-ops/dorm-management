@@ -20,6 +20,7 @@ from app.schemas.dorm import (
     TangCreate,
     TangResponse,
     ToaNhaCreate,
+    ToaNhaUpdate,
     ToaNhaResponse,
 )
 from app.services import dorm_service
@@ -104,6 +105,20 @@ def get_building_by_id(
     db: Session = Depends(get_db),
 ):
     return dorm_service.get_building_by_id(db, ma_toa)
+
+
+@router.put(
+    "/buildings/{ma_toa}",
+    response_model=ToaNhaResponse,
+    summary="Cập nhật tòa nhà (Chỉ Quản Lý)",
+    dependencies=[Depends(RoleChecker(["QuanLy"]))],
+)
+def update_building(
+    ma_toa: str,
+    building_in: ToaNhaUpdate,
+    db: Session = Depends(get_db),
+):
+    return dorm_service.update_building(db, ma_toa, building_in)
 
 
 @router.delete(

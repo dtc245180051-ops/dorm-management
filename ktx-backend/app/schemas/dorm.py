@@ -116,6 +116,12 @@ class ToaNhaCreate(ToaNhaBase):
     ma_toa: Optional[str] = Field(default=None, max_length=20, description="Mã tòa nhà tùy chọn")
 
 
+class ToaNhaUpdate(BaseModel):
+    ten_toa: Optional[str] = Field(default=None, min_length=1, max_length=50, description="Tên tòa nhà mới")
+    gioi_tinh: Optional[str] = Field(default=None, max_length=20, description="Phân loại giới tính (Nam, Nữ, Nam & Nữ)")
+    so_tang: Optional[int] = Field(default=None, ge=1, le=50, description="Tổng số tầng của tòa")
+
+
 class ToaNhaResponse(BaseModel):
     ma_toa: str
     ten_toa: str

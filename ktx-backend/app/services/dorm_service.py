@@ -14,6 +14,7 @@ from app.schemas.dorm import (
     RoomAvailableResponse,
     TangCreate,
     ToaNhaCreate,
+    ToaNhaUpdate,
 )
 
 
@@ -61,9 +62,15 @@ def create_building(db: Session, building_in: ToaNhaCreate) -> ToaNha:
 
     building = ToaNha(ma_toa=ma_toa, ten_toa=ten_toa, gioi_tinh=gioi_tinh, so_tang=so_tang)
     db.add(building)
+    db.flush()
+
+    # Tự động tạo các tầng tương ứng cho tòa nhà mới
+    for floor_num in range(1, so_tang + 1):
+        ma_tang = f"{ma_toa}_T{floor_num}"
+        db.add(Tang(ma_tang=ma_tang, so_tang=floor_num, ma_toa=ma_toa))
+
     db.commit()
-    db.refresh(building)
-    return building
+    return get_building_by_id(db, ma_toa)
 
 
 def get_buildings(db: Session) -> List[ToaNha]:
@@ -93,6 +100,55 @@ def get_building_by_id(db: Session, ma_toa: str) -> ToaNha:
             detail=f"Không tìm thấy tòa nhà với mã '{ma_toa}'.",
         )
     return building
+
+
+def update_building(db: Session, ma_toa: str, building_in: ToaNhaUpdate) -> ToaNha:
+    """Cập nhật thông tin tòa nhà (tên tòa, giới tính, số tầng)."""
+    building = get_building_by_id(db, ma_toa)
+
+    if building_in.ten_toa is not None:
+        raw_name = building_in.ten_toa.strip()
+        if raw_name.lower().startswith("tòa "):
+            ten_toa = raw_name
+        else:
+            ten_toa = f"Tòa {raw_name}"
+
+        # Kiểm tra trùng tên tòa
+        existing = (
+            db.query(ToaNha)
+            .filter(ToaNha.ten_toa == ten_toa, ToaNha.ma_toa != ma_toa)
+            .first()
+        )
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Tên tòa nhà '{ten_toa}' đã được sử dụng.",
+            )
+        building.ten_toa = ten_toa
+
+    if building_in.gioi_tinh is not None:
+        building.gioi_tinh = building_in.gioi_tinh
+
+    if building_in.so_tang is not None:
+        if building_in.so_tang <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Số tầng của tòa nhà phải lớn hơn 0.",
+            )
+        # Ràng buộc: Số tầng mới không được nhỏ hơn số tầng cao nhất đang có phòng trong tòa
+        max_existing_floor = 0
+        for tang in building.tangs:
+            if tang.phongs and tang.so_tang > max_existing_floor:
+                max_existing_floor = tang.so_tang
+        if building_in.so_tang < max_existing_floor:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Không thể giảm số tầng xuống {building_in.so_tang} vì tòa nhà đang có phòng ở tầng {max_existing_floor}.",
+            )
+        building.so_tang = building_in.so_tang
+
+    db.commit()
+    return get_building_by_id(db, building.ma_toa)
 
 
 def delete_building(db: Session, ma_toa: str) -> None:

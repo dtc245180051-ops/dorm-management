@@ -30,11 +30,12 @@ export default function AddRoomModal({
   onClose,
   buildings = [],
   activeBuildingId = 'A1',
+  initialFloor = 1,
   onRoomAdded,
 }) {
-  const getInitialFormData = (buildingId) => ({
+  const getInitialFormData = (buildingId, floor) => ({
     ma_toa: buildingId || (buildings[0]?.ma_toa || 'A1'),
-    so_tang: 1,
+    so_tang: floor || 1,
     so_phong: '',
     suc_chua: 4,
     loai_phong: 'Phòng tiêu chuẩn',
@@ -42,7 +43,7 @@ export default function AddRoomModal({
     hinh_anh: '',
   });
 
-  const [formData, setFormData] = useState(() => getInitialFormData(activeBuildingId));
+  const [formData, setFormData] = useState(() => getInitialFormData(activeBuildingId, initialFloor));
 
   // State thêm tòa nhà mới: nhập tên tòa, chọn nam/nữ và số tầng
   const [isAddingNewBuilding, setIsAddingNewBuilding] = useState(false);
@@ -64,7 +65,7 @@ export default function AddRoomModal({
 
   // Hàm reset form về trạng thái ban đầu sạch sẽ
   const resetForm = () => {
-    setFormData(getInitialFormData(activeBuildingId));
+    setFormData(getInitialFormData(activeBuildingId, initialFloor));
     setIsAddingNewBuilding(false);
     setNewBuilding({ ten_toa: '', gioi_tinh: 'Nam', so_tang: 5 });
     setImageFile(null);
@@ -82,7 +83,7 @@ export default function AddRoomModal({
     if (isOpen) {
       resetForm();
     }
-  }, [isOpen, activeBuildingId]);
+  }, [isOpen, activeBuildingId, initialFloor]);
 
   if (!isOpen) return null;
 
@@ -310,7 +311,9 @@ export default function AddRoomModal({
       // Tự động reset form sạch sẽ sau khi thêm phòng thành công
       resetForm();
 
-      if (onRoomAdded) onRoomAdded(targetBuildingId);
+      if (onRoomAdded) {
+        await onRoomAdded(targetBuildingId);
+      }
       onClose();
     } catch (err) {
       console.error('Error adding room:', err);
