@@ -233,10 +233,17 @@ def create_room(db: Session, room_in: PhongCreate) -> Phong:
 
 
 def get_room_by_id(db: Session, ma_phong: str) -> Phong:
-    """Lấy chi tiết phòng và danh sách giường."""
+    """Lấy chi tiết phòng và danh sách giường kèm thông tin sinh viên và tòa nhà."""
+    from app.models.user import SinhVien
     room = (
         db.query(Phong)
-        .options(joinedload(Phong.giuongs))
+        .options(
+            joinedload(Phong.tang).joinedload(Tang.toa_nha),
+            joinedload(Phong.giuongs)
+            .joinedload(Giuong.hop_dongs)
+            .joinedload(HopDong.sinh_vien)
+            .joinedload(SinhVien.nguoi_dung),
+        )
         .filter(Phong.ma_phong == ma_phong)
         .first()
     )
@@ -245,6 +252,12 @@ def get_room_by_id(db: Session, ma_phong: str) -> Phong:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Không tìm thấy phòng với mã '{ma_phong}'.",
         )
+
+    # Đếm số giường trống và đã ở
+    so_trong = sum(1 for g in room.giuongs if g.trang_thai == "TRONG")
+    room.so_giuong_trong = so_trong
+    room.so_giuong_da_o = len(room.giuongs) - so_trong
+
     return room
 
 
@@ -296,6 +309,17 @@ def update_room(db: Session, ma_phong: str, room_in: PhongUpdate) -> Phong:
     if room_in.suc_chua is not None:
         target_capacity = room_in.suc_chua
         current_beds = list(room.giuongs or [])
+        # Đếm số người ở hiện tại (giường không TRONG hoặc có hợp đồng ACTIVE)
+        occupied_beds = [
+            g for g in current_beds
+            if g.trang_thai != "TRONG" or any(h.trang_thai == "ACTIVE" for h in (g.hop_dongs or []))
+        ]
+        if target_capacity < len(occupied_beds):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Không thể giảm số giường về {target_capacity} vì phòng hiện đang có {len(occupied_beds)} người đang ở.",
+            )
+
         if len(current_beds) < target_capacity:
             for i in range(len(current_beds) + 1, target_capacity + 1):
                 suffix = f"_G{i:02d}"
@@ -308,6 +332,15 @@ def update_room(db: Session, ma_phong: str, room_in: PhongUpdate) -> Phong:
                         ma_phong=room.ma_phong,
                     )
                     db.add(bed)
+        elif len(current_beds) > target_capacity:
+            # Thu hồi bớt các giường trống ở cuối danh sách
+            beds_to_remove = len(current_beds) - target_capacity
+            empty_beds = [
+                g for g in reversed(current_beds)
+                if g.trang_thai == "TRONG" and not any(h.trang_thai == "ACTIVE" for h in (g.hop_dongs or []))
+            ]
+            for bed in empty_beds[:beds_to_remove]:
+                db.delete(bed)
 
     db.commit()
     db.refresh(room)
@@ -317,21 +350,27 @@ def update_room(db: Session, ma_phong: str, room_in: PhongUpdate) -> Phong:
 def delete_room(db: Session, ma_phong: str) -> None:
     """
     Xóa phòng và các giường thuộc phòng.
-    Ràng buộc: Không được phép xóa nếu đang có hợp đồng ACTIVE.
+    Ràng buộc: Không được phép xóa nếu phòng vẫn có người ở hoặc đang có hợp đồng ACTIVE.
     """
     room = get_room_by_id(db, ma_phong)
 
-    # Kiểm tra xem có giường nào đang gắn với hợp đồng ACTIVE không
+    # 1. Kiểm tra xem có giường nào đang có người ở (trạng thái != 'TRONG')
+    occupied_bed = (
+        db.query(Giuong)
+        .filter(Giuong.ma_phong == ma_phong, Giuong.trang_thai != "TRONG")
+        .first()
+    )
+    # 2. Kiểm tra xem có hợp đồng nào đang ACTIVE trên các giường của phòng
     active_contract = (
         db.query(HopDong)
-        .join(Giuong)
+        .join(Giuong, HopDong.ma_giuong == Giuong.ma_giuong)
         .filter(Giuong.ma_phong == ma_phong, HopDong.trang_thai == "ACTIVE")
         .first()
     )
-    if active_contract:
+    if occupied_bed or active_contract:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Không thể xóa phòng '{room.so_phong}' vì đang có hợp đồng thuê hoạt động.",
+            detail=f"Không thể xóa phòng '{room.so_phong}' vì hiện tại phòng vẫn đang có người ở hoặc hợp đồng hiệu lực.",
         )
 
     db.delete(room)

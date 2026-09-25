@@ -4,7 +4,7 @@ import { Search, Bell, User } from 'lucide-react';
 export default function Header({
   searchTerm = '',
   onSearchChange,
-  userName = 'QL_Minh',
+  userName = 'QL',
 }) {
   return (
     <header className="bg-[#f4f5f7] rounded-2xl border border-slate-200/60 px-8 py-3 flex items-center justify-between gap-6 shrink-0">

@@ -22,6 +22,7 @@ class GiuongResponse(BaseModel):
     ma_giuong: str
     ma_phong: str
     trang_thai: str
+    sinh_vien: Optional[dict] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -57,8 +58,13 @@ class PhongResponse(BaseModel):
     gia_tien_nam: Optional[float] = None
     hinh_anh: Optional[str] = None
     ma_tang: str
+    so_tang: Optional[int] = None
+    ma_toa: Optional[str] = None
+    ten_toa: Optional[str] = None
+    gioi_tinh: Optional[str] = None
     giuongs: List[GiuongResponse] = []
     so_giuong_trong: Optional[int] = None
+    so_giuong_da_o: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 

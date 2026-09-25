@@ -12,6 +12,7 @@ import {
 import { dormService } from '../../services/api';
 import AddRoomModal from './AddRoomModal';
 import RoomDetailModal from './RoomDetailModal';
+import RoomDetailPage from './RoomDetailPage';
 
 export default function RoomManagement({ searchTerm = '' }) {
   // States
@@ -20,6 +21,9 @@ export default function RoomManagement({ searchTerm = '' }) {
   const [activeRoomFilter, setActiveRoomFilter] = useState('all');
   const [filterMode, setFilterMode] = useState('all');
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+
+  // Xem trang chi tiết phòng (theo mẫu mockup iDORM)
+  const [viewingRoomDetail, setViewingRoomDetail] = useState(null);
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -127,6 +131,29 @@ export default function RoomManagement({ searchTerm = '' }) {
       return true;
     });
   }, [currentBuildingRooms, searchTerm, activeRoomFilter, filterMode]);
+
+  // Nếu đang xem chi tiết phòng (theo mẫu mockup iDORM)
+  if (viewingRoomDetail) {
+    return (
+      <RoomDetailPage
+        room={viewingRoomDetail}
+        onBack={() => {
+          setViewingRoomDetail(null);
+          fetchData();
+        }}
+        onRoomDeleted={(deletedRoomId) => {
+          setViewingRoomDetail(null);
+          fetchData();
+          showToast(`Đã xóa phòng thành công`);
+        }}
+        onRoomUpdated={(updatedRoom) => {
+          setViewingRoomDetail(updatedRoom);
+          fetchData();
+          showToast(`Cập nhật thông tin phòng thành công`);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="flex-1 bg-[#f4f5f7] rounded-2xl border border-slate-200/60 p-7 min-h-0 relative overflow-y-auto flex flex-col">
@@ -386,7 +413,14 @@ export default function RoomManagement({ searchTerm = '' }) {
                 >
                   {/* Cột 1: Phòng (Số phòng) */}
                   <div className="col-span-1 font-bold text-slate-800 text-base">
-                    {room.so_phong}
+                    <button
+                      type="button"
+                      onClick={() => setViewingRoomDetail(room)}
+                      className="hover:text-blue-600 transition cursor-pointer text-left font-bold"
+                      title="Nhấp để xem chi tiết phòng"
+                    >
+                      {room.so_phong}
+                    </button>
                   </div>
 
                   {/* Cột 2: Hình ảnh (Bên phải của cột phòng) */}
@@ -456,11 +490,8 @@ export default function RoomManagement({ searchTerm = '' }) {
                       return (
                         <div
                           key={bed.ma_giuong || idx}
-                          title={`Giường ${idx + 1}: ${isFree ? 'Còn trống' : 'Đã có người ở'}`}
-                          onClick={() => {
-                            setSelectedRoom(room);
-                            setIsDetailModalOpen(true);
-                          }}
+                          title={`Giường ${idx + 1}: ${isFree ? 'Còn trống' : 'Đã có người ở'} - Nhấp xem chi tiết phòng`}
+                          onClick={() => setViewingRoomDetail(room)}
                           className={`w-7 h-7 lg:w-8 lg:h-8 rounded-lg cursor-pointer transition-all duration-150 transform hover:scale-110 shadow-2xs ${
                             isFree
                               ? 'bg-[#79d78e] hover:bg-[#68c87e]' // Green
@@ -475,10 +506,7 @@ export default function RoomManagement({ searchTerm = '' }) {
                   <div className="col-span-1 text-right">
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedRoom(room);
-                        setIsDetailModalOpen(true);
-                      }}
+                      onClick={() => setViewingRoomDetail(room)}
                       className="text-sky-600 underline font-semibold hover:text-sky-800 text-xs transition cursor-pointer whitespace-nowrap"
                     >
                       xem chi tiết

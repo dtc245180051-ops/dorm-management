@@ -127,6 +127,22 @@ class Phong(Base):
         cascade="all, delete-orphan",
     )
 
+    @property
+    def so_tang(self) -> Optional[int]:
+        return self.tang.so_tang if self.tang else None
+
+    @property
+    def ma_toa(self) -> Optional[str]:
+        return self.tang.ma_toa if self.tang else None
+
+    @property
+    def ten_toa(self) -> Optional[str]:
+        return self.tang.toa_nha.ten_toa if self.tang and self.tang.toa_nha else None
+
+    @property
+    def gioi_tinh(self) -> Optional[str]:
+        return self.tang.toa_nha.gioi_tinh if self.tang and self.tang.toa_nha else "Nam & Nữ"
+
     def __repr__(self) -> str:
         return f"<Phong(ma_phong='{self.ma_phong}', so_phong='{self.so_phong}', suc_chua={self.suc_chua})>"
 
@@ -163,6 +179,22 @@ class Giuong(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
+    @property
+    def sinh_vien(self) -> Optional[dict]:
+        if not self.hop_dongs:
+            return None
+        active_contract = next((hd for hd in self.hop_dongs if hd.trang_thai == "ACTIVE"), None)
+        if active_contract and active_contract.sinh_vien:
+            sv = active_contract.sinh_vien
+            user_name = sv.nguoi_dung.ho_ten if sv.nguoi_dung else sv.msv
+            return {
+                "msv": sv.msv,
+                "ho_ten": user_name,
+                "ma_hop_dong": active_contract.ma_hop_dong,
+                "lop": sv.lop,
+            }
+        return None
 
     def __repr__(self) -> str:
         return f"<Giuong(ma_giuong='{self.ma_giuong}', trang_thai='{self.trang_thai}', ma_phong='{self.ma_phong}')>"
