@@ -1,6 +1,10 @@
+import os
+import shutil
+import uuid
+from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -16,11 +20,49 @@ from app.schemas.dorm import (
     TangCreate,
     TangResponse,
     ToaNhaCreate,
+    ToaNhaUpdate,
     ToaNhaResponse,
 )
 from app.services import dorm_service
 
 router = APIRouter(prefix="/rooms", tags=["Quản lý Cơ sở vật chất & Phòng"])
+
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+
+
+# ==============================================================================
+# TẢI LÊN HÌNH ẢNH PHÒNG
+# ==============================================================================
+@router.post(
+    "/upload-image",
+    summary="Tải lên hình ảnh phòng từ máy tính (Chỉ Quản Lý)",
+    dependencies=[Depends(RoleChecker(["QuanLy"]))],
+)
+async def upload_room_image(file: UploadFile = File(...)):
+    """Tải lên tệp ảnh từ máy tính, lưu vào thư mục tĩnh và trả về URL ảnh."""
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Định dạng tệp '{ext}' không được hỗ trợ. Vui lòng tải lên ảnh có đuôi JPG, PNG, WEBP hoặc GIF.",
+        )
+
+    unique_filename = f"room_{uuid.uuid4().hex[:12]}{ext}"
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    upload_folder = os.path.join(base_dir, "uploads", "rooms")
+    os.makedirs(upload_folder, exist_ok=True)
+    file_path = os.path.join(upload_folder, unique_filename)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    return {
+        "status": "success",
+        "url": f"http://localhost:8000/uploads/rooms/{unique_filename}",
+        "relative_url": f"/uploads/rooms/{unique_filename}",
+        "filename": unique_filename,
+    }
+
 
 
 # ==============================================================================
@@ -63,6 +105,20 @@ def get_building_by_id(
     db: Session = Depends(get_db),
 ):
     return dorm_service.get_building_by_id(db, ma_toa)
+
+
+@router.put(
+    "/buildings/{ma_toa}",
+    response_model=ToaNhaResponse,
+    summary="Cập nhật tòa nhà (Chỉ Quản Lý)",
+    dependencies=[Depends(RoleChecker(["QuanLy"]))],
+)
+def update_building(
+    ma_toa: str,
+    building_in: ToaNhaUpdate,
+    db: Session = Depends(get_db),
+):
+    return dorm_service.update_building(db, ma_toa, building_in)
 
 
 @router.delete(
