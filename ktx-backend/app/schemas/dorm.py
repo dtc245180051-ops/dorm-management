@@ -30,7 +30,8 @@ class GiuongResponse(BaseModel):
 class PhongBase(BaseModel):
     so_phong: str = Field(..., max_length=20, description="Số phòng (ví dụ: 101, 102)")
     suc_chua: int = Field(default=4, ge=1, le=16, description="Sức chứa (số lượng giường)")
-    loai_phong: str = Field(..., max_length=50, description="Loại phòng (ví dụ: Nam, Nu, TieuChuan)")
+    loai_phong: str = Field(..., max_length=50, description="Loại phòng (ví dụ: Phòng tiêu chuẩn, Phòng dịch vụ)")
+    hinh_anh: Optional[str] = Field(default=None, max_length=255, description="Hình ảnh phòng")
     ma_tang: str = Field(..., max_length=20, description="Mã tầng trực thuộc")
 
 
@@ -42,6 +43,7 @@ class PhongUpdate(BaseModel):
     so_phong: Optional[str] = Field(default=None, max_length=20)
     suc_chua: Optional[int] = Field(default=None, ge=1, le=16)
     loai_phong: Optional[str] = Field(default=None, max_length=50)
+    hinh_anh: Optional[str] = Field(default=None, max_length=255)
     ma_tang: Optional[str] = Field(default=None, max_length=20)
 
 
@@ -50,6 +52,7 @@ class PhongResponse(BaseModel):
     so_phong: str
     suc_chua: int
     loai_phong: str
+    hinh_anh: Optional[str] = None
     ma_tang: str
     giuongs: List[GiuongResponse] = []
     so_giuong_trong: Optional[int] = None
@@ -62,6 +65,7 @@ class RoomAvailableResponse(BaseModel):
     so_phong: str
     loai_phong: str
     suc_chua: int
+    hinh_anh: Optional[str] = None
     ma_tang: str
     so_tang: Optional[int] = None
     ma_toa: Optional[str] = None

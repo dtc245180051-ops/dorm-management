@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -88,6 +88,10 @@ class Phong(Base):
     loai_phong: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
+    )
+    hinh_anh: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
     )
     ma_tang: Mapped[str] = mapped_column(
         String(20),

@@ -181,6 +181,7 @@ def create_room(db: Session, room_in: PhongCreate) -> Phong:
         so_phong=room_in.so_phong,
         suc_chua=room_in.suc_chua,
         loai_phong=room_in.loai_phong,
+        hinh_anh=room_in.hinh_anh,
         ma_tang=room_in.ma_tang,
     )
     db.add(room)
@@ -263,6 +264,23 @@ def update_room(db: Session, ma_phong: str, room_in: PhongUpdate) -> Phong:
     for field, val in update_data.items():
         setattr(room, field, val)
 
+    # Đồng bộ số lượng giường nếu sức chứa thay đổi
+    if room_in.suc_chua is not None:
+        target_capacity = room_in.suc_chua
+        current_beds = list(room.giuongs or [])
+        if len(current_beds) < target_capacity:
+            for i in range(len(current_beds) + 1, target_capacity + 1):
+                suffix = f"_G{i:02d}"
+                prefix_len = 20 - len(suffix)
+                ma_giuong = f"{room.ma_phong[:prefix_len]}{suffix}"
+                if not any(g.ma_giuong == ma_giuong for g in current_beds):
+                    bed = Giuong(
+                        ma_giuong=ma_giuong,
+                        trang_thai="TRONG",
+                        ma_phong=room.ma_phong,
+                    )
+                    db.add(bed)
+
     db.commit()
     db.refresh(room)
     return room
@@ -328,6 +346,7 @@ def get_available_beds(
                     so_phong=room.so_phong,
                     loai_phong=room.loai_phong,
                     suc_chua=room.suc_chua,
+                    hinh_anh=room.hinh_anh,
                     ma_tang=room.ma_tang,
                     so_tang=room.tang.so_tang if room.tang else None,
                     ma_toa=room.tang.ma_toa if room.tang else None,
