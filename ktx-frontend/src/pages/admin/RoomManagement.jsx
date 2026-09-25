@@ -10,8 +10,8 @@ import {
   X,
 } from 'lucide-react';
 import { dormService } from '../../services/api';
-import AddRoomModal from './AddRoomModal';
-import RoomDetailModal from './RoomDetailModal';
+import AddRoomModal from '../../components/room/AddRoomModal';
+import RoomDetailModal from '../../components/room/RoomDetailModal';
 import RoomDetailPage from './RoomDetailPage';
 
 export default function RoomManagement({ searchTerm = '' }) {

@@ -9,6 +9,7 @@ from app.core.database import Base, engine
 from app.routers.auth import router as auth_router
 from app.routers.rooms import router as rooms_router
 from app.routers.students import router as students_router
+from app.routers.contracts import router as contracts_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -46,6 +47,7 @@ except Exception as e:
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(rooms_router, prefix=settings.API_V1_STR)
 app.include_router(students_router, prefix=settings.API_V1_STR)
+app.include_router(contracts_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/", tags=["Health Check"])

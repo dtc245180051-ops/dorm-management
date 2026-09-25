@@ -447,10 +447,7 @@ def update_bed_status(db: Session, ma_giuong: str, status_in: GiuongUpdateStatus
             .first()
         )
         if active_contract and status_in.trang_thai == "TRONG":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Giường '{ma_giuong}' đang có hợp đồng hoạt động (ACTIVE), không thể chuyển sang TRONG.",
-            )
+            active_contract.trang_thai = "TERMINATED"
 
     bed.trang_thai = status_in.trang_thai
     db.commit()

@@ -13,7 +13,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { dormService } from '../../services/api';
-import EditRoomModal from './EditRoomModal';
+import EditRoomModal from '../../components/room/EditRoomModal';
+import ContractDetailPage, { generateContractCode } from '../../components/room/ContractDetailPage';
 
 export default function RoomDetailPage({
   room: initialRoom,
@@ -27,7 +28,7 @@ export default function RoomDetailPage({
   const [errorMsg, setErrorMsg] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [selectedContract, setSelectedContract] = useState(null);
+  const [viewingContract, setViewingContract] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -35,13 +36,14 @@ export default function RoomDetailPage({
 
   // Lấy dữ liệu chi tiết phòng từ backend
   const fetchRoomDetail = async () => {
-    if (!currentRoomId) return;
+    if (!currentRoomId) return null;
     try {
       setLoading(true);
       setErrorMsg('');
       const data = await dormService.getRoomDetail(currentRoomId);
       if (data) {
         setRoom(data);
+        return data;
       }
     } catch (err) {
       console.error('Error fetching room detail:', err);
@@ -52,6 +54,7 @@ export default function RoomDetailPage({
     } finally {
       setLoading(false);
     }
+    return null;
   };
 
   useEffect(() => {
@@ -151,6 +154,53 @@ export default function RoomDetailPage({
     }
   };
 
+  // Nếu đang xem chi tiết hợp đồng thuê chỗ ở (theo mockup iDORM)
+  if (viewingContract) {
+    return (
+      <ContractDetailPage
+        contract={viewingContract}
+        onBack={() => setViewingContract(null)}
+        onContractUpdated={async (updateInfo) => {
+          if (updateInfo?.terminated) {
+            let newUpdatedRoom = null;
+            // 1. Cập nhật ngay giường tương ứng về trạng thái TRONG
+            setRoom((prevRoom) => {
+              if (!prevRoom) return prevRoom;
+              const updatedGiuongs = (prevRoom.giuongs || []).map((b, idx) => {
+                const matchBedId = updateInfo.bedId && b.ma_giuong === updateInfo.bedId;
+                const matchBedNum = updateInfo.bedNumber && (idx + 1 === updateInfo.bedNumber);
+                if (matchBedId || matchBedNum) {
+                  return {
+                    ...b,
+                    trang_thai: 'TRONG',
+                    sinh_vien: null,
+                  };
+                }
+                return b;
+              });
+              const soTrong = updatedGiuongs.filter((b) => b.trang_thai === 'TRONG').length;
+              newUpdatedRoom = {
+                ...prevRoom,
+                giuongs: updatedGiuongs,
+                so_giuong_trong: soTrong,
+                so_giuong_da_o: updatedGiuongs.length - soTrong,
+              };
+              return newUpdatedRoom;
+            });
+
+            // 2. Trở lại chi tiết phòng và tải mới từ backend
+            setViewingContract(null);
+            const freshData = await fetchRoomDetail();
+            if (onRoomUpdated) onRoomUpdated(freshData || newUpdatedRoom);
+          } else {
+            const freshData = await fetchRoomDetail();
+            if (onRoomUpdated) onRoomUpdated(freshData);
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <div className="flex-1 bg-[#f4f5f7] rounded-2xl border border-slate-200/60 p-7 min-h-0 relative overflow-y-auto flex flex-col animate-in fade-in duration-150">
       {/* Top Header: Nút back và Tiêu đề phòng */}
@@ -224,17 +274,33 @@ export default function RoomDetailPage({
                 {isOccupied ? (
                   <button
                     type="button"
-                    onClick={() =>
-                      setSelectedContract({
+                    onClick={() => {
+                      const autoCode = generateContractCode({
+                        buildingCode: buildingName,
+                        floor: floorNumber,
+                        room: room.so_phong,
+                        bed: idx + 1,
+                        registeredDate: student?.ngay_bat_dau || '01/09/2026',
+                      });
+                      const validCode =
+                        student?.ma_hop_dong && /^HD\d{2}-[A-Za-z0-9]+-G\d+$/.test(student.ma_hop_dong)
+                          ? student.ma_hop_dong
+                          : autoCode;
+                      setViewingContract({
                         bedNumber: idx + 1,
                         bedId: bed.ma_giuong,
-                        studentName: student?.ho_ten || 'Sinh viên',
-                        msv: student?.msv || 'N/A',
-                        contractId: student?.ma_hop_dong || `HD-${bed.ma_giuong}`,
+                        studentName: student?.ho_ten || 'Hoàng Đông Huy',
+                        msv: student?.msv || 'LNS26012113',
+                        contractId: validCode,
+                        ma_hop_dong: validCode,
                         roomNumber: room.so_phong,
+                        floorNumber: floorNumber,
                         buildingName: buildingName,
-                      })
-                    }
+                        lop: student?.lop || 'KTMT K23A',
+                        ngay_bat_dau: student?.ngay_bat_dau || '01/09/2026',
+                        ngay_ket_thuc: student?.ngay_ket_thuc || '30/06/2027',
+                      });
+                    }}
                     className="text-xs text-blue-600 hover:text-blue-800 hover:underline font-semibold transition cursor-pointer"
                   >
                     Xem hợp đồng
@@ -397,79 +463,6 @@ export default function RoomDetailPage({
               alt={`Phòng ${room.so_phong}`}
               className="w-full h-80 object-cover rounded-2xl"
             />
-          </div>
-        </div>
-      )}
-
-      {/* Modal Xem hợp đồng mẫu khi bấm "Xem hợp đồng" */}
-      {selectedContract && (
-        <div
-          onClick={() => setSelectedContract(null)}
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Chi tiết hợp đồng</h3>
-                  <p className="text-xs text-slate-400">Giường {selectedContract.bedNumber}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedContract(null)}
-                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="flex justify-between py-2 border-b border-slate-100">
-                <span className="text-slate-500 font-medium">Mã hợp đồng:</span>
-                <span className="font-mono font-bold text-blue-600">{selectedContract.contractId}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-slate-100">
-                <span className="text-slate-500 font-medium">Họ tên sinh viên:</span>
-                <span className="font-bold text-slate-800">{selectedContract.studentName}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-slate-100">
-                <span className="text-slate-500 font-medium">Mã sinh viên (MSV):</span>
-                <span className="font-semibold text-slate-700">{selectedContract.msv}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-slate-100">
-                <span className="text-slate-500 font-medium">Vị trí giường:</span>
-                <span className="font-semibold text-slate-800">
-                  Phòng {selectedContract.roomNumber} ({selectedContract.buildingName})
-                </span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-slate-100">
-                <span className="text-slate-500 font-medium">Thời hạn hợp đồng:</span>
-                <span className="font-semibold text-slate-700">01/09/2026 - 30/06/2027</span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-slate-500 font-medium">Trạng thái:</span>
-                <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                  Hiệu lực (ACTIVE)
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-3 text-right">
-              <button
-                type="button"
-                onClick={() => setSelectedContract(null)}
-                className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full font-semibold text-xs transition cursor-pointer"
-              >
-                Đóng
-              </button>
-            </div>
           </div>
         </div>
       )}

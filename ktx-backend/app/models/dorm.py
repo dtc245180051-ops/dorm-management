@@ -193,6 +193,8 @@ class Giuong(Base):
                 "ho_ten": user_name,
                 "ma_hop_dong": active_contract.ma_hop_dong,
                 "lop": sv.lop,
+                "ngay_bat_dau": active_contract.ngay_bat_dau.strftime("%d/%m/%Y") if active_contract.ngay_bat_dau else "01/09/2026",
+                "ngay_ket_thuc": active_contract.ngay_ket_thuc.strftime("%d/%m/%Y") if active_contract.ngay_ket_thuc else "30/06/2027",
             }
         return None
 

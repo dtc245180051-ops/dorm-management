@@ -171,4 +171,22 @@ export const dormService = {
   },
 };
 
+// ----------------- CONTRACT SERVICES -----------------
+export const contractService = {
+  getContractDetail: async (ma_hop_dong) => {
+    const res = await api.get(`/contracts/${ma_hop_dong}`);
+    return res.data;
+  },
+
+  renewContract: async (ma_hop_dong, data) => {
+    const res = await api.post(`/contracts/${ma_hop_dong}/renew`, data);
+    return res.data;
+  },
+
+  terminateContract: async (ma_hop_dong, data = {}) => {
+    const res = await api.post(`/contracts/${ma_hop_dong}/terminate`, data);
+    return res.data;
+  },
+};
+
 export default api;
