@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -10,6 +10,7 @@ from app.schemas.student import (
     SinhVienCreate,
     SinhVienResponse,
     SinhVienUpdate,
+    StudentStatsResponse,
 )
 from app.services import student_service
 
@@ -32,23 +33,51 @@ def create_student(
     - Tạo TaiKhoan (vai trò SinhVien) với mật khẩu mặc định (hoặc tùy chọn).
     - Tạo NguoiDung.
     - Tạo SinhVien (ràng buộc MSV duy nhất).
+    - Tùy chọn chỉ định phòng & giường, tự động tạo hợp đồng và đánh dấu giường đã có người ở.
     """
     return student_service.create_student(db, student_in)
 
 
 @router.get(
+    "/stats",
+    response_model=StudentStatsResponse,
+    summary="Thống kê số lượng sinh viên theo trạng thái ở",
+    dependencies=[Depends(RoleChecker(["QuanLy", "KeToan"]))],
+)
+def get_student_stats(
+    db: Session = Depends(get_db),
+):
+    """Lấy số lượng tổng, đang ở và chưa xếp phòng để hiển thị trên các thẻ tab."""
+    return student_service.get_student_stats(db)
+
+
+@router.get(
     "/",
     response_model=List[SinhVienResponse],
-    summary="Danh sách sinh viên có phân trang & tìm kiếm (Quản Lý & Kế Toán)",
+    summary="Danh sách sinh viên có phân trang, bộ lọc & tìm kiếm (Quản Lý & Kế Toán)",
     dependencies=[Depends(RoleChecker(["QuanLy", "KeToan"]))],
 )
 def get_students(
+    response: Response,
     skip: int = Query(0, ge=0, description="Số lượng bản ghi bỏ qua"),
     limit: int = Query(50, ge=1, le=200, description="Số lượng bản ghi lấy tối đa"),
-    search: Optional[str] = Query(None, description="Từ khóa tìm kiếm theo MSV, tên, lớp, email"),
+    search: Optional[str] = Query(None, description="Từ khóa tìm kiếm theo MSV, tên, lớp, email, sđt"),
+    status: Optional[str] = Query("all", description="Trạng thái ở: all, dang_o, chua_xep"),
+    ma_toa: Optional[str] = Query(None, description="Mã tòa lọc sinh viên đang ở"),
+    so_phong: Optional[str] = Query(None, description="Số phòng lọc sinh viên đang ở"),
     db: Session = Depends(get_db),
 ):
-    return student_service.get_students(db, skip=skip, limit=limit, search_keyword=search)
+    students, total_count = student_service.get_students(
+        db,
+        skip=skip,
+        limit=limit,
+        search_keyword=search,
+        filter_status=status,
+        ma_toa=ma_toa,
+        so_phong=so_phong,
+    )
+    response.headers["X-Total-Count"] = str(total_count)
+    return students
 
 
 @router.get(
