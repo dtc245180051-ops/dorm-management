@@ -1,0 +1,410 @@
+/* ==========================================================================
+   CSS CHO TRANG SỔ CÔNG NỢ (DEBT LEDGER) - BÁM SÁT 100% SCREENSHOT FIGMA
+   ========================================================================== */
+
+.debt-container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 8px 12px 32px 12px;
+  font-family: inherit;
+  color: #1e293b;
+}
+
+/* ================= HEADER ================= */
+.debt-header {
+  margin-bottom: 24px;
+}
+
+.debt-page-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.debt-detail-header {
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.debt-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px 4px 0;
+  color: #0f172a;
+  transition: all 0.15s ease;
+}
+
+.debt-back-btn:hover {
+  opacity: 0.75;
+  transform: translateX(-2px);
+}
+
+.debt-back-btn svg {
+  color: #0f172a;
+  flex-shrink: 0;
+}
+
+/* ================= 3 THỐNG KÊ CARDS ================= */
+.debt-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.debt-stat-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.02);
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.debt-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.debt-stat-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 10px;
+}
+
+.debt-stat-value {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.debt-stat-value.text-blue {
+  color: #0284c7;
+}
+
+.debt-stat-value.text-green {
+  color: #16a34a;
+}
+
+.debt-stat-value.text-red {
+  color: #dc2626;
+}
+
+/* ================= SECTION & TITLE ================= */
+.debt-section-title {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.debt-card-section {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+}
+
+.debt-list-section {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+}
+
+/* ================= TABLE DESIGN ================= */
+.debt-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 8px;
+}
+
+.debt-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+/* Header Table có nền xanh nhạt theo đúng bản thiết kế */
+.debt-table thead tr {
+  background-color: #e0f2fe;
+}
+
+.debt-table thead th {
+  padding: 12px 16px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0369a1;
+  border: none;
+  white-space: nowrap;
+}
+
+.debt-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.15s ease;
+}
+
+.debt-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.debt-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.debt-table tbody td {
+  padding: 14px 16px;
+  color: #334155;
+  font-size: 13.5px;
+  vertical-align: middle;
+}
+
+.debt-table td.font-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 500;
+}
+
+.debt-table td.font-medium {
+  font-weight: 500;
+}
+
+.debt-table td.font-semibold {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* Hạn chót & highlight quá hạn */
+.debt-deadline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.debt-overdue-tag {
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Thao tác links */
+.debt-actions-cell {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.debt-link-action {
+  background: transparent;
+  border: none;
+  color: #0284c7;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.debt-link-action:hover {
+  color: #0369a1;
+  text-decoration: underline;
+}
+
+.debt-link-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ================= PERSONAL DEBT INFO TABLE ================= */
+.debt-student-table {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.debt-student-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 14px;
+}
+
+.debt-student-row:last-child {
+  border-bottom: none;
+}
+
+.debt-student-label {
+  color: #334155;
+  font-weight: 500;
+}
+
+.debt-student-value {
+  color: #0f172a;
+  font-weight: 500;
+  text-align: right;
+}
+
+.debt-student-row.total-row {
+  background-color: #fafaf9;
+}
+
+.debt-student-row.total-row .debt-student-label {
+  font-weight: 700;
+}
+
+.text-debt-red {
+  color: #dc2626 !important;
+  font-weight: 800 !important;
+  font-size: 15px;
+}
+
+/* ================= FEE STATUS BADGES ================= */
+.debt-fee-status {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.debt-fee-status.status-completed {
+  color: #16a34a;
+}
+
+.debt-fee-status.status-partial {
+  color: #ea580c;
+}
+
+.debt-fee-status.status-unpaid {
+  color: #dc2626;
+}
+
+/* ================= ACTION FOOTER ================= */
+.debt-action-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.debt-btn-remind-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #ea580c;
+  color: #ffffff;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25);
+  transition: all 0.2s ease;
+}
+
+.debt-btn-remind-primary:hover {
+  background: #c2410c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(234, 88, 12, 0.35);
+}
+
+.debt-btn-remind-primary:active {
+  transform: translateY(0);
+}
+
+.debt-btn-remind-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ================= TOAST NOTIFICATION ================= */
+.debt-toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  animation: debtToastSlide 0.3s ease;
+}
+
+.debt-toast.toast-success {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.debt-toast.toast-error {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.toast-icon {
+  font-size: 16px;
+}
+
+@keyframes debtToastSlide {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ================= LOADING ================= */
+.debt-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #64748b;
+  gap: 12px;
+}
+
+.debt-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #0284c7;
+  border-radius: 50%;
+  animation: debtSpin 0.7s linear infinite;
+}
+
+@keyframes debtSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ================= RESPONSIVE ================= */
+@media (max-width: 900px) {
+  .debt-stats-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
