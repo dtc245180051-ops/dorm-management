@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+export const API_BASE_URL = 'http://localhost:8000/api/v1';
 
 /**
  * Service gọi API xác thực (Authentication) cho KTX ICTU
@@ -50,24 +50,21 @@ export const authService = {
    * Đăng ký tài khoản Sinh viên mới
    * @param {Object} registerData
    */
-  async register({ fullName, gender, emailOrPhone, password }) {
+  async register({ fullName, gender, email, emailOrPhone, password }) {
     try {
-      const isEmail = emailOrPhone.includes('@');
-      const isPhone = /^[0-9+() -]+$/.test(emailOrPhone.trim());
+      const emailVal = (email || emailOrPhone || '').trim();
+      const isEmail = emailVal.includes('@');
 
-      // Tạo username hợp lệ từ email/sđt
-      let username = emailOrPhone.trim();
-      if (isEmail) {
-        username = emailOrPhone.split('@')[0];
-      }
+      // Tạo username từ mã sinh viên (phần trước @ của email trường DTCxxxxxxxxx)
+      let username = isEmail ? emailVal.split('@')[0] : emailVal;
 
       const payload = {
         username: username,
         password: password,
         role: 'SinhVien',
         full_name: fullName.trim(),
-        email: isEmail ? emailOrPhone.trim() : null,
-        phone: isPhone && !isEmail ? emailOrPhone.trim() : null,
+        email: emailVal,
+        gender: gender || 'Nữ',
       };
 
       const response = await fetch(`${API_BASE_URL}/auth/register`, {

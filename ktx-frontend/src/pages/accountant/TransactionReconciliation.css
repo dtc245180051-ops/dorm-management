@@ -1,0 +1,1088 @@
+/* ==========================================================================
+   TRANSACTION RECONCILIATION (ĐỐI SOÁT GIAO DỊCH) STYLES
+   Khớp 100% Screenshot Figma
+   ========================================================================== */
+
+.recon-container {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ================= PAGE TITLE ================= */
+.recon-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 2px;
+}
+
+.recon-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.3px;
+  text-transform: uppercase;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.recon-subtitle {
+  font-size: 13.5px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.recon-header-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  background-color: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.recon-header-badge .badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #10b981;
+}
+
+/* ================= THAO TÁC NHANH (QUICK ACTIONS) ================= */
+.recon-quick-actions-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 16px 22px;
+  border: 1px solid #eef2f6;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.recon-section-heading {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 12px;
+}
+
+.recon-quick-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.recon-quick-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 14px;
+}
+
+.recon-quick-row:last-child {
+  border-bottom: none;
+  padding-bottom: 4px;
+}
+
+.recon-quick-label {
+  color: #334155;
+  font-weight: 500;
+}
+
+.recon-file-link-btn {
+  background: transparent;
+  border: none;
+  color: #0084ff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s ease;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.recon-file-link-btn:hover {
+  text-decoration: underline;
+  background-color: #eff6ff;
+}
+
+.recon-inline-select {
+  border: none;
+  background: transparent;
+  color: #475569;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: right;
+  padding-right: 4px;
+}
+
+.recon-inline-select:focus {
+  outline: none;
+  color: #0084ff;
+}
+
+.recon-period-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.recon-calendar-icon {
+  color: #64748b;
+  display: flex;
+  align-items: center;
+}
+
+/* ================= 3 CARD THỐNG KÊ (STATISTICS) ================= */
+.recon-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.recon-stat-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 20px 24px;
+  border: 1px solid #eef2f6;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.recon-stat-label {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: 0.2px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.recon-stat-value {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.recon-stat-value.text-blue {
+  color: #0084ff;
+}
+
+.recon-stat-value.text-green {
+  color: #10b981;
+}
+
+.recon-stat-value.text-red {
+  color: #ef4444;
+}
+
+/* ================= BỘ LỌC (FILTERS) ================= */
+.recon-filter-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 16px 20px;
+  border: 1px solid #eef2f6;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.recon-filter-grid {
+  display: grid;
+  grid-template-columns: 2fr 1.3fr 1fr 1fr;
+  gap: 14px;
+  align-items: flex-end;
+}
+
+.recon-filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recon-filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.recon-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.recon-input-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.recon-input,
+.recon-select {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: #1e293b;
+  background-color: #ffffff;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.recon-search-input {
+  padding-left: 36px;
+}
+
+.recon-input:focus,
+.recon-select:focus {
+  border-color: #0084ff;
+  box-shadow: 0 0 0 3px rgba(0, 132, 255, 0.12);
+  outline: none;
+}
+
+.recon-filter-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.recon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.recon-btn-primary {
+  background-color: #0084ff;
+  color: #ffffff;
+  border: 1px solid #0084ff;
+}
+
+.recon-btn-primary:hover {
+  background-color: #0070dc;
+  border-color: #0070dc;
+}
+
+.recon-btn-outline {
+  background-color: #ffffff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.recon-btn-outline:hover {
+  background-color: #f8fafc;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+
+/* ================= BẢNG GIAO DỊCH (TABLE) ================= */
+.recon-table-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #eef2f6;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
+  overflow: hidden;
+}
+
+.recon-table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.recon-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+/* Header màu xanh nhạt chuẩn theo Screenshot 1 */
+.recon-th {
+  background-color: #dbeafe;
+  color: #1e293b;
+  font-weight: 700;
+  padding: 13px 16px;
+  border: none;
+  white-space: nowrap;
+}
+
+.recon-th.th-code {
+  width: 160px;
+}
+
+.recon-th.th-time {
+  width: 110px;
+}
+
+.recon-th.th-amount {
+  width: 130px;
+}
+
+.recon-th.th-content {
+  min-width: 260px;
+}
+
+.recon-th.th-invoice {
+  width: 180px;
+}
+
+.recon-th.th-status {
+  width: 130px;
+}
+
+.recon-th.th-action {
+  width: 90px;
+  text-align: right;
+  padding-right: 22px;
+}
+
+.recon-tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.12s ease;
+}
+
+.recon-tr:hover {
+  background-color: #f8fafc;
+}
+
+.recon-tr:last-child {
+  border-bottom: none;
+}
+
+.recon-td {
+  padding: 14px 16px;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.recon-td.td-action {
+  text-align: right;
+  padding-right: 22px;
+}
+
+.recon-code-text {
+  font-weight: 600;
+  color: #1e293b;
+  letter-spacing: -0.2px;
+}
+
+.recon-code-text.recon-code-clickable {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+  font-family: inherit;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.recon-code-text.recon-code-clickable:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.recon-time-text {
+  color: #475569;
+}
+
+.recon-amount-text {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.recon-content-text {
+  color: #1e293b;
+  font-weight: 400;
+}
+
+.recon-invoice-matched {
+  color: #0f172a;
+  font-weight: 500;
+}
+
+.recon-invoice-missing {
+  color: #64748b;
+  font-size: 13.5px;
+}
+
+/* Badge trạng thái */
+.recon-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.recon-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Màu trạng thái bám sát screenshot */
+.recon-status-badge.badge-matched {
+  color: #16a34a;
+}
+.recon-status-badge.badge-matched .recon-status-dot {
+  background-color: #16a34a;
+}
+
+.recon-status-badge.badge-warning {
+  color: #ef4444;
+}
+.recon-status-badge.badge-warning .recon-status-dot {
+  background-color: #ef4444;
+}
+
+.recon-status-badge.badge-manual-matched {
+  color: #0284c7;
+}
+.recon-status-badge.badge-manual-matched .recon-status-dot {
+  background-color: #0284c7;
+}
+
+.recon-status-badge.badge-error {
+  color: #dc2626;
+}
+.recon-status-badge.badge-error .recon-status-dot {
+  background-color: #dc2626;
+}
+
+.recon-status-badge.badge-partial {
+  color: #ea580c;
+}
+.recon-status-badge.badge-partial .recon-status-dot {
+  background-color: #ea580c;
+}
+
+/* Thao tác Links */
+.recon-action-link {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.recon-action-view {
+  color: #0084ff;
+}
+
+.recon-action-view:hover {
+  text-decoration: underline;
+  background-color: #eff6ff;
+}
+
+.recon-action-match {
+  color: #0084ff;
+}
+
+.recon-action-match:hover {
+  text-decoration: underline;
+  background-color: #eff6ff;
+}
+
+/* ================= PHÂN TRANG (PAGINATION) ================= */
+.recon-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-top: 1px solid #f1f5f9;
+  background-color: #ffffff;
+  font-size: 13.5px;
+  color: #64748b;
+}
+
+.recon-pagination-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.recon-page-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background-color: #ffffff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.recon-page-btn:hover:not(:disabled) {
+  border-color: #0084ff;
+  color: #0084ff;
+  background-color: #f0f7ff;
+}
+
+.recon-page-btn.active {
+  background-color: #0084ff;
+  border-color: #0084ff;
+  color: #ffffff;
+}
+
+.recon-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ================= EMPTY & LOADING STATES ================= */
+.recon-empty-state,
+.recon-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.recon-empty-icon {
+  color: #94a3b8;
+  margin-bottom: 12px;
+}
+
+.recon-empty-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 6px;
+}
+
+.recon-empty-desc {
+  font-size: 14px;
+  color: #64748b;
+  max-width: 440px;
+  margin-bottom: 18px;
+}
+
+.recon-spinner {
+  width: 38px;
+  height: 38px;
+  border: 3.5px solid #e2e8f0;
+  border-top-color: #0084ff;
+  border-radius: 50%;
+  animation: recon-spin 0.8s linear infinite;
+  margin-bottom: 14px;
+}
+
+@keyframes recon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ================= MODAL GÁN THỦ CÔNG (SCREENSHOT 2) ================= */
+.recon-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: recon-fade-in 0.18s ease;
+}
+
+@keyframes recon-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.recon-modal-dialog {
+  background-color: #ffffff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 540px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  animation: recon-scale-up 0.18s ease;
+}
+
+@keyframes recon-scale-up {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.recon-modal-header {
+  padding: 18px 24px 14px 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.recon-modal-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+}
+
+.recon-modal-info-box {
+  padding: 14px 24px;
+  border-bottom: 1px solid #f1f5f9;
+  background-color: #fafbfc;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13.5px;
+  color: #334155;
+}
+
+.recon-info-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  line-height: 1.4;
+}
+
+.recon-info-bullet {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.recon-modal-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.recon-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recon-form-label {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.recon-combobox-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.recon-form-input,
+.recon-form-select {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1e293b;
+  background-color: #ffffff;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.recon-form-input:focus,
+.recon-form-select:focus {
+  border-color: #0084ff;
+  box-shadow: 0 0 0 3px rgba(0, 132, 255, 0.12);
+  outline: none;
+}
+
+.recon-input-icon-right {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.recon-combobox-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 100;
+  list-style: none;
+  padding: 4px;
+  margin: 0;
+}
+
+.recon-combobox-item {
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.recon-combobox-item:hover,
+.recon-combobox-item.selected {
+  background-color: #eff6ff;
+}
+
+.recon-item-primary {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.recon-item-sub {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.recon-combobox-empty {
+  padding: 12px;
+  font-size: 13px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+/* Phần kiểm tra số tiền */
+.recon-match-check-box {
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  border: 1px solid transparent;
+}
+
+.recon-match-check-box.check-matched {
+  background-color: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.recon-match-check-box.check-mismatch {
+  background-color: #fffbeb;
+  border-color: #fde68a;
+}
+
+.recon-check-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #334155;
+}
+
+.recon-check-row.recon-check-diff {
+  padding-top: 4px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.08);
+}
+
+.recon-check-badge {
+  margin-top: 6px;
+}
+
+.recon-check-msg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.recon-check-msg.matched {
+  color: #15803d;
+}
+
+.recon-check-msg.mismatch {
+  color: #b45309;
+}
+
+/* Modal Footer Buttons (Chuẩn Screenshot 2) */
+.recon-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 14px 24px 22px 24px;
+}
+
+.recon-modal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 22px;
+  border-radius: 9999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+/* Nút Hủy thao tác (Blue filled pill theo Screenshot 2) */
+.recon-btn-cancel {
+  background-color: #0084ff;
+  color: #ffffff;
+  border: 1px solid #0084ff;
+  box-shadow: 0 2px 4px rgba(0, 132, 255, 0.2);
+}
+
+.recon-btn-cancel:hover:not(:disabled) {
+  background-color: #0070dc;
+  border-color: #0070dc;
+}
+
+/* Nút Xác nhận (Blue outline/pill style theo Screenshot 2) */
+.recon-btn-confirm {
+  background-color: #ffffff;
+  color: #0084ff;
+  border: 1.5px solid #0084ff;
+}
+
+.recon-btn-confirm:hover:not(:disabled) {
+  background-color: #eff6ff;
+}
+
+.recon-btn-confirm:disabled,
+.recon-btn-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Toast Message */
+.recon-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background-color: #0f172a;
+  color: #ffffff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15);
+  z-index: 2000;
+  animation: recon-slide-up 0.2s ease;
+}
+
+@keyframes recon-slide-up {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.recon-toast-success {
+  background-color: #065f46;
+  border: 1px solid #059669;
+}
+
+/* ================= RESPONSIVE ================= */
+@media (max-width: 1024px) {
+  .recon-filter-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .recon-filter-item.recon-filter-search {
+    grid-column: 1 / -1;
+  }
+
+  .recon-stats-grid {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .recon-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .recon-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .recon-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .recon-quick-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .recon-modal-footer {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .recon-modal-btn {
+    width: 100%;
+  }
+}
+
+/* ================= INVOICE SELECTION IN MODAL ================= */
+.recon-invoice-empty-notice {
+  padding: 12px 14px;
+  background-color: #f8fafc;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #64748b;
+  text-align: center;
+}
+
+.recon-invoice-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.recon-invoice-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  background-color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.recon-invoice-card:hover {
+  border-color: #93c5fd;
+  background-color: #f8fafc;
+}
+
+.recon-invoice-card.selected {
+  border-color: #0284c7;
+  background-color: #f0f9ff;
+  box-shadow: 0 0 0 1px #0284c7;
+}
+
+.recon-invoice-radio {
+  accent-color: #0284c7;
+  width: 17px;
+  height: 17px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.recon-invoice-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.recon-invoice-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.recon-invoice-code-badge {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.recon-invoice-amount-tag {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0284c7;
+}
+
+.recon-invoice-card-desc {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.recon-match-pill {
+  font-size: 11px;
+  font-weight: 700;
+  background-color: #dcfce7;
+  color: #15803d;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+

@@ -5,6 +5,14 @@ from app.schemas.auth import (
     UserRegister,
     UserResponse,
 )
+from app.schemas.invoice import (
+    HoaDonResponse,
+    PublishResultResponse,
+    RoomBillingCandidate,
+    RoomInvoicePublishRequest,
+    UtilityBillingCandidate,
+    UtilityInvoicePublishRequest,
+)
 
 __all__ = [
     "Token",
@@ -12,4 +20,11 @@ __all__ = [
     "UserRegister",
     "NguoiDungResponse",
     "UserResponse",
+    "HoaDonResponse",
+    "RoomBillingCandidate",
+    "RoomInvoicePublishRequest",
+    "UtilityBillingCandidate",
+    "UtilityInvoicePublishRequest",
+    "PublishResultResponse",
 ]
+
