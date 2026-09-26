@@ -16,12 +16,14 @@ class TokenData(BaseModel):
 
 
 class UserRegister(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50, description="Tên đăng nhập")
+    username: Optional[str] = Field(default=None, min_length=3, max_length=50, description="Tên đăng nhập")
     password: str = Field(..., min_length=6, description="Mật khẩu")
-    role: str = Field(..., description="Vai trò: QuanLy, KeToan, SinhVien")
+    role: str = Field(default="SinhVien", description="Vai trò: QuanLy, KeToan, SinhVien")
     full_name: str = Field(..., min_length=2, max_length=100, description="Họ và tên")
     email: Optional[str] = Field(default=None, max_length=100, description="Địa chỉ email")
     phone: Optional[str] = Field(default=None, max_length=15, description="Số điện thoại")
+    email_or_phone: Optional[str] = Field(default=None, max_length=100, description="Email hoặc số điện thoại")
+    gender: Optional[str] = Field(default=None, max_length=10, description="Giới tính (Nam, Nu)")
 
 
 class NguoiDungResponse(BaseModel):
