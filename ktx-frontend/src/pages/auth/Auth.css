@@ -1,0 +1,633 @@
+/* ===================================================
+   KTX ICTU - AUTHENTICATION (LOGIN & REGISTER) STYLES
+   Khắc phục triệt để lỗi tràn đáy & căn chỉnh form Đăng ký:
+   1. Card tự co giãn linh hoạt: height: auto; min-height: 640px;
+   2. Cột phải có padding-bottom: 32px đảm bảo không bao giờ tràn đáy
+   3. Form Đăng ký: Gap 14px - 16px giữa các hàng input
+   4. Nút Đăng ký cách hàng mật khẩu 20px
+   5. Nút Đăng ký -> Hoặc -> Nút Google -> Link chân trang: đều nhau 16px - 18px
+   6. Cả 2 tab gọn gàng, đồng bộ, không dính chùm
+=================================================== */
+
+.auth-container {
+  width: 88%;
+  max-width: 1260px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+/* Khối Card lớn: Tự co giãn theo nội dung (height: auto; min-height: 640px), không viền, đổ bóng mềm */
+.auth-card {
+  width: 100%;
+  background-color: #ffffff;
+  border: none;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  display: grid;
+  grid-template-columns: 46% 54%;
+  overflow: hidden;
+  height: auto;
+  min-height: 640px;
+  box-sizing: border-box;
+  transition: all 0.25s ease;
+}
+
+/* ===================================================
+   CỘT TRÁI: GIỚI THIỆU KÝ TÚC XÁ ICTU (NỀN XANH NHẠT)
+=================================================== */
+.auth-left {
+  background-color: #e8f1fd;
+  padding: 44px 42px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+/* Logo KTX */
+.brand-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.brand-icon-wrapper {
+  color: #1d70f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-icon-svg {
+  width: 56px;
+  height: 56px;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-title {
+  font-size: 32px;
+  font-weight: 800;
+  color: #1d70f5;
+  line-height: 1.1;
+  letter-spacing: 0.5px;
+}
+
+.brand-subtitle {
+  font-size: 14px;
+  color: #475569;
+  font-weight: 500;
+}
+
+/* Tiêu đề chào mừng */
+.welcome-section {
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.welcome-title-line1 {
+  font-size: 25px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.welcome-title-line2 {
+  font-size: 29px;
+  font-weight: 800;
+  color: #1d70f5;
+  line-height: 1.3;
+  margin-top: 4px;
+}
+
+.welcome-desc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #4b5563;
+  text-align: center;
+  max-width: 410px;
+  margin-bottom: 34px;
+}
+
+/* 4 Badge tính năng */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.feature-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.feature-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  transition: transform 0.2s ease;
+}
+
+.feature-item:hover .feature-circle {
+  transform: translateY(-2px);
+}
+
+.feature-circle.blue {
+  background-color: #dbeafe;
+  color: #2563eb;
+}
+
+.feature-circle.green {
+  background-color: #dcfce7;
+  color: #16a34a;
+}
+
+.feature-circle.purple {
+  background-color: #f3e8ff;
+  color: #9333ea;
+}
+
+.feature-circle.amber {
+  background-color: #ffedd5;
+  color: #ea580c;
+}
+
+.feature-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 3px;
+  white-space: nowrap;
+}
+
+.feature-caption {
+  font-size: 10.5px;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+/* ===================================================
+   CỘT PHẢI: FORM ĐĂNG NHẬP / ĐĂNG KÝ (NỀN TRẮNG)
+=================================================== */
+.auth-right {
+  background-color: #ffffff;
+  padding: 36px 48px 32px 48px; /* Có padding-bottom: 32px đảm bảo không tràn đáy */
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* Tabs chuyển đổi */
+.auth-tabs {
+  display: flex;
+  width: 100%;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.auth-tab-btn {
+  flex: 1;
+  background: transparent;
+  padding: 10px 0 14px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #64748b;
+  text-align: center;
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+.auth-tab-btn:hover {
+  color: #1d70f5;
+}
+
+.auth-tab-btn.active {
+  color: #1d70f5;
+}
+
+.auth-tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2.5px;
+  background-color: #1d70f5;
+  border-radius: 2px 2px 0 0;
+}
+
+/* Wrapper chứa Form */
+.auth-form-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  animation: fadeInForm 0.2s ease-out;
+}
+
+@keyframes fadeInForm {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===================================================
+   BỐ CỤC KHỐI INPUTS (ĐÃ ĐIỀU CHỈNH GỌN GÀNG)
+=================================================== */
+/* Form Đăng nhập */
+.login-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Form Đăng ký: Giảm gap giữa các hàng input xuống 15px (14px - 16px) */
+.register-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.form-row-2col,
+.form-row-2col-equal {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 6px;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Ô nhập liệu & Select */
+.form-input {
+  width: 100%;
+  height: 46px;
+  padding: 0 16px;
+  border: 1.3px solid #e2e8f0;
+  border-radius: 9px;
+  font-size: 14px;
+  color: #1e293b;
+  background-color: #ffffff;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.form-input::placeholder {
+  color: #94a3b8;
+  font-size: 13.5px;
+}
+
+.form-input:focus {
+  border-color: #1d70f5;
+  box-shadow: 0 0 0 3.5px rgba(29, 112, 245, 0.12);
+}
+
+.form-select {
+  width: 100%;
+  height: 46px;
+  padding: 0 36px 0 16px;
+  border: 1.3px solid #e2e8f0;
+  border-radius: 9px;
+  font-size: 14px;
+  color: #1e293b;
+  background-color: #ffffff;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.form-select:focus {
+  border-color: #1d70f5;
+  box-shadow: 0 0 0 3.5px rgba(29, 112, 245, 0.12);
+}
+
+.input-icon-btn {
+  position: absolute;
+  right: 14px;
+  background: transparent;
+  color: #94a3b8;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.input-icon-btn:hover {
+  color: #475569;
+}
+
+/* Quên mật khẩu */
+.forgot-pwd-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.forgot-pwd-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d70f5;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  transition: text-decoration 0.2s ease;
+}
+
+.forgot-pwd-link:hover {
+  text-decoration: underline;
+}
+
+/* ===================================================
+   CỤM ACTION BUTTONS (KHOẢNG CÁCH CHUẨN ĐỀU ĐẶN)
+=================================================== */
+.form-actions {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Khoảng cách riêng cho tab Đăng nhập (Login form) */
+.login-form .form-actions {
+  margin-top: 26px;
+}
+
+.login-form .divider-or {
+  margin: 24px 0;
+}
+
+.login-form .switch-auth-text {
+  margin-top: 32px;
+}
+
+.register-form .form-actions {
+  margin-top: 20px;
+}
+
+/* Nút Submit chính */
+.submit-btn {
+  width: 100%;
+  height: 48px;
+  background-color: #1d70f5;
+  color: #ffffff;
+  font-size: 15.5px;
+  font-weight: 600;
+  border-radius: 9px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(29, 112, 245, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background-color: #1558d6;
+  box-shadow: 0 6px 18px rgba(29, 112, 245, 0.32);
+  transform: translateY(-1px);
+}
+
+.submit-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.submit-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Khoảng cách từ nút Đăng ký -> vạch Hoặc -> nút Google đặt đều nhau 16px - 18px */
+.divider-or {
+  display: flex;
+  align-items: center;
+  margin: 16px 0;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background-color: #e2e8f0;
+}
+
+.divider-text {
+  padding: 0 14px;
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* Nút Google */
+.google-btn {
+  width: 100%;
+  height: 46px;
+  background-color: #ffffff;
+  border: 1.3px solid #e2e8f0;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.2s ease;
+}
+
+.google-btn:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.google-icon-svg {
+  width: 19px;
+  height: 19px;
+}
+
+/* Khoảng cách từ nút Google -> link chân trang: 18px (16px - 18px) */
+.switch-auth-text {
+  text-align: center;
+  font-size: 14px;
+  color: #64748b;
+  margin-top: 18px;
+}
+
+.switch-auth-link {
+  font-weight: 600;
+  color: #1d70f5;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 4px;
+}
+
+.switch-auth-link:hover {
+  text-decoration: underline;
+}
+
+/* Thông báo phản hồi (Alert Banner) */
+.auth-alert {
+  padding: 10px 16px;
+  border-radius: 9px;
+  font-size: 13.5px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: fadeInAlert 0.2s ease;
+  flex-shrink: 0;
+}
+
+.auth-alert.error {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.auth-alert.success {
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+}
+
+.auth-alert.info {
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+}
+
+@keyframes fadeInAlert {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Spinner khi đang tải */
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===================================================
+   RESPONSIVE DESIGN (TABLET & MOBILE)
+=================================================== */
+@media (max-width: 992px) {
+  .auth-container {
+    width: 95%;
+  }
+
+  .auth-card {
+    grid-template-columns: 1fr;
+    max-width: 560px;
+    height: auto;
+    min-height: auto;
+  }
+
+  .auth-left {
+    padding: 36px 28px;
+    height: auto;
+  }
+
+  .features-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .auth-right {
+    padding: 32px 28px;
+    height: auto;
+  }
+
+  .divider-or {
+    margin: 16px 0;
+  }
+
+  .switch-auth-text {
+    margin-top: 18px;
+  }
+}
+
+@media (max-width: 520px) {
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .form-row-2col,
+  .form-row-2col-equal {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .welcome-title-line1 {
+    font-size: 21px;
+  }
+
+  .welcome-title-line2 {
+    font-size: 25px;
+  }
+}
