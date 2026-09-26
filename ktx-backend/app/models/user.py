@@ -135,6 +135,46 @@ class SinhVien(Base):
         String(10),
         nullable=False,
     )
+    khoa: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    que_quan: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    ngay_sinh: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+    cccd: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+    dia_chi: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    nguoi_giam_ho: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    moi_quan_he: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+    sdt_nguoi_giam_ho: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+    anh_dai_dien: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    anh_hop_dong: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
 
     # Quan hệ 1-1 với NguoiDung
     nguoi_dung: Mapped["NguoiDung"] = relationship(
