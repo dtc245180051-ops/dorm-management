@@ -190,6 +190,20 @@ export default function ProcessRegistrationPage({
         ma_toa: selectedBuilding,
         phong_id: selectedRoom,
         giuong_id: selectedBed,
+        msv: requestData?.msv,
+        ho_ten: requestData?.ho_ten,
+        gioi_tinh: requestData?.gioi_tinh,
+        ngay_sinh: requestData?.ngay_sinh,
+        cccd: requestData?.cccd,
+        so_dien_thoai: requestData?.so_dien_thoai,
+        email: requestData?.email,
+        khoa: requestData?.khoa,
+        lop: requestData?.lop,
+        dia_chi: requestData?.dia_chi,
+        doi_tuong_uu_tien: requestData?.doi_tuong_uu_tien,
+        nguoi_giam_ho: requestData?.nguoi_giam_ho,
+        moi_quan_he: requestData?.moi_quan_he,
+        sdt_nguoi_giam_ho: requestData?.sdt_nguoi_giam_ho,
       };
 
       const result = await occupancyService.approveRequest(requestId, payload);
