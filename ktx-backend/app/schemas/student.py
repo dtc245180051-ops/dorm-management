@@ -46,6 +46,7 @@ class SinhVienCreate(BaseModel):
     ngay_sinh: Optional[str] = Field(default=None, max_length=20, description="Ngày sinh (dd/mm/yyyy)")
     cccd: Optional[str] = Field(default=None, max_length=20, description="Số CCCD / Định danh")
     dia_chi: Optional[str] = Field(default=None, max_length=255, description="Địa chỉ thường trú")
+    doi_tuong_uu_tien: Optional[str] = Field(default=None, max_length=100, description="Đối tượng ưu tiên")
     nguoi_giam_ho: Optional[str] = Field(default=None, max_length=100, description="Họ và tên người giám hộ")
     moi_quan_he: Optional[str] = Field(default=None, max_length=50, description="Mối quan hệ")
     sdt_nguoi_giam_ho: Optional[str] = Field(default=None, max_length=20, description="SĐT liên hệ khẩn cấp")
@@ -80,6 +81,7 @@ class SinhVienUpdate(BaseModel):
     ngay_sinh: Optional[str] = Field(default=None, max_length=20)
     cccd: Optional[str] = Field(default=None, max_length=20)
     dia_chi: Optional[str] = Field(default=None, max_length=255)
+    doi_tuong_uu_tien: Optional[str] = Field(default=None, max_length=100)
     nguoi_giam_ho: Optional[str] = Field(default=None, max_length=100)
     moi_quan_he: Optional[str] = Field(default=None, max_length=50)
     sdt_nguoi_giam_ho: Optional[str] = Field(default=None, max_length=20)
@@ -99,6 +101,7 @@ class SinhVienResponse(BaseModel):
     ngay_sinh: Optional[str] = None
     cccd: Optional[str] = None
     dia_chi: Optional[str] = None
+    doi_tuong_uu_tien: Optional[str] = None
     nguoi_giam_ho: Optional[str] = None
     moi_quan_he: Optional[str] = None
     sdt_nguoi_giam_ho: Optional[str] = None

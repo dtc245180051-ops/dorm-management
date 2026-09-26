@@ -229,6 +229,7 @@ def create_student(db: Session, student_in: SinhVienCreate) -> SinhVienResponse:
         ngay_sinh=student_in.ngay_sinh,
         cccd=student_in.cccd,
         dia_chi=student_in.dia_chi,
+        doi_tuong_uu_tien=student_in.doi_tuong_uu_tien,
         nguoi_giam_ho=student_in.nguoi_giam_ho,
         moi_quan_he=student_in.moi_quan_he,
         sdt_nguoi_giam_ho=student_in.sdt_nguoi_giam_ho,
@@ -475,6 +476,8 @@ def update_student(
         student.cccd = update_data.cccd
     if update_data.dia_chi is not None:
         student.dia_chi = update_data.dia_chi
+    if update_data.doi_tuong_uu_tien is not None:
+        student.doi_tuong_uu_tien = update_data.doi_tuong_uu_tien
     if update_data.nguoi_giam_ho is not None:
         student.nguoi_giam_ho = update_data.nguoi_giam_ho
     if update_data.moi_quan_he is not None:
