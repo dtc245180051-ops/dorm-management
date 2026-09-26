@@ -264,11 +264,10 @@ export default function ProcessRegistrationPage({
       {/* Toast thông báo */}
       {toast.show && (
         <div
-          className={`fixed top-5 right-5 z-50 flex items-center gap-2.5 px-5 py-3 rounded-xl shadow-xl text-sm font-semibold transition-all animate-in fade-in slide-in-from-top-4 ${
-            toast.type === 'success'
+          className={`fixed top-5 right-5 z-50 flex items-center gap-2.5 px-5 py-3 rounded-xl shadow-xl text-sm font-semibold transition-all animate-in fade-in slide-in-from-top-4 ${toast.type === 'success'
               ? 'bg-emerald-600 text-white shadow-emerald-500/20'
               : 'bg-rose-600 text-white shadow-rose-500/20'
-          }`}
+            }`}
         >
           {toast.type === 'success' ? (
             <CheckCircle2 className="w-5 h-5" />
@@ -280,7 +279,7 @@ export default function ProcessRegistrationPage({
       )}
 
       {/* Thẻ Card chính màu trắng bao trọn nội dung theo chuẩn Figma */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 lg:p-8 flex-1 flex flex-col justify-between">
+      <div className="bg-[#f4f5f7] rounded-2xl border border-slate-200/80 shadow-xs p-6 lg:p-8 flex-1 flex flex-col justify-between">
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center min-h-[450px]">
             <Loader2 className="w-9 h-9 text-blue-600 animate-spin mb-3" />
