@@ -155,6 +155,10 @@ class SinhVien(Base):
         String(255),
         nullable=True,
     )
+    doi_tuong_uu_tien: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+    )
     nguoi_giam_ho: Mapped[Optional[str]] = mapped_column(
         String(100),
         nullable=True,

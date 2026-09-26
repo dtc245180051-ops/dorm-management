@@ -30,6 +30,7 @@ export default function EditStudentModal({ isOpen, onClose, student, onStudentUp
     ngay_sinh: '',
     cccd: '',
     dia_chi: '',
+    doi_tuong_uu_tien: '',
     nguoi_giam_ho: '',
     moi_quan_he: '',
     sdt_nguoi_giam_ho: '',
@@ -63,6 +64,7 @@ export default function EditStudentModal({ isOpen, onClose, student, onStudentUp
         ngay_sinh: toDateInputValue(student.ngay_sinh),
         cccd: student.cccd || '',
         dia_chi: student.dia_chi || '',
+        doi_tuong_uu_tien: student.doi_tuong_uu_tien || '',
         nguoi_giam_ho: student.nguoi_giam_ho || '',
         moi_quan_he: student.moi_quan_he || '',
         sdt_nguoi_giam_ho: student.sdt_nguoi_giam_ho || '',
@@ -293,6 +295,28 @@ export default function EditStudentModal({ isOpen, onClose, student, onStudentUp
                   onChange={handleChange}
                   className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-[5px] focus:outline-none focus:border-blue-500 focus:bg-white transition"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Đối tượng ưu tiên
+                </label>
+                <select
+                  name="doi_tuong_uu_tien"
+                  value={formData.doi_tuong_uu_tien}
+                  onChange={handleChange}
+                  className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-[5px] focus:outline-none focus:border-blue-500 focus:bg-white transition cursor-pointer text-slate-700"
+                >
+                  <option value="">-- Chọn đối tượng ưu tiên --</option>
+                  <option value="Không thuộc diện ưu tiên">Không thuộc diện ưu tiên</option>
+                  <option value="Con liệt sĩ / Con thương binh, bệnh binh">Con liệt sĩ / Con thương binh, bệnh binh</option>
+                  <option value="Sinh viên khuyết tật">Sinh viên khuyết tật</option>
+                  <option value="Hộ nghèo / Hộ cận nghèo">Hộ nghèo / Hộ cận nghèo</option>
+                  <option value="Dân tộc thiểu số vùng sâu vùng xa">Dân tộc thiểu số vùng sâu vùng xa</option>
+                  <option value="Mồ côi cả cha lẫn mẹ">Mồ côi cả cha lẫn mẹ</option>
+                  <option value="Hoàn cảnh khó khăn đột xuất">Hoàn cảnh khó khăn đột xuất</option>
+                  <option value="Khác">Khác</option>
+                </select>
               </div>
 
               {/* Yêu cầu 3: Địa chỉ cho chọn thay vì gõ tay */}

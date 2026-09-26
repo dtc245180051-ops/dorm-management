@@ -30,6 +30,7 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
     khoa: '',
     lop: '',
     dia_chi: '',
+    doi_tuong_uu_tien: '',
 
     // Thông tin liên hệ khẩn cấp
     nguoi_giam_ho: '',
@@ -317,6 +318,7 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
         khoa: formData.khoa || null,
         lop: formData.lop || 'CNTTK24M',
         dia_chi: formData.dia_chi || null,
+        doi_tuong_uu_tien: formData.doi_tuong_uu_tien || null,
         que_quan: selectedProvince || null,
 
         nguoi_giam_ho: formData.nguoi_giam_ho || null,
@@ -492,6 +494,25 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
                   placeholder="Lớp chuyên ngành"
                   className="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-[5px] placeholder-slate-400 focus:outline-none focus:border-blue-500 transition shadow-2xs"
                 />
+              </div>
+
+              <div>
+                <select
+                  name="doi_tuong_uu_tien"
+                  value={formData.doi_tuong_uu_tien}
+                  onChange={handleChange}
+                  className="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-[5px] text-slate-700 focus:outline-none focus:border-blue-500 transition shadow-2xs cursor-pointer"
+                >
+                  <option value="">-- Chọn đối tượng ưu tiên --</option>
+                  <option value="Không thuộc diện ưu tiên">Không thuộc diện ưu tiên</option>
+                  <option value="Con liệt sĩ / Con thương binh, bệnh binh">Con liệt sĩ / Con thương binh, bệnh binh</option>
+                  <option value="Sinh viên khuyết tật">Sinh viên khuyết tật</option>
+                  <option value="Hộ nghèo / Hộ cận nghèo">Hộ nghèo / Hộ cận nghèo</option>
+                  <option value="Dân tộc thiểu số vùng sâu vùng xa">Dân tộc thiểu số vùng sâu vùng xa</option>
+                  <option value="Mồ côi cả cha lẫn mẹ">Mồ côi cả cha lẫn mẹ</option>
+                  <option value="Hoàn cảnh khó khăn đột xuất">Hoàn cảnh khó khăn đột xuất</option>
+                  <option value="Khác">Khác</option>
+                </select>
               </div>
             </div>
           </div>

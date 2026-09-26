@@ -293,6 +293,18 @@ export default function StudentDetailPage({
                 </span>
               </div>
               <div className="px-5 py-3 flex items-center justify-between text-sm">
+                <span className="text-slate-600 font-medium">Đối tượng ưu tiên</span>
+                <span className="text-slate-800 font-medium">
+                  {student.doi_tuong_uu_tien ? (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                      {student.doi_tuong_uu_tien}
+                    </span>
+                  ) : (
+                    'Không thuộc diện ưu tiên'
+                  )}
+                </span>
+              </div>
+              <div className="px-5 py-3 flex items-center justify-between text-sm">
                 <span className="text-slate-600 font-medium">Thông tin liên hệ khẩn cấp</span>
                 <span className="text-slate-800 font-medium">
                   {student.sdt_nguoi_giam_ho
