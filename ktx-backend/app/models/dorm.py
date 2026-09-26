@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy import Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -23,6 +23,16 @@ class ToaNha(Base):
         unique=True,
         nullable=False,
     )
+    gioi_tinh: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        default="Nam & Nữ",
+    )
+    so_tang: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=5,
+    )
 
     # Quan hệ 1-N với Tang
     tangs: Mapped[List["Tang"]] = relationship(
@@ -32,7 +42,7 @@ class ToaNha(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<ToaNha(ma_toa='{self.ma_toa}', ten_toa='{self.ten_toa}')>"
+        return f"<ToaNha(ma_toa='{self.ma_toa}', ten_toa='{self.ten_toa}', gioi_tinh='{self.gioi_tinh}', so_tang={self.so_tang})>"
 
 
 class Tang(Base):
@@ -89,6 +99,15 @@ class Phong(Base):
         String(50),
         nullable=False,
     )
+    gia_tien_nam: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        default=None,
+    )
+    hinh_anh: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
     ma_tang: Mapped[str] = mapped_column(
         String(20),
         ForeignKey("tang.ma_tang", ondelete="CASCADE"),
@@ -107,6 +126,22 @@ class Phong(Base):
         back_populates="phong",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def so_tang(self) -> Optional[int]:
+        return self.tang.so_tang if self.tang else None
+
+    @property
+    def ma_toa(self) -> Optional[str]:
+        return self.tang.ma_toa if self.tang else None
+
+    @property
+    def ten_toa(self) -> Optional[str]:
+        return self.tang.toa_nha.ten_toa if self.tang and self.tang.toa_nha else None
+
+    @property
+    def gioi_tinh(self) -> Optional[str]:
+        return self.tang.toa_nha.gioi_tinh if self.tang and self.tang.toa_nha else "Nam & Nữ"
 
     def __repr__(self) -> str:
         return f"<Phong(ma_phong='{self.ma_phong}', so_phong='{self.so_phong}', suc_chua={self.suc_chua})>"
@@ -141,7 +176,27 @@ class Giuong(Base):
     hop_dongs: Mapped[List["HopDong"]] = relationship(
         "HopDong",
         back_populates="giuong",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
+
+    @property
+    def sinh_vien(self) -> Optional[dict]:
+        if not self.hop_dongs:
+            return None
+        active_contract = next((hd for hd in self.hop_dongs if hd.trang_thai == "ACTIVE"), None)
+        if active_contract and active_contract.sinh_vien:
+            sv = active_contract.sinh_vien
+            user_name = sv.nguoi_dung.ho_ten if sv.nguoi_dung else sv.msv
+            return {
+                "msv": sv.msv,
+                "ho_ten": user_name,
+                "ma_hop_dong": active_contract.ma_hop_dong,
+                "lop": sv.lop,
+                "ngay_bat_dau": active_contract.ngay_bat_dau.strftime("%d/%m/%Y") if active_contract.ngay_bat_dau else "01/09/2026",
+                "ngay_ket_thuc": active_contract.ngay_ket_thuc.strftime("%d/%m/%Y") if active_contract.ngay_ket_thuc else "30/06/2027",
+            }
+        return None
 
     def __repr__(self) -> str:
         return f"<Giuong(ma_giuong='{self.ma_giuong}', trang_thai='{self.trang_thai}', ma_phong='{self.ma_phong}')>"

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 :root {
   --primary: #1d70f5;
   --primary-hover: #1558d6;
@@ -48,3 +49,12 @@ input, select {
   font-family: inherit;
   outline: none;
 }
+=======
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-white text-slate-800 antialiased font-sans m-0 p-0;
+  }
+}
+>>>>>>> 1be9ab389bf95f6bd1f614e0aa1a80b6415d9d06

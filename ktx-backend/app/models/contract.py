@@ -17,7 +17,7 @@ class HopDong(Base):
     __tablename__ = "hop_dong"
 
     ma_hop_dong: Mapped[str] = mapped_column(
-        String(20),
+        String(50),
         primary_key=True,
     )
     msv: Mapped[str] = mapped_column(
@@ -87,7 +87,7 @@ class YeuCauChuyenTraPhong(Base):
         index=True,
     )
     ma_hop_dong: Mapped[str] = mapped_column(
-        String(20),
+        String(50),
         ForeignKey("hop_dong.ma_hop_dong", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -125,7 +125,7 @@ class Phi(Base):
         primary_key=True,
     )
     ma_hop_dong: Mapped[str] = mapped_column(
-        String(20),
+        String(50),
         ForeignKey("hop_dong.ma_hop_dong", ondelete="CASCADE"),
         nullable=False,
         index=True,
