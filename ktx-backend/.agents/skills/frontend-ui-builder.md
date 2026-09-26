@@ -1,51 +1,102 @@
----
-name: frontend-ui-builder
-description: Quy chuẩn thiết kế giao diện người dùng (Frontend Design System) cho hệ thống Ký túc xá KTX.
----
+# SKILL: Frontend UI Builder (Quy chuẩn Thiết kế Giao diện Toàn hệ thống)
 
-# KTX Frontend UI Design System & Guidelines
-
-## 1. Màu sắc thương hiệu & Trực quan (Color Tokens)
-- **Primary Brand Blue**: `#2563eb` (Tailwind `blue-600`), hover `#1d4ed8` (Tailwind `blue-700`).
-- **Primary Accent / Sky**: `#0284c7` (Tailwind `sky-600`), `#0ea5e9` (Tailwind `sky-500`), `#dbeafe` (Tailwind `blue-100`).
-- **Success Green**: `#15803d` (Tailwind `green-700`), `#166534` (Tailwind `green-800`), `#2d6a4f`.
-- **Neutral Backgrounds**:
-  - Toàn bộ trang nền xanh lam/xám nhạt: `#f0f4f8` hoặc `#edf2f7`.
-  - Khối Sidebar / Header: `#f4f5f7` hoặc `#ffffff`.
-  - Khối thẻ Card nội dung: Nền trắng `#ffffff`, bo tròn mềm mại `rounded-2xl` hoặc `rounded-xl`.
-- **Text & Borders**:
-  - Tiêu đề đậm: `#0f172a` (Slate 900) hoặc `#1e293b` (Slate 800).
-  - Nhãn in hoa phụ: Text Slate 600 - 700, font-bold, tracking-wide.
-  - Văn bản phụ / Placeholder: `#64748b` (Slate 500) hoặc `#94a3b8` (Slate 400).
-  - Đường viền nhẹ: `border-slate-200` hoặc `border-blue-100/80`.
+## 1. Mục tiêu & Nguyên tắc Thiết kế
+Chuẩn hóa toàn bộ hệ thống giao diện KTX (React + Tailwind CSS) theo đúng các mẫu Figma thực tế[cite: 4, 7]:
+- Bố cục nhất quán: Sidebar cố định bên trái (nền trắng/xám sáng), Header thanh mảnh ở trên cùng, Content chính bo góc nằm trên nền xám nhạt (`bg-[#f4f7fb]` hoặc `bg-slate-50`)[cite: 4, 7].
+- Card & Container: Nền trắng (`bg-white`), viền bo tròn nhẹ (`rounded-2xl` cho khung lớn, `rounded-lg` cho card nhỏ), đổ bóng nhẹ (`shadow-sm`)[cite: 4, 7].
+- Bo góc Input / Button: Thống nhất dùng `rounded-lg` hoặc `rounded-[5px]`[cite: 4, 7]. Không bo tròn viên thuốc (`rounded-full`) ngoại trừ avatar và pill badge trạng thái[cite: 4, 7].
 
 ---
 
-## 2. Quy chuẩn Bố cục Form Đăng ký ở (Room Registration)
-Theo mẫu thiết kế Figma chuẩn (Ảnh 1):
-1. **Header trang con**:
-   - Icon nét vẽ bút viết ô vuông (Edit Icon) màu xanh nổi bật.
-   - Tiêu đề chính "Đăng ký ở" (size 24px - 28px, font-bold).
-   - Mô tả phụ: "Kiểm tra thông tin trước khi xác nhận" (size 14px, màu xám nhạt).
-2. **Hệ thống 3 Thẻ Card nền trắng**:
-   - **Card 1: THÔNG TIN SINH VIÊN**: Form 2 cột cân đối, viền nhẹ, tự động điền sẵn thông tin sinh viên từ tài khoản/API.
-   - **Card 2: THÔNG TIN LIÊN HỆ KHẨN CẤP**: Họ tên người giám hộ, Mối liên hệ, Số điện thoại liên hệ.
-   - **Card 3: NGUYỆN VỌNG**: Dropdown chọn phòng/giường trống và Textarea nhập nội dung nguyện vọng của sinh viên.
-3. **Thanh thao tác chân trang**:
-   - Checkbox xác nhận: "Tôi xác nhận thông tin đăng ký ở là đúng".
-   - Nút "Quay lại": Viền xanh, text xanh, hover nền xanh nhạt.
-   - Nút "Gửi yêu cầu đăng ký": Nền xanh thương hiệu, chữ trắng, chỉ active khi đã tích checkbox xác nhận.
+## 2. Bảng Màu Thương hiệu (Color Tokens)
+
+### Màu chủ đạo (Primary & Brand)
+- **Primary Blue:** `#007bff` hoặc `bg-blue-600` (dùng cho nút chính, icon active, trạng thái active menu)[cite: 4, 7].
+- **Light Blue Background:** `#e7f1ff` hoặc `bg-blue-50` (dùng cho background active item trên menu, card highlight)[cite: 4, 7].
+- **Primary Text:** `#1e293b` (slate-800 - tiêu đề, nhãn input chính)[cite: 4, 7].
+- **Muted Text:** `#64748b` (slate-500 - placeholder, nhãn phụ)[cite: 4, 7].
+- **Border Input:** `#e2e8f0` (slate-200)[cite: 4, 7].
+
+### Màu Trạng thái (Status Badges & Action Buttons)
+- **Chờ duyệt / Cảnh báo:** `bg-amber-50 text-amber-600 border border-amber-200`.
+- **Thành công / Đã duyệt / Còn trống:** `bg-emerald-50 text-emerald-600 border border-emerald-200`.
+- **Từ chối / Vi phạm / Khẩn cấp:** `bg-rose-50 text-rose-600 border border-rose-200` (Nút từ chối: `bg-rose-200 text-rose-700` hoặc hover `bg-rose-300`)[cite: 7].
+- **Đang xử lý / Đã xếp:** `bg-blue-50 text-blue-600 border border-blue-200`[cite: 7].
 
 ---
 
-## 3. Quy chuẩn Màn hình gửi thành công (Success Screen)
-Theo mẫu thiết kế Figma chuẩn (Ảnh 2):
-1. Căn giữa toàn bộ nội dung theo cả chiều ngang và chiều dọc.
-2. Tiêu đề: "Gửi yêu cầu đăng ký thành công" với tông xanh lục đậm trang nhã.
-3. Đoạn giải thích 2 dòng:
-   - "Yêu cầu của bạn đã được gửi đến quản lý ktx."
-   - "Bạn có thể theo dõi kết quả tại Lịch sử đăng ký."
-4. Bộ 2 nút điều hướng:
-   - "Xem lịch sử đăng ký": Viền xanh, chữ xanh, điều hướng tới `/student/history`.
-   - "Về trang chủ": Nút xanh đầy đủ, điều hướng tới `/student/dashboard`.
-5. Nút nổi Chatbot AI ở góc dưới bên phải màn hình: Icon robot tròn, viền đổ bóng nổi, điểm nhấn công nghệ.
+## 3. Hệ thống Layouts theo 3 Phân hệ (Role Layouts)
+
+### A. Phân hệ Quản lý KTX (Admin Layout)
+- **Sidebar Brand:** Logo thương hiệu dạng text/icon đen đậm **iDoRM**[cite: 7].
+- **Danh mục Menu (`AdminSidebar`):**
+  - Group `MENU`: Dashboard, Quản lý phòng ở, Hồ sơ sinh viên, Phản ánh sự cố, Quản lý vi phạm, Báo cáo[cite: 7].
+  - Group `HỆ THỐNG`: Đăng xuất[cite: 7].
+- **Header:**
+  - Ô tìm kiếm rộng có kính lúp: *"Tra cứu phòng, sinh viên,..."* (`bg-white rounded-full` hoặc `rounded-xl`)[cite: 7].
+  - Nút chuông "Thông báo" (`rounded-full border border-blue-200 text-blue-600`)[cite: 7].
+  - Pill User: Nền xanh `bg-blue-600 text-white rounded-full` hiển thị icon user + username (ví dụ: `QL_Minh`)[cite: 7].
+
+### B. Phân hệ Sinh viên (Student Layout)
+- **Sidebar Brand:** Logo hình ngôi nhà kèm text **KTX - Hệ thống ký túc xá**[cite: 4, 5].
+- **Danh mục Menu (`StudentSidebar`):**
+  - Trang chủ (`Home`)[cite: 4, 5].
+  - Group `QUẢN LÝ PHÒNG`: Đăng ký ở, Chuyển / trả phòng, Tra cứu phòng, Lịch sử, Gửi phản ánh[cite: 4, 5].
+  - Group `TÀI CHÍNH`: Thanh toán phí KTX, Lịch sử thanh toán[cite: 4, 5].
+  - Group `CÁ NHÂN`: Thông tin cá nhân[cite: 4, 5].
+  - Group `HỆ THỐNG`: Trợ giúp và hỗ trợ, Đăng xuất[cite: 4, 5].
+- **Header:**
+  - Ô search nhỏ bo tròn nhẹ `Tìm kiếm...`[cite: 4, 5].
+  - Icon chuông thông báo (có chấm đỏ)[cite: 4, 5].
+  - Avatar tròn xám + Profile info (Họ tên: `Nguyễn Văn A`, role: `Sinh viên`)[cite: 4, 5].
+- **Floating AI Assistant:** Icon Chatbot AI luôn ghim cố định ở góc dưới bên phải màn hình (`fixed bottom-6 right-6`)[cite: 5].
+
+### C. Phân hệ Kế toán (Accountant Layout)
+- Kế thừa cấu trúc của Admin Layout nhưng tùy biến danh mục menu chuyên về tài chính:
+  - Hóa đơn phòng & dịch vụ điện nước.
+  - Sổ theo dõi công nợ sinh viên.
+  - Lịch sử thu / xác nhận chuyển khoản.
+  - Báo cáo thu chi tháng / kỳ.
+
+---
+
+## 4. Quy chuẩn Component Chi tiết
+
+### Input & Form Fields
+- Label: `text-sm font-medium text-slate-700 mb-1.5 block`.
+- Ô nhập dữ liệu (`input`, `select`):
+  - Class: `w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all`.
+  - Placeholder: `placeholder:text-slate-400`.
+- Chế độ chỉ đọc (Read-only / View): Dùng `bg-slate-50 border-slate-200 text-slate-600 cursor-not-allowed` khi hiển thị thông tin không được chỉnh sửa[cite: 7].
+
+### Buttons (Nút bấm)
+- **Nút Primary (Gửi / Phê duyệt):** `px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-lg shadow-sm transition-all` (Ví dụ: Nút "Phê duyệt & xếp phòng", "Gửi yêu cầu đăng ký")[cite: 4, 7].
+- **Nút Secondary / Quay lại:** `px-6 py-2.5 bg-white border border-blue-500 text-blue-600 hover:bg-blue-50 font-medium text-sm rounded-lg transition-all`[cite: 4, 5].
+- **Nút Danger / Từ chối:** `px-6 py-2.5 bg-rose-200 hover:bg-rose-300 text-rose-700 font-medium text-sm rounded-lg transition-all`[cite: 7].
+
+### Bảng Dữ liệu (Data Tables)
+- Container: `overflow-hidden bg-white border border-slate-100 rounded-xl shadow-sm`.
+- Table Header (`<thead>`): `bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wider`.
+- Table Row (`<tr>`): `border-b border-slate-100 hover:bg-slate-50/80 transition-colors`.
+- Cell Padding: `px-4 py-3.5 text-sm text-slate-700`.
+
+---
+
+## 5. Cấu trúc Thư mục Frontend Chuẩn (`src/`)
+Tất cả code giao diện bắt buộc tuân theo sơ đồ phân chia thư mục:
+```text
+src/
+├── components/                # Modal, popup, card, button tái sử dụng
+│   ├── common/                # Button, Input, Modal wrapper, Table
+│   ├── room/                  # AddRoomModal, EditRoomModal, RoomFilter
+│   └── occupancy/             # ApproveModal, RejectModal, AiSuggestModal
+├── layouts/                   # Layout khung bọc ngoài theo vai trò
+│   ├── AdminLayout.jsx        # Sidebar iDoRM + Header QL_Minh
+│   ├── StudentLayout.jsx      # Sidebar KTX + Header Sinh viên + Bot nổi
+│   └── AccountantLayout.jsx   # Sidebar & Header chuyên biệt Kế toán
+├── pages/                     # Màn hình trang hoàn chỉnh tương ứng route
+│   ├── admin/                 # Dashboard, RoomManagement, ProcessRegistrationPage
+│   ├── student/               # RoomRegistrationPage, RoomTransferPage, ComplaintsPage
+│   └── accountant/            # InvoicesPage, DebtTrackingPage
+├── services/                  # Toàn bộ hàm gọi API Axios
+└── routes/                    # File AppRoutes.jsx cấu hình phân quyền và link

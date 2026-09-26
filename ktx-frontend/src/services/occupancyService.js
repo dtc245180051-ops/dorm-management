@@ -516,6 +516,183 @@ export const occupancyService = {
   getCurrentStudentInfo: async () => {
     return null;
   },
+
+  /**
+   * =========================================================================
+   * YÊU CẦU CHUYỂN PHÒNG & TRẢ PHÒNG (SINH VIÊN)
+   * =========================================================================
+   */
+
+  /**
+   * Sinh viên gửi yêu cầu chuyển phòng
+   */
+  createTransferRequest: async (payload) => {
+    const today = new Date();
+    const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+    const newId = `YC-${Date.now().toString().slice(-4)}`;
+
+    const currentRoom = payload.phong_hien_tai || 'P36 – Tòa A2 – Tầng 3';
+    const targetRoom = payload.phong_mong_muon || 'P36 - Tòa A3 - Tầng 3';
+    
+    const currentClean = currentRoom.split(' – ')[0].split(' - ')[0].trim();
+    const targetClean = targetRoom.split(' – ')[0].split(' - ')[0].trim();
+    const phongLienQuan = `${currentClean} → ${targetClean}`;
+
+    const newReq = {
+      id: newId,
+      ma_yeu_cau: `#${newId}`,
+      loai_yeu_cau: 'Chuyển phòng',
+      loai_yeu_cau_code: 'CHUYEN_PHONG',
+      ngay_gui: formattedDate,
+      phong_hien_tai: currentRoom,
+      phong_mong_muon: targetRoom,
+      phong_lien_quan: phongLienQuan,
+      trang_thai: 'CHO_DUYET',
+      ly_do: payload.ly_do,
+      ngay_mong_muon: payload.ngay_mong_muon,
+      mo_ta: payload.mo_ta || '',
+    };
+
+    // 1. Lưu vào LocalStorage
+    try {
+      const stored = JSON.parse(localStorage.getItem('dorm_student_transfer_checkout_requests') || '[]');
+      const updated = [newReq, ...stored];
+      localStorage.setItem('dorm_student_transfer_checkout_requests', JSON.stringify(updated));
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+
+    // 2. Gửi API backend
+    try {
+      const res = await api.post('/student/requests/transfer', payload);
+      if (res.data) return res.data;
+    } catch (err) {
+      console.warn('POST /student/requests/transfer offline, using local:', err);
+    }
+
+    return {
+      status: 'success',
+      message: 'Gửi yêu cầu chuyển phòng thành công',
+      data: newReq,
+    };
+  },
+
+  /**
+   * Sinh viên gửi yêu cầu trả phòng
+   */
+  createCheckoutRequest: async (payload) => {
+    const today = new Date();
+    const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+    const newId = `YC-${Date.now().toString().slice(-4)}`;
+
+    const currentRoom = payload.phong_hien_tai || 'P36 – Tòa A2 – Tầng 3';
+    const currentClean = currentRoom.split(' – ')[0].split(' - ')[0].trim();
+
+    const newReq = {
+      id: newId,
+      ma_yeu_cau: `#${newId}`,
+      loai_yeu_cau: 'Trả phòng',
+      loai_yeu_cau_code: 'TRA_PHONG',
+      ngay_gui: formattedDate,
+      phong_hien_tai: currentRoom,
+      phong_lien_quan: currentClean,
+      trang_thai: 'CHO_DUYET',
+      ly_do: payload.ly_do,
+      ngay_mong_muon: payload.ngay_mong_muon,
+      dia_chi_sau_tra: payload.dia_chi_sau_tra || '',
+      mo_ta: payload.mo_ta || '',
+    };
+
+    // 1. Lưu vào LocalStorage
+    try {
+      const stored = JSON.parse(localStorage.getItem('dorm_student_transfer_checkout_requests') || '[]');
+      const updated = [newReq, ...stored];
+      localStorage.setItem('dorm_student_transfer_checkout_requests', JSON.stringify(updated));
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+
+    // 2. Gửi API backend
+    try {
+      const res = await api.post('/student/requests/checkout', payload);
+      if (res.data) return res.data;
+    } catch (err) {
+      console.warn('POST /student/requests/checkout offline, using local:', err);
+    }
+
+    return {
+      status: 'success',
+      message: 'Gửi yêu cầu trả phòng thành công',
+      data: newReq,
+    };
+  },
+
+  /**
+   * Lấy lịch sử yêu cầu chuyển / trả phòng của sinh viên
+   */
+  getMyRequests: async (msv) => {
+    let apiData = [];
+    try {
+      const res = await api.get('/student/requests/my-requests', { params: { msv } });
+      if (res.data?.data && Array.isArray(res.data.data)) {
+        apiData = res.data.data;
+      }
+    } catch (err) {
+      console.warn('GET /student/requests/my-requests offline, using local store:', err);
+    }
+
+    // Dữ liệu mẫu chuẩn Figma
+    const defaultData = [
+      {
+        id: 'YC-0231',
+        ma_yeu_cau: '#YC-0231',
+        loai_yeu_cau: 'Chuyển phòng',
+        loai_yeu_cau_code: 'CHUYEN_PHONG',
+        ngay_gui: '25/11/2025',
+        phong_lien_quan: 'P12 → P36',
+        trang_thai: 'DA_DUYET',
+        ly_do: 'Phòng hiện tại quá tải',
+        ngay_mong_muon: '01/12/2025',
+        mo_ta: 'Nguyện vọng chuyển sang phòng 6 người',
+      },
+      {
+        id: 'YC-0232',
+        ma_yeu_cau: '#YC-0232',
+        loai_yeu_cau: 'Trả phòng',
+        loai_yeu_cau_code: 'TRA_PHONG',
+        ngay_gui: '25/08/2026',
+        phong_lien_quan: 'P36',
+        trang_thai: 'CHO_DUYET',
+        ly_do: 'Đã tốt nghiệp',
+        ngay_mong_muon: '01/09/2026',
+        mo_ta: 'Em đã hoàn thành khóa luận tốt nghiệp',
+      },
+    ];
+
+    let localData = [];
+    try {
+      const raw = localStorage.getItem('dorm_student_transfer_checkout_requests');
+      if (raw) {
+        localData = JSON.parse(raw);
+      } else {
+        localStorage.setItem('dorm_student_transfer_checkout_requests', JSON.stringify(defaultData));
+        localData = defaultData;
+      }
+    } catch (e) {
+      localData = defaultData;
+    }
+
+    // Kết hợp dữ liệu (loại bỏ trùng lặp theo ID)
+    const map = new Map();
+    [...apiData, ...localData, ...defaultData].forEach((item) => {
+      const key = item.id || item.ma_yeu_cau;
+      if (key && !map.has(key)) {
+        map.set(key, item);
+      }
+    });
+
+    return Array.from(map.values());
+  },
 };
 
 export default occupancyService;

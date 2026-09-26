@@ -11,11 +11,23 @@ import {
   HelpCircle,
   LogOut,
   Bell,
-  MessageSquare,
   Sparkles,
   X,
   Send,
 } from 'lucide-react';
+
+const STUDENT_NAV_ITEMS = [
+  { id: 'dashboard', label: 'Trang chủ', icon: Home, section: 'main' },
+  { id: 'register', label: 'Đăng ký ở', icon: FileEdit, section: 'room' },
+  { id: 'transfer', label: 'Chuyển / trả phòng', icon: ArrowLeftRight, section: 'room' },
+  { id: 'lookup', label: 'Tra cứu phòng', icon: Search, section: 'room' },
+  { id: 'history', label: 'Lịch sử', icon: Clock, section: 'room' },
+  { id: 'feedback', label: 'Gửi phản ánh', icon: FileText, section: 'room' },
+  { id: 'payment', label: 'Thanh toán phí KTX', icon: CreditCard, section: 'finance' },
+  { id: 'payment_history', label: 'Lịch sử thanh toán', icon: Clock, section: 'finance' },
+  { id: 'profile', label: 'Thông tin cá nhân', icon: User, section: 'personal' },
+  { id: 'help', label: 'Trợ giúp và hỗ trợ', icon: HelpCircle, section: 'system' },
+];
 
 export default function StudentLayout({
   children,
@@ -54,42 +66,32 @@ export default function StudentLayout({
     }, 600);
   };
 
-  const navItems = [
-    { id: 'dashboard', label: 'Trang chủ', icon: Home, section: 'main' },
-    {
-      id: 'register',
-      label: 'Đăng ký phòng',
-      icon: FileEdit,
-      section: 'room',
-      highlightLabel: 'Đăng ký ở',
-    },
-    { id: 'transfer', label: 'Chuyển / trả phòng', icon: ArrowLeftRight, section: 'room' },
-    { id: 'lookup', label: 'Tra cứu phòng', icon: Search, section: 'room' },
-    { id: 'history', label: 'Lịch sử', icon: Clock, section: 'room' },
-    { id: 'feedback', label: 'Gửi phản ánh', icon: FileText, section: 'room' },
-    { id: 'payment', label: 'Thanh toán phí KTX', icon: CreditCard, section: 'finance' },
-    { id: 'payment_history', label: 'Lịch sử thanh toán', icon: Clock, section: 'finance' },
-    { id: 'profile', label: 'Thông tin cá nhân', icon: User, section: 'personal' },
-    { id: 'help', label: 'Trợ giúp và hỗ trợ', icon: HelpCircle, section: 'system' },
-  ];
-
   const handleTabClick = (tabId) => {
     if (onSelectTab) {
       onSelectTab(tabId);
     } else {
       if (tabId === 'register') {
         window.history.pushState({}, '', '/student/register');
+        window.dispatchEvent(new PopStateEvent('popstate'));
       } else if (tabId === 'history') {
         window.history.pushState({}, '', '/student/history');
+        window.dispatchEvent(new PopStateEvent('popstate'));
       } else if (tabId === 'dashboard') {
         window.history.pushState({}, '', '/student/dashboard');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      } else if (tabId === 'transfer') {
+        window.history.pushState({}, '', '/student/transfer-room');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      } else {
+        window.history.pushState({}, '', `/student/${tabId}`);
+        window.dispatchEvent(new PopStateEvent('popstate'));
       }
     }
   };
 
   return (
     <div className="min-h-screen bg-[#eef2f6] text-slate-800 font-sans flex flex-col antialiased selection:bg-blue-100 selection:text-blue-700">
-      {/* 1. Header trên cùng theo chuẩn Figma */}
+      {/* 1. Header trên cùng chuẩn Figma */}
       <header className="h-18 bg-white border-b border-slate-200/80 px-6 sm:px-8 flex items-center justify-between gap-6 shrink-0 sticky top-0 z-40 shadow-xs">
         {/* Logo KTX */}
         <div
@@ -97,7 +99,6 @@ export default function StudentLayout({
           className="flex items-center gap-3 cursor-pointer select-none group"
         >
           <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:bg-blue-700 transition">
-            {/* SVG Nhà KTX */}
             <svg
               className="w-6 h-6 fill-current"
               viewBox="0 0 24 24"
@@ -171,11 +172,10 @@ export default function StudentLayout({
               <button
                 type="button"
                 onClick={() => handleTabClick('dashboard')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
-                  activeTab === 'dashboard'
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${activeTab === 'dashboard'
+                  ? 'bg-blue-50 text-blue-600 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  }`}
               >
                 <Home className="w-4 h-4 shrink-0 text-slate-500" />
                 <span>Trang chủ</span>
@@ -188,7 +188,7 @@ export default function StudentLayout({
                 QUẢN LÝ PHÒNG
               </div>
               <div className="space-y-1">
-                {navItems
+                {STUDENT_NAV_ITEMS
                   .filter((item) => item.section === 'room')
                   .map((item) => {
                     const Icon = item.icon;
@@ -198,16 +198,14 @@ export default function StudentLayout({
                         key={item.id}
                         type="button"
                         onClick={() => handleTabClick(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${
-                          isActive
-                            ? 'bg-[#e0f2fe] text-[#0284c7] font-bold shadow-2xs'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
-                        }`}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
+                          ? 'bg-[#e0f2fe] text-[#0284c7] font-bold shadow-2xs'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                          }`}
                       >
                         <Icon
-                          className={`w-4 h-4 shrink-0 ${
-                            isActive ? 'text-[#0284c7]' : 'text-slate-400'
-                          }`}
+                          className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#0284c7]' : 'text-slate-400'
+                            }`}
                         />
                         <span>{item.label}</span>
                       </button>
@@ -222,7 +220,7 @@ export default function StudentLayout({
                 TÀI CHÍNH
               </div>
               <div className="space-y-1">
-                {navItems
+                {STUDENT_NAV_ITEMS
                   .filter((item) => item.section === 'finance')
                   .map((item) => {
                     const Icon = item.icon;
@@ -232,13 +230,15 @@ export default function StudentLayout({
                         key={item.id}
                         type="button"
                         onClick={() => handleTabClick(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${
-                          isActive
-                            ? 'bg-[#e0f2fe] text-[#0284c7] font-bold'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
-                        }`}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
+                          ? 'bg-[#e0f2fe] text-[#0284c7] font-bold shadow-2xs'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                          }`}
                       >
-                        <Icon className="w-4 h-4 shrink-0 text-slate-400" />
+                        <Icon
+                          className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#0284c7]' : 'text-slate-400'
+                            }`}
+                        />
                         <span>{item.label}</span>
                       </button>
                     );
@@ -252,7 +252,7 @@ export default function StudentLayout({
                 CÁ NHÂN
               </div>
               <div className="space-y-1">
-                {navItems
+                {STUDENT_NAV_ITEMS
                   .filter((item) => item.section === 'personal')
                   .map((item) => {
                     const Icon = item.icon;
@@ -262,13 +262,15 @@ export default function StudentLayout({
                         key={item.id}
                         type="button"
                         onClick={() => handleTabClick(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${
-                          isActive
-                            ? 'bg-[#e0f2fe] text-[#0284c7] font-bold'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
-                        }`}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
+                          ? 'bg-[#e0f2fe] text-[#0284c7] font-bold shadow-2xs'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                          }`}
                       >
-                        <Icon className="w-4 h-4 shrink-0 text-slate-400" />
+                        <Icon
+                          className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#0284c7]' : 'text-slate-400'
+                            }`}
+                        />
                         <span>{item.label}</span>
                       </button>
                     );
@@ -282,7 +284,7 @@ export default function StudentLayout({
                 HỆ THỐNG
               </div>
               <div className="space-y-1">
-                {navItems
+                {STUDENT_NAV_ITEMS
                   .filter((item) => item.section === 'system')
                   .map((item) => {
                     const Icon = item.icon;
@@ -292,13 +294,15 @@ export default function StudentLayout({
                         key={item.id}
                         type="button"
                         onClick={() => handleTabClick(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${
-                          isActive
-                            ? 'bg-[#e0f2fe] text-[#0284c7] font-bold'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
-                        }`}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
+                          ? 'bg-[#e0f2fe] text-[#0284c7] font-bold shadow-2xs'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                          }`}
                       >
-                        <Icon className="w-4 h-4 shrink-0 text-slate-400" />
+                        <Icon
+                          className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#0284c7]' : 'text-slate-400'
+                            }`}
+                        />
                         <span>{item.label}</span>
                       </button>
                     );
@@ -329,7 +333,7 @@ export default function StudentLayout({
         </main>
       </div>
 
-      {/* 3. Nút nổi Chatbot AI ở góc dưới bên phải theo đúng thiết kế Ảnh 2 */}
+      {/* 3. Nút nổi Chatbot AI ở góc dưới bên phải theo đúng thiết kế */}
       <div className="fixed bottom-6 right-8 z-50">
         <button
           type="button"
@@ -338,19 +342,12 @@ export default function StudentLayout({
           title="Trợ lý AI KTX"
         >
           {/* Avatar Robot Công nghệ */}
-          <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-blue-600 via-sky-500 to-indigo-400 p-0.5 shadow-xl shadow-blue-500/30 flex items-center justify-center">
-            <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden relative">
-              {/* Cute Robot Face SVG */}
-              <div className="w-10 h-10 rounded-full bg-gradient-to-b from-blue-50 to-blue-100 flex items-center justify-center relative shadow-inner">
-                {/* Robot Eyes & Smile */}
-                <div className="w-7 h-4 bg-blue-600 rounded-full flex items-center justify-around px-1 relative">
-                  <div className="w-1.5 h-1.5 bg-cyan-300 rounded-full animate-pulse"></div>
-                  <div className="w-1.5 h-1.5 bg-cyan-300 rounded-full animate-pulse"></div>
-                </div>
-                {/* Robot Antennas */}
-                <div className="absolute -top-1 w-2 h-1 bg-sky-400 rounded-t-sm"></div>
-              </div>
-            </div>
+          <div className="w-16 h-16 rounded-full overflow-hidden shadow-lg flex items-center justify-center">
+            <img
+              src="/public/images/chatbot.png"
+              alt="Chatbot Avatar"
+              className="w-full h-full object-cover"
+            />
           </div>
 
           {/* Chấm tròn xanh lá cây online góc dưới bên phải */}
@@ -388,11 +385,10 @@ export default function StudentLayout({
                   className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl leading-relaxed ${
-                      msg.sender === 'user'
-                        ? 'bg-blue-600 text-white rounded-br-xs'
-                        : 'bg-white text-slate-800 border border-slate-200/80 shadow-2xs rounded-bl-xs'
-                    }`}
+                    className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl leading-relaxed ${msg.sender === 'user'
+                      ? 'bg-blue-600 text-white rounded-br-xs'
+                      : 'bg-white text-slate-800 border border-slate-200/80 shadow-2xs rounded-bl-xs'
+                      }`}
                   >
                     {msg.text}
                   </div>

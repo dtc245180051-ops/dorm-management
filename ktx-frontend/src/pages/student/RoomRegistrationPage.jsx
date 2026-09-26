@@ -13,6 +13,7 @@ import { VIETNAM_PROVINCES } from '../../data/vietnamAddressData';
 export default function RoomRegistrationPage({
   onNavigateHistory,
   onNavigateDashboard,
+  onSelectTab,
 }) {
   // State chuyển đổi mượt mà giữa Form và Màn hình thành công (không chuyển URL)
   const [isSuccess, setIsSuccess] = useState(false);
@@ -172,7 +173,9 @@ export default function RoomRegistrationPage({
 
   // Điều hướng nút Xem lịch sử
   const handleGoToHistory = () => {
-    if (onNavigateHistory) {
+    if (onSelectTab) {
+      onSelectTab('history');
+    } else if (onNavigateHistory) {
       onNavigateHistory();
     } else {
       window.history.pushState({}, '', '/student/history');
@@ -182,7 +185,9 @@ export default function RoomRegistrationPage({
 
   // Điều hướng nút Về trang chủ
   const handleGoToDashboard = () => {
-    if (onNavigateDashboard) {
+    if (onSelectTab) {
+      onSelectTab('dashboard');
+    } else if (onNavigateDashboard) {
       onNavigateDashboard();
     } else {
       window.history.pushState({}, '', '/student/dashboard');
@@ -193,6 +198,7 @@ export default function RoomRegistrationPage({
   return (
     <StudentLayout
       activeTab="register"
+      onSelectTab={onSelectTab}
       userName={formData.ho_ten || 'Sinh viên'}
       userRole="Sinh viên"
     >

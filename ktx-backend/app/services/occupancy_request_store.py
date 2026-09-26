@@ -92,3 +92,106 @@ def update_request_status(req_id: str, new_status: str, extra_data: Optional[dic
             req.update(extra_data)
         return req
     return None
+
+
+# =========================================================================
+# STORE QUẢN LÝ YÊU CẦU CHUYỂN PHÒNG & TRẢ PHÒNG (SINH VIÊN)
+# =========================================================================
+TRANSFER_CHECKOUT_REQUESTS: List[Dict] = [
+    {
+        "id": "YC-0231",
+        "ma_yeu_cau": "#YC-0231",
+        "loai_yeu_cau": "Chuyển phòng",
+        "loai_yeu_cau_code": "CHUYEN_PHONG",
+        "ngay_gui": "2025-11-25",
+        "phong_hien_tai": "P12",
+        "phong_mong_muon": "P36",
+        "phong_lien_quan": "P12 → P36",
+        "trang_thai": "DA_DUYET",
+        "ly_do": "Phòng hiện tại quá tải",
+        "ngay_mong_muon": "2025-12-01",
+        "mo_ta": "Nguyện vọng chuyển sang phòng 6 người cùng bạn học",
+        "msv": "B21DCCN001",
+    },
+    {
+        "id": "YC-0232",
+        "ma_yeu_cau": "#YC-0232",
+        "loai_yeu_cau": "Trả phòng",
+        "loai_yeu_cau_code": "TRA_PHONG",
+        "ngay_gui": "2026-08-25",
+        "phong_hien_tai": "P36",
+        "phong_lien_quan": "P36",
+        "trang_thai": "CHO_DUYET",
+        "ly_do": "Đã tốt nghiệp",
+        "ngay_mong_muon": "2026-09-01",
+        "dia_chi_sau_tra": "Số 123 Cầu Giấy, Hà Nội",
+        "mo_ta": "Em đã hoàn thành chương trình đại học và xin trả phòng đúng hạn.",
+        "msv": "B21DCCN001",
+    },
+]
+
+
+def add_transfer_request(req_data: dict) -> dict:
+    """Thêm một yêu cầu chuyển phòng mới."""
+    new_id = f"YC-{len(TRANSFER_CHECKOUT_REQUESTS) + 231:04d}"
+    phong_hien_tai = req_data.get("phong_hien_tai", "P36")
+    phong_mong_muon = req_data.get("phong_mong_muon", "P36 - Tòa A3")
+    
+    # Rút gọn nhãn phòng hiển thị dạng P12 → P36
+    target_clean = phong_mong_muon.split(" - ")[0].strip() if " - " in phong_mong_muon else phong_mong_muon
+    current_clean = phong_hien_tai.split(" - ")[0].strip() if " - " in phong_hien_tai else phong_hien_tai
+    phong_lien_quan = f"{current_clean} → {target_clean}"
+
+    new_item = {
+        "id": new_id,
+        "ma_yeu_cau": f"#{new_id}",
+        "loai_yeu_cau": "Chuyển phòng",
+        "loai_yeu_cau_code": "CHUYEN_PHONG",
+        "ngay_gui": datetime.date.today().strftime("%Y-%m-%d"),
+        "phong_hien_tai": phong_hien_tai,
+        "phong_mong_muon": phong_mong_muon,
+        "phong_lien_quan": phong_lien_quan,
+        "trang_thai": "CHO_DUYET",
+        "ly_do": req_data.get("ly_do", "Phòng hiện tại quá tải"),
+        "ngay_mong_muon": req_data.get("ngay_mong_muon", ""),
+        "mo_ta": req_data.get("mo_ta", ""),
+        "msv": req_data.get("msv", "B21DCCN001"),
+    }
+    TRANSFER_CHECKOUT_REQUESTS.insert(0, new_item)
+    return new_item
+
+
+def add_checkout_request(req_data: dict) -> dict:
+    """Thêm một yêu cầu trả phòng mới."""
+    new_id = f"YC-{len(TRANSFER_CHECKOUT_REQUESTS) + 231:04d}"
+    phong_hien_tai = req_data.get("phong_hien_tai", "P36")
+    current_clean = phong_hien_tai.split(" – ")[0].split(" - ")[0].strip() if " – " in phong_hien_tai or " - " in phong_hien_tai else phong_hien_tai
+
+    new_item = {
+        "id": new_id,
+        "ma_yeu_cau": f"#{new_id}",
+        "loai_yeu_cau": "Trả phòng",
+        "loai_yeu_cau_code": "TRA_PHONG",
+        "ngay_gui": datetime.date.today().strftime("%Y-%m-%d"),
+        "phong_hien_tai": phong_hien_tai,
+        "phong_lien_quan": current_clean,
+        "trang_thai": "CHO_DUYET",
+        "ly_do": req_data.get("ly_do", "Đã tốt nghiệp"),
+        "ngay_mong_muon": req_data.get("ngay_mong_muon", ""),
+        "dia_chi_sau_tra": req_data.get("dia_chi_sau_tra", ""),
+        "mo_ta": req_data.get("mo_ta", ""),
+        "msv": req_data.get("msv", "B21DCCN001"),
+    }
+    TRANSFER_CHECKOUT_REQUESTS.insert(0, new_item)
+    return new_item
+
+
+def get_student_transfer_checkout_requests(msv: Optional[str] = None) -> List[Dict]:
+    """Lấy danh sách các yêu cầu chuyển/trả phòng của sinh viên."""
+    if not msv:
+        return TRANSFER_CHECKOUT_REQUESTS
+    return [
+        req for req in TRANSFER_CHECKOUT_REQUESTS
+        if req.get("msv", "").lower() == msv.strip().lower()
+    ] or TRANSFER_CHECKOUT_REQUESTS
+

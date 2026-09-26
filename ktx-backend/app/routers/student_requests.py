@@ -200,3 +200,74 @@ def register_room(
         "message": "Gửi yêu cầu đăng ký phòng thành công",
         "data": stored_request,
     }
+
+
+# =========================================================================
+# YÊU CẦU CHUYỂN PHÒNG & TRẢ PHÒNG (SINH VIÊN)
+# =========================================================================
+
+class TransferRoomRequest(BaseModel):
+    msv: Optional[str] = "B21DCCN001"
+    phong_hien_tai: Optional[str] = "P36 – Tòa A2 – Tầng 3"
+    ly_do: str
+    ngay_mong_muon: str
+    phong_mong_muon: str
+    mo_ta: Optional[str] = ""
+
+
+class CheckoutRoomRequest(BaseModel):
+    msv: Optional[str] = "B21DCCN001"
+    phong_hien_tai: Optional[str] = "P36 – Tòa A2 – Tầng 3"
+    ly_do: str
+    ngay_mong_muon: str
+    dia_chi_sau_tra: Optional[str] = ""
+    mo_ta: Optional[str] = ""
+
+
+@router.post(
+    "/transfer",
+    summary="Gửi yêu cầu chuyển phòng",
+    status_code=status.HTTP_201_CREATED,
+)
+def create_transfer_request(req: TransferRoomRequest):
+    """Tiếp nhận yêu cầu chuyển phòng từ sinh viên."""
+    from app.services import occupancy_request_store
+    data = req.model_dump()
+    saved = occupancy_request_store.add_transfer_request(data)
+    return {
+        "status": "success",
+        "message": "Gửi yêu cầu chuyển phòng thành công",
+        "data": saved,
+    }
+
+
+@router.post(
+    "/checkout",
+    summary="Gửi yêu cầu trả phòng",
+    status_code=status.HTTP_201_CREATED,
+)
+def create_checkout_request(req: CheckoutRoomRequest):
+    """Tiếp nhận yêu cầu trả phòng từ sinh viên."""
+    from app.services import occupancy_request_store
+    data = req.model_dump()
+    saved = occupancy_request_store.add_checkout_request(data)
+    return {
+        "status": "success",
+        "message": "Gửi yêu cầu trả phòng thành công",
+        "data": saved,
+    }
+
+
+@router.get(
+    "/my-requests",
+    summary="Lấy lịch sử yêu cầu chuyển / trả phòng của sinh viên",
+)
+def get_my_requests(msv: Optional[str] = None):
+    """Lấy danh sách các yêu cầu chuyển và trả phòng của sinh viên."""
+    from app.services import occupancy_request_store
+    items = occupancy_request_store.get_student_transfer_checkout_requests(msv)
+    return {
+        "status": "success",
+        "data": items,
+    }
+
