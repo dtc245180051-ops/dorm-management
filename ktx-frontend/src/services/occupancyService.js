@@ -58,6 +58,62 @@ function saveLocalRequests(requests) {
   }
 }
 
+const TRANSFER_CHECKOUT_STORAGE_KEY = 'dorm_transfer_checkout_requests';
+
+const DEFAULT_TRANSFER_CHECKOUT_REQUESTS = [
+  {
+    id: 'YC-0231',
+    ma_yeu_cau: '#YC-0231',
+    loai_yeu_cau: 'Chuyển phòng',
+    ngay_gui: '25/11/2025',
+    phong_lien_quan: 'P12 → P36',
+    phong_hien_tai: 'P12',
+    phong_dich: 'P36',
+    ly_do: 'Phòng hiện tại quá tải',
+    ngay_mong_muon: '01/12/2025',
+    mo_ta: 'Muốn chuyển sang phòng thoáng hơn',
+    trang_thai: 'DA_DUYET',
+    trang_thai_label: 'Đã duyệt',
+  },
+  {
+    id: 'YC-0232',
+    ma_yeu_cau: '#YC-0232',
+    loai_yeu_cau: 'Trả phòng',
+    ngay_gui: '25/08/2026',
+    phong_lien_quan: 'P36',
+    phong_hien_tai: 'P36',
+    ly_do: 'Đã tốt nghiệp',
+    ngay_mong_muon: '01/09/2026',
+    dia_chi_sau_tra: 'Số 123 Đường Cầu Giấy, Hà Nội',
+    mo_ta: 'Đã hoàn thành chương trình học',
+    trang_thai: 'CHO_DUYET',
+    trang_thai_label: 'Chờ duyệt',
+  },
+];
+
+function getLocalTransferCheckoutRequests() {
+  try {
+    const raw = localStorage.getItem(TRANSFER_CHECKOUT_STORAGE_KEY);
+    if (!raw) {
+      localStorage.setItem(TRANSFER_CHECKOUT_STORAGE_KEY, JSON.stringify(DEFAULT_TRANSFER_CHECKOUT_REQUESTS));
+      return DEFAULT_TRANSFER_CHECKOUT_REQUESTS;
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_TRANSFER_CHECKOUT_REQUESTS;
+  } catch (e) {
+    return DEFAULT_TRANSFER_CHECKOUT_REQUESTS;
+  }
+}
+
+function saveLocalTransferCheckoutRequests(reqs) {
+  try {
+    localStorage.setItem(TRANSFER_CHECKOUT_STORAGE_KEY, JSON.stringify(reqs));
+  } catch (e) {
+    console.error('Failed to save transfer/checkout to localStorage:', e);
+  }
+}
+
+
 export const occupancyService = {
   /**
    * Lấy danh sách các lựa chọn phòng/giường trống cho sinh viên đăng ký
@@ -516,6 +572,175 @@ export const occupancyService = {
   getCurrentStudentInfo: async () => {
     return null;
   },
+
+  /**
+   * Lấy thông tin phòng hiện tại của sinh viên
+   */
+  getCurrentRoomInfo: async () => {
+    return {
+      phong_hien_tai: 'P36 – Tòa A2 – Tầng 3',
+      thanh_vien: '6/8 người',
+      thoi_gian_luu_tru: '09/2025 – Nay',
+      so_phong: 'P36',
+      toa: 'A2',
+      tang: '3',
+      so_thanh_vien: 6,
+      suc_chua: 8,
+    };
+  },
+
+  /**
+   * Sinh viên gửi đơn xin chuyển phòng
+   */
+  submitTransferRequest: async (data) => {
+    const today = new Date();
+    const dateStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+    const all = getLocalTransferCheckoutRequests();
+    const nextNum = all.length + 231;
+    const reqId = `YC-${String(nextNum).padStart(4, '0')}`;
+
+    const targetRoom = data.phong_mong_muon || 'P36';
+    const targetShort = targetRoom.includes(' - ') ? targetRoom.split(' - ')[0] : targetRoom;
+    const currentShort = data.phong_hien_tai || 'P36';
+
+    const newReq = {
+      id: reqId,
+      ma_yeu_cau: `#${reqId}`,
+      loai_yeu_cau: 'Chuyển phòng',
+      ngay_gui: dateStr,
+      phong_lien_quan: `${currentShort} → ${targetShort}`,
+      phong_hien_tai: currentShort,
+      phong_dich: targetRoom,
+      ly_do: data.ly_do || 'Phòng hiện tại quá tải',
+      ngay_mong_muon: data.ngay_mong_muon || '',
+      mo_ta: data.mo_ta_chi_tiet || data.mo_ta || '',
+      trang_thai: 'CHO_DUYET',
+      trang_thai_label: 'Chờ duyệt',
+      created_at: new Date().toISOString(),
+    };
+
+    // Lưu ngay vào LocalStorage
+    const updated = [newReq, ...all];
+    saveLocalTransferCheckoutRequests(updated);
+
+    // Gửi lên Backend nếu backend online
+    try {
+      const res = await api.post('/student/requests/transfer', {
+        msv: data.msv || 'B21DCCN001',
+        ho_ten: data.ho_ten || 'Nguyễn Văn A',
+        phong_hien_tai: currentShort,
+        ly_do: data.ly_do,
+        ngay_mong_muon: data.ngay_mong_muon,
+        phong_mong_muon: targetRoom,
+        mo_ta_chi_tiet: data.mo_ta_chi_tiet || '',
+      });
+      if (res.data?.data) {
+        return res.data;
+      }
+    } catch (err) {
+      console.warn('Backend POST /student/requests/transfer offline, using local response:', err);
+    }
+
+    return {
+      status: 'success',
+      message: 'Gửi yêu cầu chuyển phòng thành công',
+      data: newReq,
+    };
+  },
+
+  /**
+   * Sinh viên gửi đơn xin trả phòng
+   */
+  submitCheckoutRequest: async (data) => {
+    const today = new Date();
+    const dateStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+    const all = getLocalTransferCheckoutRequests();
+    const nextNum = all.length + 231;
+    const reqId = `YC-${String(nextNum).padStart(4, '0')}`;
+    const currentShort = data.phong_hien_tai || 'P36';
+
+    const newReq = {
+      id: reqId,
+      ma_yeu_cau: `#${reqId}`,
+      loai_yeu_cau: 'Trả phòng',
+      ngay_gui: dateStr,
+      phong_lien_quan: currentShort,
+      phong_hien_tai: currentShort,
+      ly_do: data.ly_do || 'Đã tốt nghiệp',
+      ngay_mong_muon: data.ngay_mong_muon || '',
+      dia_chi_sau_tra: data.dia_chi_lien_he || '',
+      mo_ta: data.mo_ta_chi_tiet || data.mo_ta || '',
+      trang_thai: 'CHO_DUYET',
+      trang_thai_label: 'Chờ duyệt',
+      created_at: new Date().toISOString(),
+    };
+
+    // Lưu ngay vào LocalStorage
+    const updated = [newReq, ...all];
+    saveLocalTransferCheckoutRequests(updated);
+
+    // Gửi lên Backend nếu backend online
+    try {
+      const res = await api.post('/student/requests/checkout', {
+        msv: data.msv || 'B21DCCN001',
+        ho_ten: data.ho_ten || 'Nguyễn Văn A',
+        phong_hien_tai: currentShort,
+        ly_do: data.ly_do,
+        ngay_mong_muon: data.ngay_mong_muon,
+        dia_chi_lien_he: data.dia_chi_lien_he,
+        mo_ta_chi_tiet: data.mo_ta_chi_tiet || '',
+      });
+      if (res.data?.data) {
+        return res.data;
+      }
+    } catch (err) {
+      console.warn('Backend POST /student/requests/checkout offline, using local response:', err);
+    }
+
+    return {
+      status: 'success',
+      message: 'Gửi yêu cầu trả phòng thành công',
+      data: newReq,
+    };
+  },
+
+  /**
+   * Lấy danh sách lịch sử yêu cầu chuyển / trả phòng
+   */
+  getTransferCheckoutRequests: async () => {
+    try {
+      const res = await api.get('/student/requests/transfer-checkout-history');
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        return res.data;
+      }
+    } catch (err) {
+      console.warn('Backend GET /student/requests/transfer-checkout-history offline, using local store:', err);
+    }
+
+    return getLocalTransferCheckoutRequests();
+  },
+
+  getMyRequests: async () => {
+    return getLocalRequests();
+  },
+
+  getMyContracts: async () => {
+    return [
+      {
+        id: 'HD26-A2P36-G07',
+        ma_hop_dong: 'HD26-A2P36-G07',
+        phong: 'P36',
+        toa: 'A2',
+        tang: '3',
+        giuong: 'G7',
+        thoi_gian_o: '2026-2027',
+        nam_hoc: '2026-2027',
+        trang_thai: 'DANG_O',
+        trang_thai_label: 'Đang ở',
+      },
+    ];
+  },
 };
 
 export default occupancyService;
+

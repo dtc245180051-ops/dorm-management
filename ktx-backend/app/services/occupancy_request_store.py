@@ -92,3 +92,93 @@ def update_request_status(req_id: str, new_status: str, extra_data: Optional[dic
             req.update(extra_data)
         return req
     return None
+
+
+# Danh sách các yêu cầu chuyển phòng và trả phòng
+TRANSFER_CHECKOUT_REQUESTS: List[Dict] = [
+    {
+        "id": "YC-0231",
+        "ma_yeu_cau": "#YC-0231",
+        "loai_yeu_cau": "Chuyển phòng",
+        "ngay_gui": "25/11/2025",
+        "phong_lien_quan": "P12 → P36",
+        "phong_hien_tai": "P12",
+        "phong_dich": "P36",
+        "ly_do": "Phòng hiện tại quá tải",
+        "ngay_mong_muon": "01/12/2025",
+        "mo_ta": "Muốn chuyển sang phòng thoáng hơn",
+        "trang_thai": "DA_DUYET",
+        "trang_thai_label": "Đã duyệt",
+    },
+    {
+        "id": "YC-0232",
+        "ma_yeu_cau": "#YC-0232",
+        "loai_yeu_cau": "Trả phòng",
+        "ngay_gui": "25/08/2026",
+        "phong_lien_quan": "P36",
+        "phong_hien_tai": "P36",
+        "ly_do": "Đã tốt nghiệp",
+        "ngay_mong_muon": "01/09/2026",
+        "dia_chi_sau_tra": "Số 123 Đường Cầu Giấy, Hà Nội",
+        "mo_ta": "Đã hoàn thành chương trình học",
+        "trang_thai": "CHO_DUYET",
+        "trang_thai_label": "Chờ duyệt",
+    },
+]
+
+
+def add_transfer_request(data: dict) -> dict:
+    req_num = len(TRANSFER_CHECKOUT_REQUESTS) + 231
+    req_id = data.get("id") or f"YC-{req_num:04d}"
+    today_str = datetime.datetime.now().strftime("%d/%m/%Y")
+    
+    phong_hien_tai = data.get("phong_hien_tai", "P36")
+    phong_mong_muon = data.get("phong_mong_muon", "")
+    target_short = phong_mong_muon.split(" - ")[0] if " - " in phong_mong_muon else phong_mong_muon
+    
+    new_req = {
+        "id": req_id,
+        "ma_yeu_cau": f"#{req_id}",
+        "loai_yeu_cau": "Chuyển phòng",
+        "ngay_gui": data.get("ngay_gui") or today_str,
+        "phong_lien_quan": f"{phong_hien_tai} → {target_short}" if target_short else phong_hien_tai,
+        "phong_hien_tai": phong_hien_tai,
+        "phong_dich": target_short,
+        "ly_do": data.get("ly_do", ""),
+        "ngay_mong_muon": data.get("ngay_mong_muon", ""),
+        "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", ""),
+        "trang_thai": "CHO_DUYET",
+        "trang_thai_label": "Chờ duyệt",
+    }
+    TRANSFER_CHECKOUT_REQUESTS.insert(0, new_req)
+    return new_req
+
+
+def add_checkout_request(data: dict) -> dict:
+    req_num = len(TRANSFER_CHECKOUT_REQUESTS) + 231
+    req_id = data.get("id") or f"YC-{req_num:04d}"
+    today_str = datetime.datetime.now().strftime("%d/%m/%Y")
+    
+    phong_hien_tai = data.get("phong_hien_tai", "P36")
+    
+    new_req = {
+        "id": req_id,
+        "ma_yeu_cau": f"#{req_id}",
+        "loai_yeu_cau": "Trả phòng",
+        "ngay_gui": data.get("ngay_gui") or today_str,
+        "phong_lien_quan": phong_hien_tai,
+        "phong_hien_tai": phong_hien_tai,
+        "ly_do": data.get("ly_do", ""),
+        "ngay_mong_muon": data.get("ngay_mong_muon", ""),
+        "dia_chi_sau_tra": data.get("dia_chi_lien_he") or data.get("dia_chi_sau_tra", ""),
+        "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", ""),
+        "trang_thai": "CHO_DUYET",
+        "trang_thai_label": "Chờ duyệt",
+    }
+    TRANSFER_CHECKOUT_REQUESTS.insert(0, new_req)
+    return new_req
+
+
+def get_transfer_checkout_requests() -> List[Dict]:
+    return TRANSFER_CHECKOUT_REQUESTS
+
