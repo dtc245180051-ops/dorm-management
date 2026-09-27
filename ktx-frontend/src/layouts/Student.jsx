@@ -79,11 +79,14 @@ export default function StudentLayout({
     } else {
       if (tabId === 'register') {
         window.history.pushState({}, '', '/student/register');
+      } else if (tabId === 'transfer') {
+        window.history.pushState({}, '', '/student/transfer-room');
       } else if (tabId === 'history') {
         window.history.pushState({}, '', '/student/history');
       } else if (tabId === 'dashboard') {
         window.history.pushState({}, '', '/student/dashboard');
       }
+      window.dispatchEvent(new PopStateEvent('popstate'));
     }
   };
 
@@ -172,8 +175,8 @@ export default function StudentLayout({
                 type="button"
                 onClick={() => handleTabClick('dashboard')}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${activeTab === 'dashboard'
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  ? 'bg-blue-50 text-blue-600 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                   }`}
               >
                 <Home className="w-4 h-4 shrink-0 text-slate-500" />
@@ -198,8 +201,8 @@ export default function StudentLayout({
                         type="button"
                         onClick={() => handleTabClick(item.id)}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
-                            ? 'bg-[#e0f2fe] text-[#0284c7] font-bold shadow-2xs'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                          ? 'bg-[#e0f2fe] text-[#0284c7] font-bold shadow-2xs'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
                           }`}
                       >
                         <Icon
@@ -230,8 +233,8 @@ export default function StudentLayout({
                         type="button"
                         onClick={() => handleTabClick(item.id)}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
-                            ? 'bg-[#e0f2fe] text-[#0284c7] font-bold'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                          ? 'bg-[#e0f2fe] text-[#0284c7] font-bold'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
                           }`}
                       >
                         <Icon className="w-4 h-4 shrink-0 text-slate-400" />
@@ -259,8 +262,8 @@ export default function StudentLayout({
                         type="button"
                         onClick={() => handleTabClick(item.id)}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
-                            ? 'bg-[#e0f2fe] text-[#0284c7] font-bold'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                          ? 'bg-[#e0f2fe] text-[#0284c7] font-bold'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
                           }`}
                       >
                         <Icon className="w-4 h-4 shrink-0 text-slate-400" />
@@ -288,8 +291,8 @@ export default function StudentLayout({
                         type="button"
                         onClick={() => handleTabClick(item.id)}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
-                            ? 'bg-[#e0f2fe] text-[#0284c7] font-bold'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                          ? 'bg-[#e0f2fe] text-[#0284c7] font-bold'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
                           }`}
                       >
                         <Icon className="w-4 h-4 shrink-0 text-slate-400" />
@@ -332,19 +335,12 @@ export default function StudentLayout({
           title="Trợ lý AI KTX"
         >
           {/* Avatar Robot Công nghệ */}
-          <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-blue-600 via-sky-500 to-indigo-400 p-0.5 shadow-xl shadow-blue-500/30 flex items-center justify-center">
-            <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden relative">
-              {/* Cute Robot Face SVG */}
-              <div className="w-10 h-10 rounded-full bg-gradient-to-b from-blue-50 to-blue-100 flex items-center justify-center relative shadow-inner">
-                {/* Robot Eyes & Smile */}
-                <div className="w-7 h-4 bg-blue-600 rounded-full flex items-center justify-around px-1 relative">
-                  <div className="w-1.5 h-1.5 bg-cyan-300 rounded-full animate-pulse"></div>
-                  <div className="w-1.5 h-1.5 bg-cyan-300 rounded-full animate-pulse"></div>
-                </div>
-                {/* Robot Antennas */}
-                <div className="absolute -top-1 w-2 h-1 bg-sky-400 rounded-t-sm"></div>
-              </div>
-            </div>
+          <div className="w-16 h-16 rounded-full overflow-hidden shadow-lg flex items-center justify-center">
+            <img
+              src="/public/chatbot.png"
+              alt="Chatbot Avatar"
+              className="w-full h-full object-cover"
+            />
           </div>
 
           {/* Chấm tròn xanh lá cây online góc dưới bên phải */}
@@ -383,8 +379,8 @@ export default function StudentLayout({
                 >
                   <div
                     className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl leading-relaxed ${msg.sender === 'user'
-                        ? 'bg-blue-600 text-white rounded-br-xs'
-                        : 'bg-white text-slate-800 border border-slate-200/80 shadow-2xs rounded-bl-xs'
+                      ? 'bg-blue-600 text-white rounded-br-xs'
+                      : 'bg-white text-slate-800 border border-slate-200/80 shadow-2xs rounded-bl-xs'
                       }`}
                   >
                     {msg.text}

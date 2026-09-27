@@ -220,8 +220,8 @@ export default function RequestHistoryPage({ onSelectTab }) {
               setSelectedStatus('Tất cả');
             }}
             className={`px-7 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${activeTab === 'registration'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-blue-600 hover:bg-blue-50/50'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-blue-600 hover:bg-blue-50/50'
               }`}
           >
             Lịch sử đăng ký
@@ -234,8 +234,8 @@ export default function RequestHistoryPage({ onSelectTab }) {
               setSelectedStatus('Tất cả');
             }}
             className={`px-7 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${activeTab === 'stay'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-blue-600 hover:bg-blue-50/50'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-blue-600 hover:bg-blue-50/50'
               }`}
           >
             Lịch sử ở
@@ -573,21 +573,6 @@ export default function RequestHistoryPage({ onSelectTab }) {
               <p>
                 Nếu bị từ chối, bạn có thể đăng ký phòng khác.
               </p>
-            </div>
-          </div>
-
-          {/* Icon Chatbot minh họa góc phải banner chuẩn thiết kế */}
-          <div className="hidden md:flex items-center justify-center shrink-0 pr-2">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-400 to-blue-500 p-1 flex items-center justify-center shadow-md relative">
-              <img
-                src="/chatbot.png"
-                alt="AI Chatbot"
-                className="w-12 h-12 object-contain"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                }}
-              />
-              <span className="w-3.5 h-3.5 bg-emerald-400 border-2 border-white rounded-full absolute bottom-0.5 right-0.5" />
             </div>
           </div>
         </div>

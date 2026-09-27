@@ -4,11 +4,11 @@ import AdminLayout from './layouts/Admin';
 import StudentLayout from './layouts/Student';
 import RoomManagement from './pages/admin/RoomManagement';
 import StudentManagement from './pages/admin/StudentManagement';
-// import ProcessRegistrationPage from './pages/admin/ProcessRegistrationPage';
+import ProcessRegistrationPage from './pages/admin/ProcessRegistrationPage';
 import RoomRegistrationPage from './pages/student/RoomRegistrationPage';
-// import RoomTransferPage from './pages/student/RoomTransferPage';
-// import RequestHistoryPage from './pages/student/RequestHistoryPage';
-// import occupancyService from './services/occupancyService';
+import RoomTransferPage from './pages/student/RoomTransferPage';
+import RequestHistoryPage from './pages/student/RequestHistoryPage';
+import occupancyService from './services/occupancyService';
 import {
   Clock,
   ArrowRight,
