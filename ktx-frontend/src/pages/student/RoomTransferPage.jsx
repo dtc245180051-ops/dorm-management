@@ -35,21 +35,21 @@ export default function RoomTransferPage() {
     { value: 'P205 - Tòa A2 - Tầng 2', label: 'P205 - Tòa A2 - Tầng 2' },
   ]);
 
-  // 4. Form state Chuyển phòng
+  // 4. Form state Chuyển phòng (Mặc định TRỐNG HOÀN TOÀN mỗi lần ấn vào)
   const [transferForm, setTransferForm] = useState({
-    ly_do: 'Phòng hiện tại quá tải',
+    ly_do: '',
     ngay_mong_muon: '',
-    phong_mong_muon: 'P36 - Tòa A3 - Tầng 3',
+    phong_mong_muon: '',
     mo_ta_chi_tiet: '',
   });
 
-  // 5. Form state Trả phòng & địa chỉ chia thành các ô nhỏ cho phép chọn
+  // 5. Form state Trả phòng & địa chỉ chia thành các ô nhỏ (Mặc định TRỐNG HOÀN TOÀN mỗi lần ấn vào)
   const [checkoutProvince, setCheckoutProvince] = useState('');
   const [checkoutDistrict, setCheckoutDistrict] = useState('');
   const [checkoutStreet, setCheckoutStreet] = useState('');
 
   const [checkoutForm, setCheckoutForm] = useState({
-    ly_do: 'Đã tốt nghiệp',
+    ly_do: '',
     ngay_mong_muon: '',
     dia_chi_lien_he: '',
     mo_ta_chi_tiet: '',
@@ -99,9 +99,17 @@ export default function RoomTransferPage() {
   }, [checkoutProvince, checkoutDistrict, checkoutStreet]);
 
 
-  // Tải dữ liệu ban đầu
+  // Tải dữ liệu ban đầu và lắng nghe cập nhật realtime
   useEffect(() => {
     loadData();
+
+    const handleOccupancyUpdate = () => {
+      loadData();
+    };
+    window.addEventListener('occupancy-updated', handleOccupancyUpdate);
+    return () => {
+      window.removeEventListener('occupancy-updated', handleOccupancyUpdate);
+    };
   }, []);
 
   const loadData = async () => {
@@ -189,10 +197,26 @@ export default function RoomTransferPage() {
   // Submit Yêu cầu chuyển phòng
   const handleSubmitTransfer = async (e) => {
     e.preventDefault();
+    if (!transferForm.ly_do) {
+      setFeedbackMessage({
+        type: 'error',
+        text: 'Vui lòng chọn lý do chuyển phòng.',
+      });
+      return;
+    }
+
     if (!transferForm.ngay_mong_muon) {
       setFeedbackMessage({
         type: 'error',
         text: 'Vui lòng chọn ngày mong muốn chuyển phòng.',
+      });
+      return;
+    }
+
+    if (!transferForm.phong_mong_muon) {
+      setFeedbackMessage({
+        type: 'error',
+        text: 'Vui lòng chọn phòng mong muốn chuyển tới.',
       });
       return;
     }
@@ -225,11 +249,11 @@ export default function RoomTransferPage() {
       // Đưa ngay lên đầu danh sách lịch sử
       setHistoryList((prev) => [newReq, ...prev]);
 
-      // Reset form
+      // Reset form về dạng trống hoàn toàn
       setTransferForm({
-        ly_do: 'Phòng hiện tại quá tải',
+        ly_do: '',
         ngay_mong_muon: '',
-        phong_mong_muon: roomOptions[0]?.value || 'P36 - Tòa A3 - Tầng 3',
+        phong_mong_muon: '',
         mo_ta_chi_tiet: '',
       });
 
@@ -251,6 +275,14 @@ export default function RoomTransferPage() {
   // Submit Yêu cầu trả phòng
   const handleSubmitCheckout = async (e) => {
     e.preventDefault();
+    if (!checkoutForm.ly_do) {
+      setFeedbackMessage({
+        type: 'error',
+        text: 'Vui lòng chọn lý do trả phòng.',
+      });
+      return;
+    }
+
     if (!checkoutForm.ngay_mong_muon) {
       setFeedbackMessage({
         type: 'error',
@@ -295,12 +327,12 @@ export default function RoomTransferPage() {
       // Đưa ngay lên đầu danh sách lịch sử
       setHistoryList((prev) => [newReq, ...prev]);
 
-      // Reset form
+      // Reset form về dạng trống hoàn toàn
       setCheckoutProvince('');
       setCheckoutDistrict('');
       setCheckoutStreet('');
       setCheckoutForm({
-        ly_do: 'Đã tốt nghiệp',
+        ly_do: '',
         ngay_mong_muon: '',
         dia_chi_lien_he: '',
         mo_ta_chi_tiet: '',
@@ -386,6 +418,12 @@ export default function RoomTransferPage() {
               onClick={() => {
                 setActiveTab('transfer');
                 setFeedbackMessage(null);
+                setTransferForm({
+                  ly_do: '',
+                  ngay_mong_muon: '',
+                  phong_mong_muon: '',
+                  mo_ta_chi_tiet: '',
+                });
               }}
               className={`px-5 py-2 rounded-xl text-sm transition-all duration-150 cursor-pointer ${
                 activeTab === 'transfer'
@@ -400,6 +438,15 @@ export default function RoomTransferPage() {
               onClick={() => {
                 setActiveTab('checkout');
                 setFeedbackMessage(null);
+                setCheckoutProvince('');
+                setCheckoutDistrict('');
+                setCheckoutStreet('');
+                setCheckoutForm({
+                  ly_do: '',
+                  ngay_mong_muon: '',
+                  dia_chi_lien_he: '',
+                  mo_ta_chi_tiet: '',
+                });
               }}
               className={`px-5 py-2 rounded-xl text-sm transition-all duration-150 cursor-pointer ${
                 activeTab === 'checkout'
@@ -454,6 +501,7 @@ export default function RoomTransferPage() {
                           onChange={handleTransferChange}
                           className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 appearance-none pr-10 cursor-pointer shadow-2xs"
                         >
+                          <option value="">-- Chọn lý do chuyển phòng --</option>
                           <option value="Phòng hiện tại quá tải">
                             Phòng hiện tại quá tải
                           </option>
@@ -509,6 +557,7 @@ export default function RoomTransferPage() {
                         onChange={handleTransferChange}
                         className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 appearance-none pr-10 cursor-pointer shadow-2xs"
                       >
+                        <option value="">-- Chọn phòng mong muốn chuyển tới --</option>
                         {roomOptions.map((opt, idx) => (
                           <option key={idx} value={opt.value}>
                             {opt.label}
@@ -565,6 +614,7 @@ export default function RoomTransferPage() {
                           onChange={handleCheckoutChange}
                           className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 appearance-none pr-10 cursor-pointer shadow-2xs"
                         >
+                          <option value="">-- Chọn lý do trả phòng --</option>
                           <option value="Đã tốt nghiệp">Đã tốt nghiệp</option>
                           <option value="Chuyển ra ngoài ở">
                             Chuyển ra ngoài ở
