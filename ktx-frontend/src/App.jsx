@@ -5,7 +5,7 @@ import StudentLayout from './layouts/Student';
 import RoomManagement from './pages/admin/RoomManagement';
 import StudentManagement from './pages/admin/StudentManagement';
 // import ProcessRegistrationPage from './pages/admin/ProcessRegistrationPage';
-// import RoomRegistrationPage from './pages/student/RoomRegistrationPage';
+import RoomRegistrationPage from './pages/student/RoomRegistrationPage';
 // import RoomTransferPage from './pages/student/RoomTransferPage';
 // import RequestHistoryPage from './pages/student/RequestHistoryPage';
 // import occupancyService from './services/occupancyService';
@@ -369,8 +369,8 @@ export default function App() {
                                 type="button"
                                 onClick={() => navigateTo(`/admin/requests/registration/${targetId}`)}
                                 className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer shadow-xs ${isPending
-                                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                                   }`}
                               >
                                 {isPending ? 'Xử lý đơn' : 'Xem chi tiết'}
@@ -432,8 +432,8 @@ function RoleSwitcher({ currentRole, onSwitchRole }) {
         type="button"
         onClick={() => onSwitchRole('admin')}
         className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 cursor-pointer ${currentRole === 'admin'
-            ? 'bg-slate-900 text-white shadow-xs'
-            : 'text-slate-600 hover:text-slate-900'
+          ? 'bg-slate-900 text-white shadow-xs'
+          : 'text-slate-600 hover:text-slate-900'
           }`}
       >
         <ShieldCheck className="w-3.5 h-3.5" />
@@ -444,8 +444,8 @@ function RoleSwitcher({ currentRole, onSwitchRole }) {
         type="button"
         onClick={() => onSwitchRole('student')}
         className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 cursor-pointer ${currentRole === 'student'
-            ? 'bg-blue-600 text-white shadow-xs'
-            : 'text-slate-600 hover:text-slate-900'
+          ? 'bg-blue-600 text-white shadow-xs'
+          : 'text-slate-600 hover:text-slate-900'
           }`}
       >
         <UserCheck className="w-3.5 h-3.5" />
