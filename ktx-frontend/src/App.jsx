@@ -1,16 +1,3 @@
-<<<<<<< HEAD
-import Login from './pages/Login';
-
-function App() {
-  return (
-    <main style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-      <Login />
-    </main>
-  );
-}
-
-export default App;
-=======
 import React, { useState, useEffect, useCallback } from 'react';
 import AdminLayout from './layouts/Admin';
 import StudentLayout from './layouts/Student';
@@ -518,4 +505,3 @@ function RoleSwitcher({ currentRole, onSwitchRole }) {
     </div>
   );
 }
->>>>>>> 1be9ab389bf95f6bd1f614e0aa1a80b6415d9d06
