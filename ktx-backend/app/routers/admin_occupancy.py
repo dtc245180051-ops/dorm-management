@@ -315,3 +315,86 @@ def reject_request(
             "trang_thai": "TU_CHOI",
         },
     }
+
+
+@router.put(
+    "/requests/transfer/{request_id}/approve",
+    summary="Phê duyệt yêu cầu chuyển phòng & xếp chỗ",
+)
+def approve_transfer_request(
+    request_id: str,
+    payload: ApproveRequestPayload,
+):
+    clean_id = request_id.strip()
+    updated = occupancy_request_store.update_request_status(
+        clean_id,
+        "DA_DUYET",
+        {"xep_phong": payload.model_dump()},
+    )
+    return {
+        "status": "success",
+        "message": "Phê duyệt yêu cầu chuyển phòng thành công",
+        "data": updated,
+    }
+
+
+@router.put(
+    "/requests/transfer/{request_id}/reject",
+    summary="Từ chối yêu cầu chuyển phòng",
+)
+def reject_transfer_request(
+    request_id: str,
+    payload: RejectRequestPayload,
+):
+    clean_id = request_id.strip()
+    updated = occupancy_request_store.update_request_status(
+        clean_id,
+        "TU_CHOI",
+        {"ly_do_tu_choi": payload.ly_do_tu_choi},
+    )
+    return {
+        "status": "success",
+        "message": "Từ chối yêu cầu chuyển phòng thành công",
+        "data": updated,
+    }
+
+
+@router.put(
+    "/requests/checkout/{request_id}/approve",
+    summary="Phê duyệt yêu cầu trả phòng",
+)
+def approve_checkout_request(
+    request_id: str,
+):
+    clean_id = request_id.strip()
+    updated = occupancy_request_store.update_request_status(
+        clean_id,
+        "DA_DUYET",
+    )
+    return {
+        "status": "success",
+        "message": "Phê duyệt yêu cầu trả phòng thành công",
+        "data": updated,
+    }
+
+
+@router.put(
+    "/requests/checkout/{request_id}/reject",
+    summary="Từ chối yêu cầu trả phòng",
+)
+def reject_checkout_request(
+    request_id: str,
+    payload: RejectRequestPayload,
+):
+    clean_id = request_id.strip()
+    updated = occupancy_request_store.update_request_status(
+        clean_id,
+        "TU_CHOI",
+        {"ly_do_tu_choi": payload.ly_do_tu_choi},
+    )
+    return {
+        "status": "success",
+        "message": "Từ chối yêu cầu trả phòng thành công",
+        "data": updated,
+    }
+
