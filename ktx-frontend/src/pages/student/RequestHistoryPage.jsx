@@ -34,22 +34,47 @@ export default function RequestHistoryPage({ onSelectTab }) {
   const [detailModalItem, setDetailModalItem] = useState(null);
   const [modalType, setModalType] = useState(null); // 'registration' | 'stay'
 
-  // Tải dữ liệu ban đầu
+  // Tải dữ liệu ban đầu và lắng nghe cập nhật realtime
   useEffect(() => {
     loadData();
+
+    const handleUpdate = () => {
+      loadData();
+    };
+    window.addEventListener('occupancy-updated', handleUpdate);
+    return () => {
+      window.removeEventListener('occupancy-updated', handleUpdate);
+    };
   }, []);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [reqs, contracts] = await Promise.all([
+      const [reqs, contracts, transferReqs] = await Promise.all([
         occupancyService.getMyRequests(),
         occupancyService.getMyContracts(),
+        occupancyService.getTransferCheckoutRequests?.(),
       ]);
 
+      const combinedReqs = [...(reqs || [])];
+      if (transferReqs && Array.isArray(transferReqs)) {
+        transferReqs.forEach((tc) => {
+          if (!combinedReqs.some((r) => r.id === tc.id || r.ma_yeu_cau === tc.ma_yeu_cau)) {
+            combinedReqs.push({
+              ...tc,
+              ngay_dang_ky: tc.ngay_gui || 'Hôm nay',
+              loai_phong: tc.loai_yeu_cau || (tc.loai_don === 'TRA_PHONG' ? 'Trả phòng' : 'Chuyển phòng'),
+              tang_mong_muon: tc.phong_lien_quan || 'Tầng 2',
+              muc_gia_mong_muon: tc.ly_do || 'Phòng tiêu chuẩn',
+              nam_hoc: '2026-2027',
+            });
+          }
+        });
+      }
+
       // Chuẩn hóa dữ liệu đơn đăng ký nếu chưa có
-      if (reqs && reqs.length > 0) {
-        setRegistrationRequests(reqs);
+      if (combinedReqs.length > 0) {
+        setRegistrationRequests(combinedReqs);
       } else {
         setRegistrationRequests([
           {
@@ -410,19 +435,19 @@ export default function RequestHistoryPage({ onSelectTab }) {
                             {req.nam_hoc || '2026–2027'}
                           </td>
 
-                          {/* Trạng thái (Pill badge bo tròn) */}
+                          {/* Trạng thái (Pill badge bo tròn bg-emerald-50 text-emerald-600 khi Đã duyệt) */}
                           <td className="py-3.5 px-4 whitespace-nowrap">
                             {isApproved ? (
-                              <span className="inline-block px-4 py-1 rounded-full text-xs font-bold bg-[#bbf7d0] text-[#15803d]">
+                              <span className="inline-block px-4 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 shadow-2xs">
                                 Đã duyệt
                               </span>
                             ) : isRejected ? (
-                              <span className="inline-block px-4 py-1 rounded-full text-xs font-bold bg-[#ffe4e6] text-[#e11d48]">
+                              <span className="inline-block px-4 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200/60 shadow-2xs">
                                 Từ chối
                               </span>
                             ) : (
-                              <span className="inline-block px-4 py-1 rounded-full text-xs font-bold bg-[#fef3c7] text-[#d97706]">
-                                {req.trang_thai_label || 'Đang xét duyệt'}
+                              <span className="inline-block px-4 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-600 border border-amber-200/60 shadow-2xs">
+                                {req.trang_thai_label || 'Chờ duyệt'}
                               </span>
                             )}
                           </td>
@@ -516,11 +541,21 @@ export default function RequestHistoryPage({ onSelectTab }) {
                           {stay.thoi_gian_o || stay.nam_hoc || '2026-2027'}
                         </td>
 
-                        {/* Trạng thái (Pill badge Đang ở màu xanh ngọc chuẩn Figma) */}
+                        {/* Trạng thái (Pill badge Đang ở / Đã trả phòng / Đã chuyển) */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
-                          <span className="inline-block px-4 py-1 rounded-full text-xs font-bold bg-[#bbf7d0] text-[#15803d]">
-                            {stay.trang_thai_label || 'Đang ở'}
-                          </span>
+                          {stay.trang_thai === 'DA_TRA_PHONG' || stay.trang_thai_label?.includes('trả') ? (
+                            <span className="inline-block px-4 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              {stay.trang_thai_label || 'Đã trả phòng / Đã rời KTX'}
+                            </span>
+                          ) : stay.trang_thai === 'DA_CHUYEN' || stay.trang_thai_label?.includes('chuyển') ? (
+                            <span className="inline-block px-4 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                              {stay.trang_thai_label || 'Đã chuyển phòng'}
+                            </span>
+                          ) : (
+                            <span className="inline-block px-4 py-1 rounded-full text-xs font-bold bg-[#bbf7d0] text-[#15803d]">
+                              {stay.trang_thai_label || 'Đang ở'}
+                            </span>
+                          )}
                         </td>
 
                         {/* Thao tác (Nút Xem viền xanh) */}

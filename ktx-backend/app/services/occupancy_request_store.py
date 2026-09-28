@@ -70,15 +70,25 @@ def add_request(req_data: dict) -> dict:
 
 
 def get_all_requests() -> List[Dict]:
-    """Lấy danh sách tất cả các đơn đăng ký."""
-    return REGISTRATION_REQUESTS
+    """Lấy danh sách tất cả các đơn đăng ký, chuyển phòng và trả phòng."""
+    return TRANSFER_CHECKOUT_REQUESTS + REGISTRATION_REQUESTS
 
 
 def get_request_by_id(req_id: str) -> Optional[Dict]:
     """Tìm đơn theo ID hoặc MSV."""
-    clean_id = req_id.strip().lower()
+    clean_id = req_id.strip().lower().replace("#", "")
+    for req in TRANSFER_CHECKOUT_REQUESTS:
+        rid = req.get("id", "").lower().replace("#", "")
+        rmsv = req.get("msv", "").lower()
+        rmyc = req.get("ma_yeu_cau", "").lower().replace("#", "")
+        if rid == clean_id or rmsv == clean_id or rmyc == clean_id:
+            return req
+
     for req in REGISTRATION_REQUESTS:
-        if req["id"].lower() == clean_id or req["msv"].lower() == clean_id:
+        rid = req.get("id", "").lower().replace("#", "")
+        rmsv = req.get("msv", "").lower()
+        rmyc = req.get("ma_yeu_cau", "").lower().replace("#", "")
+        if rid == clean_id or rmsv == clean_id or rmyc == clean_id:
             return req
     return None
 
@@ -88,6 +98,7 @@ def update_request_status(req_id: str, new_status: str, extra_data: Optional[dic
     req = get_request_by_id(req_id)
     if req:
         req["trang_thai"] = new_status
+        req["trang_thai_label"] = "Đã duyệt" if new_status == "DA_DUYET" else "Từ chối"
         if extra_data:
             req.update(extra_data)
         return req
@@ -100,13 +111,21 @@ TRANSFER_CHECKOUT_REQUESTS: List[Dict] = [
         "id": "YC-0231",
         "ma_yeu_cau": "#YC-0231",
         "loai_yeu_cau": "Chuyển phòng",
+        "loai_don": "CHUYEN_PHONG",
+        "msv": "DTC245180051",
+        "ho_ten": "Nguyễn Quốc Huy",
+        "gioi_tinh": "Nam",
+        "khoa": "Công nghệ thông tin",
+        "lop": "DTC-K20",
+        "vi_tri_hien_tai": "Phòng A102 - Giường G01",
+        "cong_no": "Đã hoàn thành toàn bộ phí",
         "ngay_gui": "25/11/2025",
         "phong_lien_quan": "P12 → P36",
         "phong_hien_tai": "P12",
         "phong_dich": "P36",
         "ly_do": "Phòng hiện tại quá tải",
         "ngay_mong_muon": "01/12/2025",
-        "mo_ta": "Muốn chuyển sang phòng thoáng hơn",
+        "mo_ta": "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học...",
         "trang_thai": "DA_DUYET",
         "trang_thai_label": "Đã duyệt",
     },
@@ -114,13 +133,26 @@ TRANSFER_CHECKOUT_REQUESTS: List[Dict] = [
         "id": "YC-0232",
         "ma_yeu_cau": "#YC-0232",
         "loai_yeu_cau": "Trả phòng",
+        "loai_don": "TRA_PHONG",
+        "msv": "DTC245180051",
+        "ho_ten": "Nguyễn Quốc Huy",
+        "gioi_tinh": "Nam",
+        "khoa": "Công nghệ thông tin",
+        "lop": "DTC-K20",
+        "vi_tri_hien_tai": "Phòng A102 - Giường G01",
+        "cong_no": "Đã hoàn thành toàn bộ phí",
         "ngay_gui": "25/08/2026",
         "phong_lien_quan": "P36",
         "phong_hien_tai": "P36",
         "ly_do": "Đã tốt nghiệp",
         "ngay_mong_muon": "01/09/2026",
-        "dia_chi_sau_tra": "Số 123 Đường Cầu Giấy, Hà Nội",
-        "mo_ta": "Đã hoàn thành chương trình học",
+        "dia_chi_sau_tra": "Số 123 Đường Cầu Giấy, Quận Cầu Giấy, Hà Nội",
+        "dia_chi_chi_tiet": {
+            "tinh": "Hà Nội",
+            "huyen": "Quận Cầu Giấy",
+            "so_nha": "Số 123 Đường Cầu Giấy",
+        },
+        "mo_ta": "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học...",
         "trang_thai": "CHO_DUYET",
         "trang_thai_label": "Chờ duyệt",
     },
@@ -133,22 +165,35 @@ def add_transfer_request(data: dict) -> dict:
     today_str = datetime.datetime.now().strftime("%d/%m/%Y")
     
     phong_hien_tai = data.get("phong_hien_tai", "P36")
-    phong_mong_muon = data.get("phong_mong_muon", "")
+    phong_mong_muon = data.get("phong_mong_muon", "P36 - Tòa A3 - Tầng 3")
     target_short = phong_mong_muon.split(" - ")[0] if " - " in phong_mong_muon else phong_mong_muon
     
     new_req = {
         "id": req_id,
         "ma_yeu_cau": f"#{req_id}",
         "loai_yeu_cau": "Chuyển phòng",
+        "loai_don": "CHUYEN_PHONG",
+        "msv": data.get("msv", "DTC245180051"),
+        "ho_ten": data.get("ho_ten", "Nguyễn Quốc Huy"),
+        "gioi_tinh": data.get("gioi_tinh", "Nam"),
+        "khoa": data.get("khoa", "Công nghệ thông tin"),
+        "lop": data.get("lop", "DTC-K20"),
+        "vi_tri_hien_tai": data.get("vi_tri_hien_tai", "Phòng A102 - Giường G01"),
+        "cong_no": "Đã hoàn thành toàn bộ phí",
         "ngay_gui": data.get("ngay_gui") or today_str,
         "phong_lien_quan": f"{phong_hien_tai} → {target_short}" if target_short else phong_hien_tai,
         "phong_hien_tai": phong_hien_tai,
         "phong_dich": target_short,
-        "ly_do": data.get("ly_do", ""),
+        "ly_do": data.get("ly_do", "Phòng hiện tại quá tải"),
         "ngay_mong_muon": data.get("ngay_mong_muon", ""),
-        "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", ""),
+        "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học..."),
         "trang_thai": "CHO_DUYET",
         "trang_thai_label": "Chờ duyệt",
+        "goi_y": {
+            "ma_toa": "A",
+            "ma_phong": "A203",
+            "ma_giuong": "G04",
+        },
     }
     TRANSFER_CHECKOUT_REQUESTS.insert(0, new_req)
     return new_req
@@ -165,13 +210,26 @@ def add_checkout_request(data: dict) -> dict:
         "id": req_id,
         "ma_yeu_cau": f"#{req_id}",
         "loai_yeu_cau": "Trả phòng",
+        "loai_don": "TRA_PHONG",
+        "msv": data.get("msv", "DTC245180051"),
+        "ho_ten": data.get("ho_ten", "Nguyễn Quốc Huy"),
+        "gioi_tinh": data.get("gioi_tinh", "Nam"),
+        "khoa": data.get("khoa", "Công nghệ thông tin"),
+        "lop": data.get("lop", "DTC-K20"),
+        "vi_tri_hien_tai": data.get("vi_tri_hien_tai", "Phòng A102 - Giường G01"),
+        "cong_no": "Đã hoàn thành toàn bộ phí",
         "ngay_gui": data.get("ngay_gui") or today_str,
         "phong_lien_quan": phong_hien_tai,
         "phong_hien_tai": phong_hien_tai,
-        "ly_do": data.get("ly_do", ""),
+        "ly_do": data.get("ly_do", "Đã tốt nghiệp"),
         "ngay_mong_muon": data.get("ngay_mong_muon", ""),
-        "dia_chi_sau_tra": data.get("dia_chi_lien_he") or data.get("dia_chi_sau_tra", ""),
-        "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", ""),
+        "dia_chi_sau_tra": data.get("dia_chi_lien_he") or data.get("dia_chi_sau_tra", "Số 123 Đường Cầu Giấy, Quận Cầu Giấy, Hà Nội"),
+        "dia_chi_chi_tiet": data.get("dia_chi_chi_tiet", {
+            "tinh": "Hà Nội",
+            "huyen": "Quận Cầu Giấy",
+            "so_nha": "Số 123 Đường Cầu Giấy",
+        }),
+        "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học..."),
         "trang_thai": "CHO_DUYET",
         "trang_thai_label": "Chờ duyệt",
     }
@@ -181,4 +239,5 @@ def add_checkout_request(data: dict) -> dict:
 
 def get_transfer_checkout_requests() -> List[Dict]:
     return TRANSFER_CHECKOUT_REQUESTS
+
 

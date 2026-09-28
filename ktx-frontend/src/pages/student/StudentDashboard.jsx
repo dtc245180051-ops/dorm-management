@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './StudentDashboard.css';
 import campusBanner from '../../assets/image.png';
+import occupancyService from '../../services/occupancyService';
 
 /**
  * ============================================================================
@@ -78,6 +79,38 @@ const MOCK_STUDENT_DATA = {
 
 export default function StudentDashboard({ user }) {
   const [activeModal, setActiveModal] = useState(null);
+  const [currentRoomInfo, setCurrentRoomInfo] = useState({
+    phong_hien_tai: 'P36 – Tòa A2 – Tầng 3',
+    thanh_vien: '6/8 người',
+    thoi_gian_luu_tru: '09/2025 – Nay',
+    so_phong: 'P36',
+    toa: 'Tòa A2',
+    tang: 'Tầng 3',
+    so_thanh_vien: 6,
+    suc_chua: 8,
+  });
+
+  const loadRoomInfo = async () => {
+    try {
+      const info = await occupancyService.getCurrentRoomInfo();
+      if (info) {
+        setCurrentRoomInfo((prev) => ({ ...prev, ...info }));
+      }
+    } catch (e) {
+      console.error('Error loading room info in StudentDashboard:', e);
+    }
+  };
+
+  useEffect(() => {
+    loadRoomInfo();
+    const handleUpdate = () => {
+      loadRoomInfo();
+    };
+    window.addEventListener('occupancy-updated', handleUpdate);
+    return () => {
+      window.removeEventListener('occupancy-updated', handleUpdate);
+    };
+  }, []);
 
   // Lấy tên hiển thị của sinh viên: ưu tiên dữ liệu đăng nhập, fallback 'Nguyễn Văn A' chuẩn theo ảnh
   const displayName =
@@ -147,9 +180,9 @@ export default function StudentDashboard({ user }) {
             </div>
             <div className="student-stat-info">
               <span className="student-stat-label">Phòng hiện tại</span>
-              <span className="student-stat-value">{MOCK_STUDENT_DATA.room.roomNumber}</span>
+              <span className="student-stat-value">{currentRoomInfo.so_phong || 'P36'}</span>
               <span className="student-stat-subtext">
-                {MOCK_STUDENT_DATA.room.building} - {MOCK_STUDENT_DATA.room.floor}
+                {currentRoomInfo.toa || 'Tòa A2'} - {currentRoomInfo.tang ? `Tầng ${currentRoomInfo.tang}` : 'Tầng 3'}
               </span>
             </div>
           </div>
@@ -162,8 +195,8 @@ export default function StudentDashboard({ user }) {
           onClick={() =>
             setActiveModal({
               title: 'Danh sách thành viên phòng',
-              desc: `Hiện có ${MOCK_STUDENT_DATA.room.currentMembers} / ${MOCK_STUDENT_DATA.room.maxCapacity} sinh viên`,
-              detail: 'Phòng đang còn 2 chỗ trống cho đợt tiếp nhận kỳ mới.',
+              desc: `Hiện có ${currentRoomInfo.thanh_vien || '6/8 người'} sinh viên`,
+              detail: 'Phòng đang còn chỗ trống cho đợt tiếp nhận kỳ mới.',
             })
           }
         >
@@ -179,7 +212,7 @@ export default function StudentDashboard({ user }) {
             <div className="student-stat-info">
               <span className="student-stat-label">Số thành viên</span>
               <span className="student-stat-value">
-                {MOCK_STUDENT_DATA.room.currentMembers}/{MOCK_STUDENT_DATA.room.maxCapacity}
+                {currentRoomInfo.thanh_vien || '6/8 người'}
               </span>
               <span className="student-stat-subtext">Hiện tại / sức chứa</span>
             </div>
