@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Login from './pages/Login';
 import LandingPage from './pages/public/LandingPage';
@@ -534,8 +535,8 @@ export default function App() {
                                   }
                                 }}
                                 className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer shadow-xs ${isPending
-                                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                                   }`}
                               >
                                 {isPending ? 'Xử lý đơn' : 'Xem chi tiết'}
@@ -638,3 +639,4 @@ function RoleSwitcher({ currentRole, onSwitchRole }) {
     </div>
   );
 }
+
