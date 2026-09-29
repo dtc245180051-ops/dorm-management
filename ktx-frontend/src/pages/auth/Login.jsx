@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './Auth.css';
 import { authService } from '../../services/authService';
 
@@ -11,8 +11,14 @@ const isValidSchoolEmail = (val) => {
   return /^[^\s@]+@ictu\.edu\.vn$/i.test(val.trim());
 };
 
-export default function Login() {
-  const [activeTab, setActiveTab] = useState('login'); // 'login' | 'register'
+export default function Login({ onLoginSuccess, initialTab = 'login', onTabChange }) {
+  const [activeTab, setActiveTab] = useState(initialTab || 'login'); // 'login' | 'register'
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // State form Đăng nhập
   const [loginForm, setLoginForm] = useState({
@@ -272,6 +278,7 @@ export default function Login() {
               onClick={() => {
                 setActiveTab('login');
                 setMessage({ type: '', text: '' });
+                if (onTabChange) onTabChange('login');
               }}
             >
               Đăng nhập
@@ -282,6 +289,7 @@ export default function Login() {
               onClick={() => {
                 setActiveTab('register');
                 setMessage({ type: '', text: '' });
+                if (onTabChange) onTabChange('register');
               }}
             >
               Đăng ký
@@ -416,6 +424,7 @@ export default function Login() {
                       onClick={() => {
                         setActiveTab('register');
                         setMessage({ type: '', text: '' });
+                        if (onTabChange) onTabChange('register');
                       }}
                     >
                       Đăng ký
@@ -603,6 +612,7 @@ export default function Login() {
                       onClick={() => {
                         setActiveTab('login');
                         setMessage({ type: '', text: '' });
+                        if (onTabChange) onTabChange('login');
                       }}
                     >
                       Đăng nhập

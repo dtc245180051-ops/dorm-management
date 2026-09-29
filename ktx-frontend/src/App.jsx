@@ -1,52 +1,50 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import Login from './pages/auth/Login';
 import AdminLayout from './layouts/Admin';
 import StudentLayout from './layouts/Student';
 import RoomManagement from './pages/admin/RoomManagement';
 import StudentManagement from './pages/admin/StudentManagement';
 import ProcessRegistrationPage from './pages/admin/ProcessRegistrationPage';
 import RoomRegistrationPage from './pages/student/RoomRegistrationPage';
+import RoomTransferPage from './pages/student/RoomTransferPage';
+import RequestHistoryPage from './pages/student/RequestHistoryPage';
 import occupancyService from './services/occupancyService';
+
 import {
   Clock,
-  CheckCircle2,
   ArrowRight,
   ShieldCheck,
   UserCheck,
   Plus,
   FileCheck,
-  AlertCircle,
-  Eye,
   RefreshCw,
 } from 'lucide-react';
 
 export default function App() {
-  // Lấy đường dẫn ban đầu từ URL
   const [currentPath, setCurrentPath] = useState(
-    window.location.pathname || '/student/register'
+    window.location.pathname || '/'
   );
 
-  // State dành cho Admin
   const [adminActiveTab, setAdminActiveTab] = useState('dashboard');
   const [adminSearchTerm, setAdminSearchTerm] = useState('');
 
-  // Danh sách các đơn đăng ký lưu trú được chia sẻ liên thông giữa Sinh viên và Quản lý
   const [requestsList, setRequestsList] = useState([]);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
 
-  // Tải danh sách đơn đăng ký
   const loadRequests = useCallback(async () => {
     setIsLoadingRequests(true);
     try {
-      const data = await occupancyService.getAllRequests();
-      setRequestsList(data || []);
+      if (occupancyService?.getAllRequests) {
+        const data = await occupancyService.getAllRequests();
+        setRequestsList(data || []);
+      }
     } catch (err) {
-      console.error('Error loading registration requests:', err);
+      console.error('Error loading requests:', err);
     } finally {
       setIsLoadingRequests(false);
     }
   }, []);
 
-  // Lắng nghe thay đổi URL
   useEffect(() => {
     const handleLocationChange = () => {
       setCurrentPath(window.location.pathname);
@@ -58,18 +56,48 @@ export default function App() {
     };
   }, []);
 
-  // Tải lại danh sách đơn mỗi khi đường dẫn thay đổi hoặc chuyển tab
   useEffect(() => {
     loadRequests();
   }, [currentPath, adminActiveTab, loadRequests]);
 
-  // Hàm chuyển đổi đường dẫn điều hướng
   const navigateTo = (path) => {
     window.history.pushState({}, '', path);
     setCurrentPath(path);
   };
 
-  // 1. Phân hệ Admin: Trang Xử lý yêu cầu đăng ký ở (/admin/requests/registration/:id)
+  const handleStudentTabSelect = (tabId) => {
+    switch (tabId) {
+      case 'home':
+      case 'dashboard':
+        navigateTo('/student/dashboard');
+        break;
+      case 'register':
+      case 'dang-ky':
+        navigateTo('/student/register');
+        break;
+      case 'transfer':
+      case 'chuyen-phong':
+        navigateTo('/student/transfer-room');
+        break;
+      case 'history':
+      case 'lich-su':
+        navigateTo('/student/history');
+        break;
+      default:
+        break;
+    }
+  };
+
+  // 0. Trang đăng nhập
+  if (currentPath === '/') {
+    return (
+      <main style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+        <Login onLoginSuccess={() => navigateTo('/student/dashboard')} />
+      </main>
+    );
+  }
+
+  // 1. Phân hệ Admin: Xử lý yêu cầu đăng ký
   if (currentPath.startsWith('/admin/requests/registration')) {
     const match = currentPath.match(/\/admin\/requests\/registration\/?(.*)/);
     const requestId = match && match[1] ? match[1] : 'DK-001';
@@ -89,13 +117,13 @@ export default function App() {
         />
         <RoleSwitcher
           currentRole="admin"
-          onSwitchRole={(r) => navigateTo(r === 'admin' ? '/admin' : '/student/register')}
+          onSwitchRole={(r) => navigateTo(r === 'admin' ? '/admin' : '/student/dashboard')}
         />
       </div>
     );
   }
 
-  // 2. Phân hệ Sinh viên: Trang Đăng ký ở (/student/register)
+  // 2. Phân hệ Sinh viên: Đăng ký ở mới
   if (
     currentPath === '/student/register' ||
     currentPath === '/student/register-room' ||
@@ -114,138 +142,52 @@ export default function App() {
           currentRole="student"
           onSwitchRole={(r) => {
             loadRequests();
-            navigateTo(r === 'admin' ? '/admin' : '/student/register');
+            navigateTo(r === 'admin' ? '/admin' : '/student/dashboard');
           }}
         />
       </div>
     );
   }
 
-  // 3. Phân hệ Sinh viên: Trang Lịch sử đăng ký (/student/history)
-  if (currentPath === '/student/history') {
+  // 3. Phân hệ Sinh viên: Chuyển / Trả phòng
+  if (currentPath === '/student/transfer-room' || currentPath === '/student/transfer') {
     return (
       <div className="relative">
-        <StudentLayout
-          activeTab="history"
-          onSelectTab={(tabId) => {
-            if (tabId === 'register') navigateTo('/student/register');
-            if (tabId === 'dashboard') navigateTo('/student/dashboard');
-          }}
-          userName="Nguyễn Văn A"
-          userRole="Sinh viên"
-        >
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 lg:p-8 flex-1 flex flex-col">
-            <div className="flex items-center justify-between pb-6 border-b border-slate-100 mb-6">
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                  <Clock className="w-6 h-6 text-blue-600" />
-                  Lịch sử đăng ký chỗ ở
-                </h1>
-                <p className="text-sm text-slate-500 mt-1">
-                  Theo dõi trạng thái các đơn yêu cầu đăng ký phòng của bạn
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={loadRequests}
-                  className="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
-                  title="Làm mới"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isLoadingRequests ? 'animate-spin' : ''}`} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigateTo('/student/register')}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold flex items-center gap-2 transition cursor-pointer shadow-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                  Đăng ký phòng mới
-                </button>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    <th className="py-3 px-4 rounded-l-lg">Mã đơn</th>
-                    <th className="py-3 px-4">Nguyện vọng phòng</th>
-                    <th className="py-3 px-4">Nội dung ghi chú</th>
-                    <th className="py-3 px-4">Ngày gửi</th>
-                    <th className="py-3 px-4 rounded-r-lg">Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
-                  {requestsList.length > 0 ? (
-                    requestsList.map((req, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/70 transition">
-                        <td className="py-3.5 px-4 font-mono font-semibold text-blue-600">
-                          {req.id || req.ma_yeu_cau || `DK-00${idx + 1}`}
-                        </td>
-                        <td className="py-3.5 px-4 font-medium text-slate-800">
-                          {req.nguyen_vong_label || req.nguyen_vong_phong || 'P36 - Tầng 3 - Tòa A2'}
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-600 max-w-xs truncate">
-                          {req.noi_dung_nguyen_vong || req.nguyen_vong || 'Nguyện vọng ở cùng bạn cùng lớp'}
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-500">
-                          {req.ngay_gui ? new Date(req.ngay_gui).toLocaleDateString('vi-VN') : '26/09/2026'}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          {req.trang_thai === 'DA_DUYET' ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                              Đã duyệt ({req.ma_hop_dong || 'Đã có phòng'})
-                            </span>
-                          ) : req.trang_thai === 'TU_CHOI' ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                              Từ chối
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                              Chờ duyệt
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-400">
-                        Chưa có đơn đăng ký nào. Bấm "Đăng ký phòng mới" để gửi đơn.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </StudentLayout>
+        <RoomTransferPage />
         <RoleSwitcher
           currentRole="student"
           onSwitchRole={(r) => {
             loadRequests();
-            navigateTo(r === 'admin' ? '/admin' : '/student/register');
+            navigateTo(r === 'admin' ? '/admin' : '/student/dashboard');
           }}
         />
       </div>
     );
   }
 
-  // 4. Phân hệ Sinh viên: Trang Chủ Sinh viên (/student/dashboard)
+  // 4. Phân hệ Sinh viên: Lịch sử (gồm cả Lịch sử đăng ký & Lịch sử ở)
+  if (currentPath === '/student/history') {
+    return (
+      <div className="relative">
+        <RequestHistoryPage />
+        <RoleSwitcher
+          currentRole="student"
+          onSwitchRole={(r) => {
+            loadRequests();
+            navigateTo(r === 'admin' ? '/admin' : '/student/dashboard');
+          }}
+        />
+      </div>
+    );
+  }
+
+  // 5. Phân hệ Sinh viên: Trang chủ Dashboard
   if (currentPath === '/student/dashboard') {
     return (
       <div className="relative">
         <StudentLayout
-          activeTab="dashboard"
-          onSelectTab={(tabId) => {
-            if (tabId === 'register') navigateTo('/student/register');
-            if (tabId === 'history') navigateTo('/student/history');
-          }}
+          activeTab="home"
+          onSelectTab={handleStudentTabSelect}
           userName="Nguyễn Văn A"
           userRole="Sinh viên"
         >
@@ -281,18 +223,31 @@ export default function App() {
                 </div>
 
                 <div
-                  onClick={() => {
-                    loadRequests();
-                    navigateTo('/student/history');
-                  }}
+                  onClick={() => navigateTo('/student/transfer-room')}
+                  className="p-5 rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200/80 hover:shadow-md transition cursor-pointer group"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center mb-3 group-hover:scale-105 transition">
+                    <RefreshCw className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-bold text-slate-900 mb-1">Chuyển / Trả phòng</h3>
+                  <p className="text-xs text-slate-500 mb-4">
+                    Gửi nguyện vọng chuyển phòng hoặc làm thủ tục trả phòng KTX
+                  </p>
+                  <span className="text-xs font-bold text-indigo-600 flex items-center gap-1">
+                    Làm đơn ngay <ArrowRight className="w-3.5 h-3.5" />
+                  </span>
+                </div>
+
+                <div
+                  onClick={() => navigateTo('/student/history')}
                   className="p-5 rounded-2xl bg-slate-50 border border-slate-200 hover:shadow-md transition cursor-pointer group"
                 >
                   <div className="w-10 h-10 rounded-xl bg-slate-700 text-white flex items-center justify-center mb-3 group-hover:scale-105 transition">
                     <Clock className="w-5 h-5" />
                   </div>
-                  <h3 className="font-bold text-slate-900 mb-1">Lịch sử đăng ký</h3>
+                  <h3 className="font-bold text-slate-900 mb-1">Lịch sử đăng ký & ở</h3>
                   <p className="text-xs text-slate-500 mb-4">
-                    Kiểm tra tiến độ xét duyệt và kết quả đăng ký phòng
+                    Theo dõi tiến độ xét duyệt đơn và quá trình lưu trú tại KTX
                   </p>
                   <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
                     Xem lịch sử <ArrowRight className="w-3.5 h-3.5" />
@@ -306,14 +261,14 @@ export default function App() {
           currentRole="student"
           onSwitchRole={(r) => {
             loadRequests();
-            navigateTo(r === 'admin' ? '/admin' : '/student/register');
+            navigateTo(r === 'admin' ? '/admin' : '/student/dashboard');
           }}
         />
       </div>
     );
   }
 
-  // 5. Mặc định hoặc Phân hệ Ban Quản lý (Admin)
+  // 6. Phân hệ Ban Quản lý (Admin)
   return (
     <div className="relative">
       <AdminLayout
@@ -323,7 +278,6 @@ export default function App() {
         onSearchChange={setAdminSearchTerm}
         userName="QL_Minh"
       >
-        {/* Tab Dashboard Admin hiển thị danh sách các đơn đăng ký đang chờ xử lý thực tế */}
         {adminActiveTab === 'dashboard' && (
           <div className="flex flex-col gap-6">
             <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
@@ -350,7 +304,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Bảng danh sách yêu cầu đăng ký liên thông trực tiếp */}
+              {/* Bảng danh sách yêu cầu Admin */}
               <div className="overflow-x-auto mt-4">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -415,10 +369,11 @@ export default function App() {
                               <button
                                 type="button"
                                 onClick={() => navigateTo(`/admin/requests/registration/${targetId}`)}
-                                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer shadow-xs ${isPending
+                                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer shadow-xs ${
+                                  isPending
                                     ? 'bg-blue-600 hover:bg-blue-700 text-white'
                                     : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                                  }`}
+                                }`}
                               >
                                 {isPending ? 'Xử lý đơn' : 'Xem chi tiết'}
                               </button>
@@ -465,24 +420,24 @@ export default function App() {
         currentRole="admin"
         onSwitchRole={(r) => {
           loadRequests();
-          navigateTo(r === 'admin' ? '/admin' : '/student/register');
+          navigateTo(r === 'admin' ? '/admin' : '/student/dashboard');
         }}
       />
     </div>
   );
 }
 
-// Thanh Switcher chuyển đổi nhanh giữa Phân hệ Admin và Phân hệ Sinh viên
 function RoleSwitcher({ currentRole, onSwitchRole }) {
   return (
     <div className="fixed top-3 right-64 z-50 flex items-center bg-white/90 backdrop-blur-md border border-slate-200 p-1 rounded-full shadow-lg text-xs font-semibold">
       <button
         type="button"
         onClick={() => onSwitchRole('admin')}
-        className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 cursor-pointer ${currentRole === 'admin'
+        className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 cursor-pointer ${
+          currentRole === 'admin'
             ? 'bg-slate-900 text-white shadow-xs'
             : 'text-slate-600 hover:text-slate-900'
-          }`}
+        }`}
       >
         <ShieldCheck className="w-3.5 h-3.5" />
         <span>Admin</span>
@@ -491,10 +446,11 @@ function RoleSwitcher({ currentRole, onSwitchRole }) {
       <button
         type="button"
         onClick={() => onSwitchRole('student')}
-        className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 cursor-pointer ${currentRole === 'student'
+        className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 cursor-pointer ${
+          currentRole === 'student'
             ? 'bg-blue-600 text-white shadow-xs'
             : 'text-slate-600 hover:text-slate-900'
-          }`}
+        }`}
       >
         <UserCheck className="w-3.5 h-3.5" />
         <span>Sinh viên</span>

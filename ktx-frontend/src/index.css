@@ -1,4 +1,7 @@
-<<<<<<< HEAD
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --primary: #1d70f5;
   --primary-hover: #1558d6;
@@ -17,44 +20,19 @@
 
 * {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  font-family: var(--font-sans);
-  background-color: var(--bg-page);
-  color: var(--text-main);
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 16px;
+  width: 100%;
 }
 
 button {
   font-family: inherit;
   cursor: pointer;
-  border: none;
-  outline: none;
 }
 
-input, select {
+input,
+select {
   font-family: inherit;
-  outline: none;
 }
-=======
-@import "tailwindcss";
-
-@layer base {
-  body {
-    @apply bg-white text-slate-800 antialiased font-sans m-0 p-0;
-  }
-}
->>>>>>> 1be9ab389bf95f6bd1f614e0aa1a80b6415d9d06
