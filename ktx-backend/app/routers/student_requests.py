@@ -200,3 +200,72 @@ def register_room(
         "message": "Gửi yêu cầu đăng ký phòng thành công",
         "data": stored_request,
     }
+
+
+class TransferRoomRequest(BaseModel):
+    msv: Optional[str] = "B21DCCN001"
+    ho_ten: Optional[str] = "Nguyễn Văn A"
+    phong_hien_tai: Optional[str] = "P36"
+    ly_do: str
+    ngay_mong_muon: str
+    phong_mong_muon: str
+    mo_ta_chi_tiet: Optional[str] = ""
+
+
+class CheckoutRoomRequest(BaseModel):
+    msv: Optional[str] = "B21DCCN001"
+    ho_ten: Optional[str] = "Nguyễn Văn A"
+    phong_hien_tai: Optional[str] = "P36"
+    ly_do: str
+    ngay_mong_muon: str
+    dia_chi_lien_he: str
+    mo_ta_chi_tiet: Optional[str] = ""
+
+
+@router.post(
+    "/transfer",
+    summary="Gửi yêu cầu chuyển phòng ký túc xá",
+    status_code=status.HTTP_201_CREATED,
+)
+def submit_transfer_request(
+    req: TransferRoomRequest,
+    db: Session = Depends(get_db),
+):
+    """Tiếp nhận yêu cầu xin chuyển phòng từ sinh viên."""
+    from app.services import occupancy_request_store
+    stored = occupancy_request_store.add_transfer_request(req.model_dump())
+    return {
+        "status": "success",
+        "message": "Gửi yêu cầu chuyển phòng thành công",
+        "data": stored,
+    }
+
+
+@router.post(
+    "/checkout",
+    summary="Gửi yêu cầu trả phòng ký túc xá",
+    status_code=status.HTTP_201_CREATED,
+)
+def submit_checkout_request(
+    req: CheckoutRoomRequest,
+    db: Session = Depends(get_db),
+):
+    """Tiếp nhận yêu cầu xin trả phòng từ sinh viên."""
+    from app.services import occupancy_request_store
+    stored = occupancy_request_store.add_checkout_request(req.model_dump())
+    return {
+        "status": "success",
+        "message": "Gửi yêu cầu trả phòng thành công",
+        "data": stored,
+    }
+
+
+@router.get(
+    "/transfer-checkout-history",
+    summary="Lấy lịch sử các yêu cầu chuyển và trả phòng",
+)
+def get_transfer_checkout_history():
+    """Lấy danh sách lịch sử yêu cầu chuyển và trả phòng."""
+    from app.services import occupancy_request_store
+    return occupancy_request_store.get_transfer_checkout_requests()
+
