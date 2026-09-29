@@ -1,19 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import './Auth.css';
-import { authService } from '../services/authService';
+import { authService } from '../../services/authService';
 
-export default function Login({ onLoginSuccess, initialTab = 'login', onTabChange }) {
-  const [activeTab, setActiveTab] = useState(initialTab || 'login'); // 'login' | 'register'
+/**
+ * Kiểm tra định dạng email trường ICTU:
+ * Chỉ cần có định dạng đuôi @ictu.edu.vn
+ */
+const isValidSchoolEmail = (val) => {
+  if (!val || typeof val !== 'string') return false;
+  return /^[^\s@]+@ictu\.edu\.vn$/i.test(val.trim());
+};
 
-  useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
-    }
-  }, [initialTab]);
+export default function Login() {
+  const [activeTab, setActiveTab] = useState('login'); // 'login' | 'register'
 
   // State form Đăng nhập
   const [loginForm, setLoginForm] = useState({
-    identifier: '',
+    email: '',
     password: '',
   });
 
@@ -21,7 +24,7 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
   const [registerForm, setRegisterForm] = useState({
     fullName: '',
     gender: 'Nữ',
-    emailOrPhone: '',
+    email: '',
     password: '',
     confirmPassword: '',
   });
@@ -50,15 +53,31 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
   // Submit Đăng nhập
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    if (!loginForm.identifier.trim() || !loginForm.password) {
-      setMessage({ type: 'error', text: 'Vui lòng nhập đầy đủ tài khoản và mật khẩu.' });
+    const emailVal = loginForm.email.trim();
+
+    if (!emailVal || !loginForm.password) {
+      setMessage({ type: 'error', text: 'Vui lòng nhập đầy đủ email và mật khẩu.' });
+      return;
+    }
+
+    // Cho phép tài khoản đặc biệt của quản trị viên / kế toán (KT_Hoa, QL_Nam)
+    const isSpecialAccount =
+      ['kt_hoa', 'admin', 'ql_nam'].includes(emailVal.toLowerCase()) ||
+      emailVal.toLowerCase().startsWith('kt_') ||
+      emailVal.toLowerCase().startsWith('ql_');
+
+    if (!isValidSchoolEmail(emailVal) && !isSpecialAccount) {
+      setMessage({
+        type: 'error',
+        text: 'Email đăng nhập phải có định dạng @ictu.edu.vn.',
+      });
       return;
     }
 
     setLoading(true);
     setMessage({ type: '', text: '' });
 
-    const result = await authService.login(loginForm.identifier, loginForm.password);
+    const result = await authService.login(emailVal, loginForm.password);
     setLoading(false);
 
     if (result.success) {
@@ -67,10 +86,12 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
         text: `Đăng nhập thành công! Xin chào ${result.data.username} (${result.data.role}).`,
       });
       setCurrentUser(result.data);
+      // Chuyển hướng hoặc làm mới phiên đăng nhập
+      window.location.reload();
     } else {
       setMessage({
         type: 'error',
-        text: result.message || 'Tên đăng nhập hoặc mật khẩu không chính xác.',
+        text: result.message || 'Email hoặc mật khẩu không chính xác.',
       });
     }
   };
@@ -78,10 +99,20 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
   // Submit Đăng ký
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-    const { fullName, gender, emailOrPhone, password, confirmPassword } = registerForm;
+    const { fullName, gender, email, password, confirmPassword } = registerForm;
+    const emailVal = email.trim();
 
-    if (!fullName.trim() || !emailOrPhone.trim() || !password) {
+    if (!fullName.trim() || !emailVal || !password) {
       setMessage({ type: 'error', text: 'Vui lòng điền đầy đủ các thông tin bắt buộc.' });
+      return;
+    }
+
+    // Kiểm tra định dạng email trường ICTU (phải có đuôi @ictu.edu.vn)
+    if (!isValidSchoolEmail(emailVal)) {
+      setMessage({
+        type: 'error',
+        text: 'Email đăng ký phải có định dạng @ictu.edu.vn.',
+      });
       return;
     }
 
@@ -101,7 +132,7 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
     const result = await authService.register({
       fullName,
       gender,
-      emailOrPhone,
+      email: emailVal,
       password,
     });
     setLoading(false);
@@ -112,7 +143,7 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
         text: 'Đăng ký tài khoản thành công! Bạn có thể chuyển sang tab Đăng nhập ngay bây giờ.',
       });
       // Điền sẵn thông tin vào login form và chuyển tab
-      setLoginForm({ identifier: emailOrPhone, password: '' });
+      setLoginForm({ email: emailVal, password: '' });
       setTimeout(() => {
         setActiveTab('login');
       }, 1500);
@@ -241,7 +272,6 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
               onClick={() => {
                 setActiveTab('login');
                 setMessage({ type: '', text: '' });
-                if (onTabChange) onTabChange('login');
               }}
             >
               Đăng nhập
@@ -252,7 +282,6 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
               onClick={() => {
                 setActiveTab('register');
                 setMessage({ type: '', text: '' });
-                if (onTabChange) onTabChange('register');
               }}
             >
               Đăng ký
@@ -272,17 +301,17 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
               /* ================= FORM ĐĂNG NHẬP ================= */
               <form className="auth-form login-form" onSubmit={handleLoginSubmit}>
                 <div className="form-fields login-fields">
-                  {/* Email / Số điện thoại */}
+                  {/* Email */}
                   <div className="form-group">
-                    <label className="form-label" htmlFor="login-identifier">Email / Số điện thoại</label>
+                    <label className="form-label" htmlFor="login-email">Email</label>
                     <div className="input-wrapper">
                       <input
-                        id="login-identifier"
-                        name="identifier"
+                        id="login-email"
+                        name="email"
                         type="text"
                         className="form-input"
-                        placeholder="Nhập email hoặc số điện thoại"
-                        value={loginForm.identifier}
+                        placeholder="@ictu.edu.vn"
+                        value={loginForm.email}
                         onChange={handleLoginChange}
                         required
                       />
@@ -387,7 +416,6 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
                       onClick={() => {
                         setActiveTab('register');
                         setMessage({ type: '', text: '' });
-                        if (onTabChange) onTabChange('register');
                       }}
                     >
                       Đăng ký
@@ -433,17 +461,17 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
                     </div>
                   </div>
 
-                  {/* Email / Số điện thoại */}
+                  {/* Email */}
                   <div className="form-group">
-                    <label className="form-label" htmlFor="register-emailOrPhone">Email / Số điện thoại</label>
+                    <label className="form-label" htmlFor="register-email">Email</label>
                     <div className="input-wrapper">
                       <input
-                        id="register-emailOrPhone"
-                        name="emailOrPhone"
+                        id="register-email"
+                        name="email"
                         type="text"
                         className="form-input"
-                        placeholder="Nhập email hoặc số điện thoại"
-                        value={registerForm.emailOrPhone}
+                        placeholder="@ictu.edu.vn"
+                        value={registerForm.email}
                         onChange={handleRegisterChange}
                         required
                       />
@@ -575,7 +603,6 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
                       onClick={() => {
                         setActiveTab('login');
                         setMessage({ type: '', text: '' });
-                        if (onTabChange) onTabChange('login');
                       }}
                     >
                       Đăng nhập
