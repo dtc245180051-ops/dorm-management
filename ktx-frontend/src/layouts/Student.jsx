@@ -337,7 +337,7 @@ export default function StudentLayout({
           {/* Avatar Robot Công nghệ */}
           <div className="w-16 h-16 rounded-full overflow-hidden shadow-lg flex items-center justify-center">
             <img
-              src="/public/chatbot.png"
+              src="/chatbot.png"
               alt="Chatbot Avatar"
               className="w-full h-full object-cover"
             />
