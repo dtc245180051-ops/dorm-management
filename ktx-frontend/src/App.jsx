@@ -14,6 +14,7 @@ import RoomRegistrationPage from './pages/student/RoomRegistrationPage';
 import RoomTransferPage from './pages/student/RoomTransferPage';
 import RequestHistoryPage from './pages/student/RequestHistoryPage';
 import FeedbackPage from './pages/student/FeedbackPage';
+import StudentDashboard from './pages/student/StudentDashboard';
 import TransactionReconciliation from './pages/accountant/TransactionReconciliation';
 import PeriodicBilling from './pages/accountant/PeriodicBilling';
 import DebtLedger from './pages/accountant/DebtLedger';
@@ -425,109 +426,26 @@ export default function App() {
 
   // 6. Trang chủ Sinh viên (Dashboard)
   if (currentPath === '/student/dashboard') {
+    const studentName =
+      localStorage.getItem('ktx_fullname') ||
+      localStorage.getItem('ktx_username') ||
+      'Nguyễn Văn A';
+
     return (
       <div className="relative">
         <StudentLayout
           activeTab="dashboard"
           onSelectTab={handleStudentTabSelect}
-          userName="Nguyễn Văn A"
+          userName={studentName}
           userRole="Sinh viên"
         >
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 lg:p-8 flex-1 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between pb-6 border-b border-slate-100 mb-6">
-                <div>
-                  <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                    Trang chủ Sinh viên KTX
-                  </h1>
-                  <p className="text-sm text-slate-500 mt-1">
-                    Chào mừng bạn đến với Cổng thông tin Ký túc xá trực tuyến
-                  </p>
-                </div>
-              </div>
-
-              {/* Banner thông tin phòng ở hiện tại */}
-              <div className="rounded-2xl bg-gradient-to-r from-sky-400 to-blue-500 text-white p-5 sm:p-6 shadow-sm mb-6 select-none">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-4 items-center">
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-white/90 mb-1">
-                      Phòng hiện tại
-                    </p>
-                    <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white drop-shadow-2xs">
-                      {currentRoomInfo.phong_hien_tai}
-                    </h3>
-                  </div>
-                  <div className="sm:border-l sm:border-white/20 sm:pl-6">
-                    <p className="text-xs sm:text-sm font-medium text-white/90 mb-1">
-                      Thành viên
-                    </p>
-                    <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white drop-shadow-2xs">
-                      {currentRoomInfo.thanh_vien}
-                    </h3>
-                  </div>
-                  <div className="sm:border-l sm:border-white/20 sm:pl-6">
-                    <p className="text-xs sm:text-sm font-medium text-white/90 mb-1">
-                      Thời gian lưu trú
-                    </p>
-                    <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white drop-shadow-2xs">
-                      {currentRoomInfo.thoi_gian_luu_tru}
-                    </h3>
-                  </div>
-                </div>
-              </div>
-
-              {/* Lối tắt nhanh */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-                <div
-                  onClick={() => navigateTo('/student/register')}
-                  className="p-5 rounded-2xl bg-gradient-to-br from-blue-50 to-sky-50 border border-blue-200/80 hover:shadow-md transition cursor-pointer group"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center mb-3 group-hover:scale-105 transition">
-                    <Plus className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-bold text-slate-900 mb-1">Đăng ký ở KTX</h3>
-                  <p className="text-xs text-slate-500 mb-4">
-                    Gửi yêu cầu đăng ký phòng/giường trống cho học kỳ mới
-                  </p>
-                  <span className="text-xs font-bold text-blue-600 flex items-center gap-1">
-                    Đăng ký ngay <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-
-                <div
-                  onClick={() => navigateTo('/student/transfer-room')}
-                  className="p-5 rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200/80 hover:shadow-md transition cursor-pointer group"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center mb-3 group-hover:scale-105 transition">
-                    <RefreshCw className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-bold text-slate-900 mb-1">Chuyển / Trả phòng</h3>
-                  <p className="text-xs text-slate-500 mb-4">
-                    Gửi nguyện vọng chuyển phòng hoặc làm thủ tục trả phòng KTX
-                  </p>
-                  <span className="text-xs font-bold text-indigo-600 flex items-center gap-1">
-                    Làm đơn ngay <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-
-                <div
-                  onClick={() => navigateTo('/student/history')}
-                  className="p-5 rounded-2xl bg-slate-50 border border-slate-200 hover:shadow-md transition cursor-pointer group"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-slate-700 text-white flex items-center justify-center mb-3 group-hover:scale-105 transition">
-                    <Clock className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-bold text-slate-900 mb-1">Lịch sử đăng ký & ở</h3>
-                  <p className="text-xs text-slate-500 mb-4">
-                    Theo dõi tiến độ xét duyệt đơn và quá trình lưu trú tại KTX
-                  </p>
-                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                    Xem lịch sử <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <StudentDashboard
+            user={{
+              ho_ten: studentName,
+              username: localStorage.getItem('ktx_username') || 'DTC245180051',
+            }}
+            onNavigate={navigateTo}
+          />
         </StudentLayout>
         <RoleSwitcher
           currentRole="student"

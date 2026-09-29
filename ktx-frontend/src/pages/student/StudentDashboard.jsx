@@ -77,7 +77,7 @@ const MOCK_STUDENT_DATA = {
   ],
 };
 
-export default function StudentDashboard({ user }) {
+export default function StudentDashboard({ user, onNavigate }) {
   const [activeModal, setActiveModal] = useState(null);
   const [currentRoomInfo, setCurrentRoomInfo] = useState({
     phong_hien_tai: 'P36 – Tòa A2 – Tầng 3',
@@ -112,15 +112,34 @@ export default function StudentDashboard({ user }) {
     };
   }, []);
 
-  // Lấy tên hiển thị của sinh viên: ưu tiên dữ liệu đăng nhập, fallback 'Nguyễn Văn A' chuẩn theo ảnh
+  // Lấy tên hiển thị của sinh viên: ưu tiên dữ liệu đăng nhập / localStorage, fallback 'Nguyễn Văn A' chuẩn theo ảnh
   const displayName =
-    user?.nguoi_dung?.ho_ten ||
     user?.ho_ten ||
+    user?.nguoi_dung?.ho_ten ||
+    localStorage.getItem('ktx_fullname') ||
     user?.username ||
     localStorage.getItem('ktx_username') ||
     'Nguyễn Văn A';
 
   const handleCardClick = (service) => {
+    if (onNavigate) {
+      if (service.id === 'reg-room') {
+        onNavigate('/student/register');
+        return;
+      }
+      if (service.id === 'move-room') {
+        onNavigate('/student/transfer-room');
+        return;
+      }
+      if (service.id === 'history-room') {
+        onNavigate('/student/history');
+        return;
+      }
+      if (service.id === 'feedback') {
+        onNavigate('/student/feedback');
+        return;
+      }
+    }
     setActiveModal({
       title: service.title,
       desc: service.desc,
@@ -139,7 +158,7 @@ export default function StudentDashboard({ user }) {
   const closeModal = () => setActiveModal(null);
 
   return (
-    <>
+    <div className="student-main-content">
       {/* ================= BANNER CHÀO MỪNG ================= */}
       <section className="student-banner-card">
         <div
@@ -256,13 +275,17 @@ export default function StudentDashboard({ user }) {
         {/* Thẻ 4: Phản ánh */}
         <div
           className="student-stat-card"
-          onClick={() =>
-            setActiveModal({
-              title: 'Phản ánh sự cố',
-              desc: 'Tình trạng khiếu nại & báo hỏng thiết bị',
-              detail: 'Hiện chưa có khiếu nại hay báo hỏng thiết bị nào đang chờ xử lý.',
-            })
-          }
+          onClick={() => {
+            if (onNavigate) {
+              onNavigate('/student/feedback');
+            } else {
+              setActiveModal({
+                title: 'Phản ánh sự cố',
+                desc: 'Tình trạng khiếu nại & báo hỏng thiết bị',
+                detail: 'Hiện chưa có khiếu nại hay báo hỏng thiết bị nào đang chờ xử lý.',
+              });
+            }
+          }}
         >
           <div className="student-stat-left">
             <div className="student-stat-icon-box green">
@@ -510,6 +533,6 @@ export default function StudentDashboard({ user }) {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
