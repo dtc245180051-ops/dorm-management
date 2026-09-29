@@ -369,11 +369,10 @@ export default function App() {
                               <button
                                 type="button"
                                 onClick={() => navigateTo(`/admin/requests/registration/${targetId}`)}
-                                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer shadow-xs ${
-                                  isPending
-                                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                                }`}
+                                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer shadow-xs ${isPending
+                                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                  }`}
                               >
                                 {isPending ? 'Xử lý đơn' : 'Xem chi tiết'}
                               </button>
@@ -433,11 +432,10 @@ function RoleSwitcher({ currentRole, onSwitchRole }) {
       <button
         type="button"
         onClick={() => onSwitchRole('admin')}
-        className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 cursor-pointer ${
-          currentRole === 'admin'
-            ? 'bg-slate-900 text-white shadow-xs'
-            : 'text-slate-600 hover:text-slate-900'
-        }`}
+        className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 cursor-pointer ${currentRole === 'admin'
+          ? 'bg-slate-900 text-white shadow-xs'
+          : 'text-slate-600 hover:text-slate-900'
+          }`}
       >
         <ShieldCheck className="w-3.5 h-3.5" />
         <span>Admin</span>
@@ -446,11 +444,10 @@ function RoleSwitcher({ currentRole, onSwitchRole }) {
       <button
         type="button"
         onClick={() => onSwitchRole('student')}
-        className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 cursor-pointer ${
-          currentRole === 'student'
-            ? 'bg-blue-600 text-white shadow-xs'
-            : 'text-slate-600 hover:text-slate-900'
-        }`}
+        className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 cursor-pointer ${currentRole === 'student'
+          ? 'bg-blue-600 text-white shadow-xs'
+          : 'text-slate-600 hover:text-slate-900'
+          }`}
       >
         <UserCheck className="w-3.5 h-3.5" />
         <span>Sinh viên</span>
