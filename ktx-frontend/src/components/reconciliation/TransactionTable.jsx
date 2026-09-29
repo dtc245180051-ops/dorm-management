@@ -138,7 +138,7 @@ export default function TransactionTable({
               const missingText =
                 isMatched && matchedCode
                   ? matchedCode
-                  : 'Thiếu mã sinh viên';
+                  : (tx.matched_invoice || 'Cần khớp tay');
 
               return (
                 <tr key={tx.id} className="recon-tr">
@@ -188,7 +188,7 @@ export default function TransactionTable({
                   <td className="recon-td td-status">
                     <TransactionStatusBadge
                       status={isMatched ? 'MATCHED' : 'INVALID_SYNTAX'}
-                      customLabel={isMatched ? 'Đã khớp' : 'Sai cú pháp'}
+                      customLabel={isMatched ? 'Đã khớp' : 'Khớp tay'}
                     />
                   </td>
 

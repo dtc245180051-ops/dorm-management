@@ -35,6 +35,19 @@ export default function ManualMatchModal({
     return `${Number(amount).toLocaleString('vi-VN')} VND`;
   };
 
+  // Format mô tả hóa đơn: Tiền phòng chuẩn theo năm học (không chia kỳ), tiền điện nước theo tháng
+  const formatInvoiceDesc = (inv) => {
+    if (!inv) return '';
+    const desc = inv.description || '';
+    if (inv.invoiceType === 'TIEN_PHONG' || desc.includes('TIEN_PHONG') || desc.toLowerCase().includes('tiền phòng')) {
+      return 'Hóa đơn tiền phòng Năm học 2026 – 2027';
+    }
+    if (inv.invoiceType === 'DIEN_NUOC' || desc.includes('DIEN_NUOC') || desc.toLowerCase().includes('điện nước')) {
+      return desc.replace('Hóa đơn DIEN_NUOC', 'Hóa đơn tiền điện nước');
+    }
+    return desc;
+  };
+
   // Xử lý chọn sinh viên -> Tải hóa đơn của sinh viên đó
   const handleSelectStudent = useCallback(async (student) => {
     setSelectedStudent(student);
@@ -49,15 +62,27 @@ export default function ManualMatchModal({
     setIsLoadingInvoices(false);
 
     if (res.success && res.data) {
-      setInvoicesList(res.data);
+      // Chỉ lấy các hóa đơn chưa thanh toán và tiền phòng phải theo cả năm học (không chia kỳ)
+      const validInvoices = res.data.filter((inv) => {
+        if (inv.status === 'DA_THANH_TOAN' || (inv.paidAmount && inv.paidAmount >= inv.amount)) {
+          return false;
+        }
+        const descLower = (inv.description || '').toLowerCase();
+        if ((inv.invoiceType === 'TIEN_PHONG' || descLower.includes('phòng')) && (descLower.includes('học kỳ') || descLower.includes('hoc ky'))) {
+          return false;
+        }
+        return true;
+      });
+
+      setInvoicesList(validInvoices);
       // Tự động chọn hóa đơn có số tiền trùng khớp với giao dịch nếu có
-      const exactMatch = res.data.find(
+      const exactMatch = validInvoices.find(
         (inv) => Math.abs(inv.amount - (transaction?.amount || 0)) < 1
       );
       if (exactMatch) {
         setSelectedInvoiceCode(exactMatch.invoiceCode);
-      } else if (res.data.length > 0) {
-        setSelectedInvoiceCode(res.data[0].invoiceCode);
+      } else if (validInvoices.length > 0) {
+        setSelectedInvoiceCode(validInvoices[0].invoiceCode);
       }
     } else {
       setInvoicesList([]);
@@ -325,7 +350,7 @@ export default function ManualMatchModal({
                           <span className="recon-invoice-code-badge">{inv.invoiceCode}</span>
                           <span className="recon-invoice-amount-tag">{formatCurrency(inv.amount)}</span>
                         </div>
-                        <div className="recon-invoice-card-desc">{inv.description}</div>
+                        <div className="recon-invoice-card-desc">{formatInvoiceDesc(inv)}</div>
                       </div>
                       {isExactAmount && (
                         <span className="recon-match-pill">Khớp số tiền</span>
