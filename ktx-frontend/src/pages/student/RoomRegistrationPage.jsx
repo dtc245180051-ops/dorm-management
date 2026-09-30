@@ -13,6 +13,7 @@ import { VIETNAM_PROVINCES } from '../../data/vietnamAddressData';
 export default function RoomRegistrationPage({
   onNavigateHistory,
   onNavigateDashboard,
+  onSelectTab,
 }) {
   // State chuyển đổi mượt mà giữa Form và Màn hình thành công (không chuyển URL)
   const [isSuccess, setIsSuccess] = useState(false);
@@ -193,6 +194,7 @@ export default function RoomRegistrationPage({
   return (
     <StudentLayout
       activeTab="register"
+      onSelectTab={onSelectTab}
       userName={formData.ho_ten || 'Sinh viên'}
       userRole="Sinh viên"
     >

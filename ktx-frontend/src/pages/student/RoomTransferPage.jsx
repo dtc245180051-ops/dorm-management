@@ -13,9 +13,25 @@ import StudentLayout from '../../layouts/Student';
 import occupancyService from '../../services/occupancyService';
 import { VIETNAM_PROVINCES } from '../../data/vietnamAddressData';
 
-export default function RoomTransferPage() {
+export default function RoomTransferPage({ onSelectTab }) {
   // 1. Quản lý tab: 'transfer' (Chuyển phòng) hoặc 'checkout' (Trả phòng)
-  const [activeTab, setActiveTab] = useState('transfer');
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tab') === 'checkout' ? 'checkout' : 'transfer';
+  });
+
+  useEffect(() => {
+    const checkTabParam = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam === 'checkout' || tabParam === 'transfer') {
+        setActiveTab(tabParam);
+      }
+    };
+    checkTabParam();
+    window.addEventListener('popstate', checkTabParam);
+    return () => window.removeEventListener('popstate', checkTabParam);
+  }, []);
 
   // 2. Thông tin phòng hiện tại (Banner trên cùng)
   const [currentRoomInfo, setCurrentRoomInfo] = useState({
@@ -356,6 +372,7 @@ export default function RoomTransferPage() {
   return (
     <StudentLayout
       activeTab="transfer"
+      onSelectTab={onSelectTab}
       userName="Nguyễn Văn A"
       userRole="Sinh viên"
     >
