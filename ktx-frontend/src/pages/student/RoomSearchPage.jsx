@@ -424,8 +424,8 @@ export default function RoomSearchPage({
                           type="button"
                           onClick={() => handleOpenDetail(room)}
                           className={`w-full py-1.5 rounded-xl font-bold text-xs mt-2.5 text-center transition cursor-pointer ${isFull
-                              ? 'border border-slate-200 text-slate-400 hover:bg-slate-50'
-                              : 'border border-blue-500 text-blue-600 hover:bg-blue-50'
+                            ? 'border border-slate-200 text-slate-400 hover:bg-slate-50'
+                            : 'border border-blue-500 text-blue-600 hover:bg-blue-50'
                             }`}
                         >
                           Xem chi tiết
@@ -464,8 +464,8 @@ export default function RoomSearchPage({
                   type="button"
                   onClick={() => setCurrentPage(pageNum)}
                   className={`w-8 h-8 rounded-lg text-sm font-bold transition cursor-pointer flex items-center justify-center ${isActive
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-2xs'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-2xs'
                     }`}
                 >
                   {pageNum}
