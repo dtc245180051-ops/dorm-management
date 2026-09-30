@@ -5,31 +5,39 @@ const STORAGE_KEY = 'dorm_registration_requests';
 // Dữ liệu mẫu ban đầu để luôn có sẵn dữ liệu chuẩn bị kiểm thử
 const DEFAULT_REQUESTS = [
   {
-    id: 'DK-001',
-    ma_yeu_cau: 'DK-001',
-    msv: 'B21DCCN001',
+    id: 'DK2026-0148',
+    ma_yeu_cau: '#DK2026-0148',
+    msv: 'DTCxxxxxxxx',
     ho_ten: 'Nguyễn Văn A',
-    gioi_tinh: 'Nam',
-    ngay_sinh: '2003-05-15',
-    cccd: '001203004567',
-    so_dien_thoai: '0987654321',
-    email: 'nguyenvana@ictu.edu.vn',
-    khoa: 'Công nghệ thông tin',
-    lop: 'D21CQCN01-B',
-    dia_chi: 'Số 123 Đường Cầu Giấy, Hà Nội',
+    gioi_tinh: 'Nữ',
+    ngay_sinh: '21/01/2006',
+    cccd: '01xxxxxxxxxx',
+    so_dien_thoai: '09xxxxxxxx',
+    email: 'DTCxxxxxxxx',
+    khoa: 'CNTT',
+    lop: 'CNTT K23A',
+    dia_chi: 'Xã A - Tỉnh Hải Dương',
     doi_tuong_uu_tien: 'Không thuộc diện ưu tiên',
     nguoi_giam_ho: 'Nguyễn Văn B',
     moi_quan_he: 'Bố',
-    sdt_nguoi_giam_ho: '0912345678',
-    nguyen_vong: 'Xin hãy xếp cho em 1 phòng nào đó ở tòa A với ạ 🥹',
+    sdt_nguoi_giam_ho: '09xxxxxxxx',
+    nguyen_vong: 'Em có nguyện vọng ở tòa A2, em xin cảm ơn',
     nguyen_vong_phong: 'P36',
     nguyen_vong_label: 'P36 - Tầng 3 - Tòa A2',
-    ngay_gui: '2026-09-26T15:00:00',
+    loai_phong: 'Phòng tiêu chuẩn',
+    tang_mong_muon: 'Tầng 3',
+    muc_gia_mong_muon: '12.000.000 đ/năm',
+    nam_hoc: '2026-2027',
+    ngay_dang_ky: '25/08/2026',
+    ngay_gui: '25/08/2026 09:12',
+    ngay_tiep_nhan: '26/08/2026 14:30',
+    ngay_du_kien: '05/09/2026',
     trang_thai: 'CHO_DUYET',
+    trang_thai_label: 'Đang xét duyệt',
     goi_y: {
-      ma_toa: 'A',
-      ma_phong: 'A203',
-      ma_giuong: 'G04',
+      ma_toa: 'A2',
+      ma_phong: 'P36',
+      ma_giuong: 'G07',
     },
   },
 ];
@@ -61,17 +69,35 @@ function saveLocalRequests(requests) {
 const TRANSFER_CHECKOUT_STORAGE_KEY = 'dorm_transfer_checkout_requests';
 const CURRENT_ROOM_STORAGE_KEY = 'dorm_current_room_info';
 const STAY_CONTRACTS_STORAGE_KEY = 'dorm_stay_contracts';
+const STUDENT_PROFILE_STORAGE_KEY = 'dorm_student_profile';
+
+const DEFAULT_STUDENT_PROFILE = {
+  ho_ten: 'Nguyễn Văn A',
+  vai_tro: 'Sinh viên',
+  msv: 'DTCxxxxxxxxx',
+  lop: 'CNTT K23A',
+  so_dien_thoai: '09xxxxxxxx',
+  email: 'DTCxxxxxxxxx@ictu.edu.vn',
+  ngay_sinh: '12/07/2007',
+  gioi_tinh: 'Nữ',
+  dan_toc: 'Kinh',
+  que_quan: 'Xã A - Tỉnh Bắc Ninh',
+  khoa: 'CNTT',
+  avatar_url: '/avatar.png',
+};
 
 const DEFAULT_CURRENT_ROOM_INFO = {
   phong_hien_tai: 'P36 – Tòa A2 – Tầng 3',
   thanh_vien: '6/8 người',
   thoi_gian_luu_tru: '09/2025 – Nay',
-  so_phong: 'P36',
-  toa: 'Tòa A2',
+  so_phong: '36',
+  toa: 'A2',
   tang: '3',
+  giuong: '4',
+  ngay_nhan_phong: '01/09/2024',
   so_thanh_vien: 6,
   suc_chua: 8,
-  vi_tri_hien_tai: 'Phòng A102 - Giường G01',
+  vi_tri_hien_tai: 'Phòng 36 - Giường 4',
   cong_no: 'Đã hoàn thành toàn bộ phí',
   trang_thai: 'DANG_O',
 };
@@ -183,6 +209,27 @@ function saveLocalCurrentRoomInfo(info) {
     localStorage.setItem(CURRENT_ROOM_STORAGE_KEY, JSON.stringify(info));
   } catch (e) {
     console.error('Failed to save current room info:', e);
+  }
+}
+
+function getLocalStudentProfile() {
+  try {
+    const raw = localStorage.getItem(STUDENT_PROFILE_STORAGE_KEY);
+    if (!raw) {
+      localStorage.setItem(STUDENT_PROFILE_STORAGE_KEY, JSON.stringify(DEFAULT_STUDENT_PROFILE));
+      return DEFAULT_STUDENT_PROFILE;
+    }
+    return { ...DEFAULT_STUDENT_PROFILE, ...JSON.parse(raw) };
+  } catch (e) {
+    return DEFAULT_STUDENT_PROFILE;
+  }
+}
+
+function saveLocalStudentProfile(profile) {
+  try {
+    localStorage.setItem(STUDENT_PROFILE_STORAGE_KEY, JSON.stringify(profile));
+  } catch (e) {
+    console.error('Failed to save student profile to localStorage:', e);
   }
 }
 
@@ -411,6 +458,55 @@ export const occupancyService = {
       message: 'Gửi yêu cầu đăng ký phòng thành công',
       data: newRequest,
     };
+  },
+
+  /**
+   * Hủy yêu cầu đăng ký phòng
+   */
+  cancelRegistrationRequest: async (id) => {
+    const cleanId = (id || '').trim();
+    const all = getLocalRequests();
+    const updated = all.map((r) => {
+      if (
+        r.id?.toLowerCase() === cleanId.toLowerCase() ||
+        r.ma_yeu_cau?.toLowerCase() === cleanId.toLowerCase() ||
+        r.ma_yeu_cau?.replace('#', '').toLowerCase() === cleanId.replace('#', '').toLowerCase()
+      ) {
+        return {
+          ...r,
+          trang_thai: 'DA_HUY',
+          trang_thai_label: 'Đã hủy',
+        };
+      }
+      return r;
+    });
+    saveLocalRequests(updated);
+    window.dispatchEvent(new Event('occupancy-updated'));
+    return { status: 'success', message: 'Hủy đơn thành công' };
+  },
+
+  /**
+   * Cập nhật thông tin nguyện vọng phòng
+   */
+  updateRegistrationWish: async (id, updatedWish) => {
+    const cleanId = (id || '').trim();
+    const all = getLocalRequests();
+    const updated = all.map((r) => {
+      if (
+        r.id?.toLowerCase() === cleanId.toLowerCase() ||
+        r.ma_yeu_cau?.toLowerCase() === cleanId.toLowerCase() ||
+        r.ma_yeu_cau?.replace('#', '').toLowerCase() === cleanId.replace('#', '').toLowerCase()
+      ) {
+        return {
+          ...r,
+          ...updatedWish,
+        };
+      }
+      return r;
+    });
+    saveLocalRequests(updated);
+    window.dispatchEvent(new Event('occupancy-updated'));
+    return { status: 'success', message: 'Cập nhật nguyện vọng thành công' };
   },
 
   /**
@@ -899,6 +995,26 @@ export const occupancyService = {
 
   getMyContracts: async () => {
     return getLocalStayContracts();
+  },
+
+  getCurrentRoomInfo: async () => {
+    return getLocalCurrentRoomInfo();
+  },
+
+  getStudentProfile: async () => {
+    return getLocalStudentProfile();
+  },
+
+  updateStudentProfile: async (updatedData) => {
+    const current = getLocalStudentProfile();
+    const merged = { ...current, ...updatedData };
+    saveLocalStudentProfile(merged);
+    window.dispatchEvent(new Event('occupancy-updated'));
+    return {
+      status: 'success',
+      message: 'Cập nhật thông tin thành công!',
+      data: merged,
+    };
   },
 
   /**

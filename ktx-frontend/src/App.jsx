@@ -15,6 +15,7 @@ import RoomTransferPage from './pages/student/RoomTransferPage';
 import RequestHistoryPage from './pages/student/RequestHistoryPage';
 import FeedbackPage from './pages/student/FeedbackPage';
 import StudentDashboard from './pages/student/StudentDashboard';
+import StudentProfilePage from './pages/student/StudentProfilePage';
 import TransactionReconciliation from './pages/accountant/TransactionReconciliation';
 import PeriodicBilling from './pages/accountant/PeriodicBilling';
 import DebtLedger from './pages/accountant/DebtLedger';
@@ -83,9 +84,17 @@ export default function App() {
       setCurrentPath(window.location.pathname);
     };
 
+    const handleCustomNavigate = (e) => {
+      if (e.detail?.path) {
+        navigateTo(e.detail.path);
+      }
+    };
+
     window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('student-navigate', handleCustomNavigate);
     return () => {
       window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('student-navigate', handleCustomNavigate);
     };
   }, []);
 
@@ -129,6 +138,10 @@ export default function App() {
       case 'feedback':
       case 'phan-anh':
         navigateTo('/student/feedback');
+        break;
+      case 'profile':
+      case 'thong-tin-ca-nhan':
+        navigateTo('/student/profile');
         break;
       default:
         break;
@@ -358,6 +371,8 @@ export default function App() {
             navigateTo('/student/history');
           }}
           onNavigateDashboard={() => navigateTo('/student/dashboard')}
+          onSelectTab={handleStudentTabSelect}
+          onNavigate={navigateTo}
         />
         <RoleSwitcher
           currentRole="student"
@@ -374,7 +389,10 @@ export default function App() {
   if (currentPath === '/student/transfer-room' || currentPath === '/student/transfer') {
     return (
       <div className="relative">
-        <RoomTransferPage />
+        <RoomTransferPage
+          onSelectTab={handleStudentTabSelect}
+          onNavigate={navigateTo}
+        />
         <RoleSwitcher
           currentRole="student"
           onSwitchRole={(r) => {
@@ -390,7 +408,10 @@ export default function App() {
   if (currentPath === '/student/history') {
     return (
       <div className="relative">
-        <RequestHistoryPage />
+        <RequestHistoryPage
+          onSelectTab={handleStudentTabSelect}
+          onNavigate={navigateTo}
+        />
         <RoleSwitcher
           currentRole="student"
           onSwitchRole={(r) => {
@@ -411,7 +432,29 @@ export default function App() {
           onNavigateDashboard={() => navigateTo('/student/dashboard')}
           onNavigateRegister={() => navigateTo('/student/register')}
           onNavigateHistory={() => navigateTo('/student/history')}
+          onNavigateProfile={() => navigateTo('/student/profile')}
+          onSelectTab={handleStudentTabSelect}
+          onNavigate={navigateTo}
           onLogout={() => navigateTo('/login')}
+        />
+        <RoleSwitcher
+          currentRole="student"
+          onSwitchRole={(r) => {
+            loadRequests();
+            navigateTo(r === 'admin' ? '/admin' : r === 'student' ? '/student/dashboard' : '/doi-soat');
+          }}
+        />
+      </div>
+    );
+  }
+
+  // 5b. Thông tin cá nhân Sinh viên
+  if (currentPath === '/student/profile' || currentPath === '/student/thong-tin-ca-nhan') {
+    return (
+      <div className="relative">
+        <StudentProfilePage
+          onSelectTab={handleStudentTabSelect}
+          onNavigate={navigateTo}
         />
         <RoleSwitcher
           currentRole="student"

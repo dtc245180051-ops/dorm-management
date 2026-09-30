@@ -76,17 +76,27 @@ export default function StudentLayout({
   const handleTabClick = (tabId) => {
     if (onSelectTab) {
       onSelectTab(tabId);
-    } else {
-      if (tabId === 'register') {
-        window.history.pushState({}, '', '/student/register');
-      } else if (tabId === 'transfer') {
-        window.history.pushState({}, '', '/student/transfer-room');
-      } else if (tabId === 'history') {
-        window.history.pushState({}, '', '/student/history');
-      } else if (tabId === 'dashboard') {
-        window.history.pushState({}, '', '/student/dashboard');
-      }
+      return;
+    }
+    const pathMap = {
+      dashboard: '/student/dashboard',
+      home: '/student/dashboard',
+      register: '/student/register',
+      'dang-ky': '/student/register',
+      transfer: '/student/transfer-room',
+      'chuyen-phong': '/student/transfer-room',
+      history: '/student/history',
+      'lich-su': '/student/history',
+      feedback: '/student/feedback',
+      'phan-anh': '/student/feedback',
+      profile: '/student/profile',
+      'thong-tin-ca-nhan': '/student/profile',
+    };
+    const targetPath = pathMap[tabId];
+    if (targetPath) {
+      window.history.pushState({}, '', targetPath);
       window.dispatchEvent(new PopStateEvent('popstate'));
+      window.dispatchEvent(new CustomEvent('student-navigate', { detail: { path: targetPath } }));
     }
   };
 
@@ -148,9 +158,19 @@ export default function StudentLayout({
           </button>
 
           {/* User profile */}
-          <div className="flex items-center gap-3 pl-2 border-l border-slate-200">
-            <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-sm shadow-xs border border-purple-200">
-              <User className="w-5 h-5 text-purple-600" />
+          <div
+            onClick={() => handleTabClick('profile')}
+            className="flex items-center gap-3 pl-2 border-l border-slate-200 cursor-pointer hover:opacity-85 transition select-none"
+            title="Xem thông tin cá nhân"
+          >
+            <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm shadow-xs border border-blue-200 overflow-hidden shrink-0">
+              <img
+                src="/avatar.png"
+                alt="Avatar"
+                className="w-full h-full object-cover"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
+              <User className="w-5 h-5 text-blue-600" />
             </div>
             <div className="flex flex-col text-left">
               <span className="text-sm font-bold text-slate-800 leading-tight">

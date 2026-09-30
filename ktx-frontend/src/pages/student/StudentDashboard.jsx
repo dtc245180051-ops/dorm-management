@@ -139,6 +139,10 @@ export default function StudentDashboard({ user, onNavigate }) {
         onNavigate('/student/feedback');
         return;
       }
+      if (service.id === 'profile' || service.id === 'thong-tin-ca-nhan') {
+        onNavigate('/student/profile');
+        return;
+      }
     }
     setActiveModal({
       title: service.title,
@@ -171,8 +175,10 @@ export default function StudentDashboard({ user, onNavigate }) {
           <p className="student-banner-subtitle">
             Chào mừng bạn trở lại. Đây là trang quản lý ký túc xá dành riêng cho sinh viên.
           </p>
-          <div className="student-banner-quote">
-            Học tập tốt - Sống khỏe - Tuổi trẻ rực rỡ
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginTop: '10px' }}>
+            <div className="student-banner-quote" style={{ marginTop: 0 }}>
+              Học tập tốt - Sống khỏe - Tuổi trẻ rực rỡ
+            </div>
           </div>
         </div>
       </section>
