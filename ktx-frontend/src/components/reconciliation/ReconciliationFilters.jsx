@@ -59,7 +59,7 @@ export default function ReconciliationFilters({
           >
             <option value="ALL">Tất cả</option>
             <option value="MATCHED">Đã khớp</option>
-            <option value="INVALID_SYNTAX">Khớp tay</option>
+            <option value="INVALID_SYNTAX">Sai cú pháp</option>
           </select>
         </div>
 

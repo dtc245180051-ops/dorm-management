@@ -421,22 +421,63 @@ export const reconciliationService = {
   },
 
   /**
+   * Lấy danh sách hóa đơn chưa thanh toán (cả tiền phòng và điện nước) để kế toán khớp tay
+   * @param {Object} params - { keyword, invoiceType, amount }
+   */
+  async getUnpaidInvoices({ keyword = '', invoiceType = 'ALL', amount = null } = {}) {
+    try {
+      const headers = await this.getAuthHeaders();
+      const params = new URLSearchParams();
+      if (keyword) params.append('keyword', keyword);
+      if (invoiceType && invoiceType !== 'ALL') params.append('invoice_type', invoiceType);
+      if (amount !== null && amount !== undefined) params.append('amount', amount);
+
+      const response = await fetch(
+        `${API_BASE_URL}/reconciliation/unpaid-invoices?${params.toString()}`,
+        {
+          method: 'GET',
+          headers,
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          success: true,
+          data,
+        };
+      }
+    } catch (error) {
+      console.warn('Lỗi getUnpaidInvoices API:', error);
+    }
+
+    return {
+      success: true,
+      data: [],
+    };
+  },
+
+  /**
    * Thực hiện gán giao dịch thủ công qua API
    * @param {string|number} transactionId
-   * @param {Object} payload - { studentId, invoiceId }
+   * @param {Object} payload - { invoiceId, studentId }
    */
   async manualMatch(transactionId, { studentId, invoiceId }) {
     try {
       const headers = await this.getAuthHeaders();
+      const bodyData = {
+        invoiceId: (invoiceId || '').trim(),
+      };
+      if (studentId) {
+        bodyData.studentId = studentId.trim();
+      }
+
       const response = await fetch(
         `${API_BASE_URL}/reconciliation/${encodeURIComponent(transactionId)}/manual-match`,
         {
           method: 'POST',
           headers,
-          body: JSON.stringify({
-            studentId: (studentId || '').trim(),
-            invoiceId: (invoiceId || '').trim(),
-          }),
+          body: JSON.stringify(bodyData),
         }
       );
 

@@ -156,9 +156,7 @@ export default function TransactionReconciliation({ searchTerm = '' }) {
         setStatementFile(res.data.fileName || file.name);
         if (res.data.bankName) setQuickBank(res.data.bankName);
         if (res.data.period) setQuickPeriod(res.data.period);
-
-        setTransactions(res.data.items || []);
-        setTotalItems(res.data.totalTransactions || (res.data.items ? res.data.items.length : 0));
+        setCurrentPage(1);
 
         if (res.data.statistics) {
           setStats({
@@ -167,6 +165,9 @@ export default function TransactionReconciliation({ searchTerm = '' }) {
             manualRequired: res.data.statistics.manualRequired,
           });
         }
+
+        // Tải trang 1 đúng pageSize 5 để đồng bộ hoàn toàn với phân trang
+        await loadTransactions({ page: 1, hasUploaded: true, force: true });
 
         showToast(res.message || `Đã tải lên và đối soát thành công file ${file.name}`);
       } else {

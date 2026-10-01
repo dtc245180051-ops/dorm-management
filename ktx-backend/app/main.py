@@ -15,6 +15,7 @@ from app.routers.students import router as students_router
 from app.routers.contracts import router as contracts_router
 from app.routers.student_requests import router as student_requests_router
 from app.routers.admin_occupancy import router as admin_occupancy_router
+from app.routers.finance import router as finance_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -92,6 +93,7 @@ app.include_router(students_router, prefix=settings.API_V1_STR)
 app.include_router(contracts_router, prefix=settings.API_V1_STR)
 app.include_router(student_requests_router, prefix=settings.API_V1_STR)
 app.include_router(admin_occupancy_router, prefix=settings.API_V1_STR)
+app.include_router(finance_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/", tags=["Health Check"])

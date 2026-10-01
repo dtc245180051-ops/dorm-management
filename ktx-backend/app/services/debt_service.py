@@ -9,6 +9,7 @@ from app.models.invoice import HoaDon, LoaiHoaDon, TrangThaiHoaDon
 from app.models.reconciliation import GiaoDichNganHang, TrangThaiDoiSoat
 from app.models.user import NguoiDung, SinhVien, TaiKhoan, VaiTro
 from app.models.contract import HopDong
+from app.models.dorm import Giuong, Phong
 from app.schemas.debt import (
     DebtItemResponse,
     DebtStatistics,
@@ -58,21 +59,21 @@ class DebtService:
             db.add(sv_long)
             db.flush()
 
-        # Invoices cho DTC245040017
+        # Invoices cho DTC245040017 (Phòng tiêu chuẩn P102 - 350.000 đ/tháng)
         inv1 = db.query(HoaDon).filter(HoaDon.ma_hoa_don == "HDTP-2026-LONG-01").first()
         if not inv1:
             inv1 = HoaDon(
                 ma_hoa_don="HDTP-2026-LONG-01",
                 msv="DTC245040017",
                 ho_ten="Nguyễn Hoàng Long",
-                so_phong="A105",
+                so_phong="P102",
                 loai_hoa_don=LoaiHoaDon.TIEN_PHONG.value,
-                ky_thanh_toan="Học kỳ I (2026-2027)",
-                so_tien=1800000.0,
+                ky_thanh_toan="Tháng 09/2026",
+                so_tien=350000.0,
                 ngay_lap=datetime.date(2026, 9, 1),
                 han_thanh_toan=datetime.date(2026, 9, 15),
                 trang_thai=TrangThaiHoaDon.CHUA_THANH_TOAN.value,
-                ghi_chu="Tiền phòng Học kỳ I",
+                ghi_chu="Tiền phòng tiêu chuẩn Tháng 09/2026",
             )
             db.add(inv1)
 
@@ -82,7 +83,7 @@ class DebtService:
                 ma_hoa_don="HDDN-2026-LONG-02",
                 msv="DTC245040017",
                 ho_ten="Nguyễn Hoàng Long",
-                so_phong="A105",
+                so_phong="P102",
                 loai_hoa_don=LoaiHoaDon.DIEN_NUOC.value,
                 ky_thanh_toan="Tháng 09/2026",
                 so_tien=145000.0,
@@ -93,38 +94,36 @@ class DebtService:
             )
             db.add(inv2)
 
-        # Khoản thu chuyển thiếu cho DTC245040017 để tổng dư nợ đúng 3.145.000 đ
+        # Khoản thu tiền phòng Tháng 10/2026 chuyển thiếu cho DTC245040017
         inv3 = db.query(HoaDon).filter(HoaDon.ma_hoa_don == "HDTP-2026-LONG-03").first()
         if not inv3:
             inv3 = HoaDon(
                 ma_hoa_don="HDTP-2026-LONG-03",
                 msv="DTC245040017",
                 ho_ten="Nguyễn Hoàng Long",
-                so_phong="A105",
+                so_phong="P102",
                 loai_hoa_don=LoaiHoaDon.TIEN_PHONG.value,
-                ky_thanh_toan="Học kỳ II (2026-2027)",
-                so_tien=1800000.0,
-                ngay_lap=datetime.date(2026, 9, 1),
-                han_thanh_toan=datetime.date(2026, 9, 15),
+                ky_thanh_toan="Tháng 10/2026",
+                so_tien=350000.0,
+                ngay_lap=datetime.date(2026, 10, 1),
+                han_thanh_toan=datetime.date(2026, 10, 15),
                 trang_thai=TrangThaiHoaDon.CHUA_THANH_TOAN.value,
-                ghi_chu="Tiền phòng Học kỳ II",
+                ghi_chu="Tiền phòng tiêu chuẩn Tháng 10/2026",
             )
             db.add(inv3)
             db.flush()
 
-            # Giao dịch nộp thiếu 455.000 đ (nộp 455.000 đ -> còn thiếu 1.345.000 đ)
-            # Tổng dư nợ: 1.800.000 + 1.345.000 = 3.145.000 đ chuẩn 100% Screenshot 2!
             tx_part = GiaoDichNganHang(
                 ma_giao_dich_ngan_hang="FT_PARTIAL_LONG_01",
                 ngay_giao_dich=datetime.datetime(2026, 9, 12, 10, 30),
-                so_tien=455000.0,
+                so_tien=200000.0,
                 noi_dung_chuyen_khoan="DTC245040017 nop tien phong",
                 ten_ngan_hang="TP Bank",
                 so_tai_khoan="20020813520",
                 trang_thai=TrangThaiDoiSoat.PARTIAL.value,
                 ma_hoa_don=inv3.ma_hoa_don,
                 msv="DTC245040017",
-                ghi_chu_doi_soat=f"Chuyển thiếu 1,345,000 đ cho hóa đơn {inv3.ma_hoa_don}",
+                ghi_chu_doi_soat=f"Chuyển thiếu 150,000 đ cho hóa đơn {inv3.ma_hoa_don}",
             )
             db.add(tx_part)
 
@@ -140,14 +139,14 @@ class DebtService:
                 ma_hoa_don="HDTP-2026-A101-01",
                 msv="DTC245180051",
                 ho_ten="Nguyễn Văn A",
-                so_phong="A101",
+                so_phong="P101",
                 loai_hoa_don=LoaiHoaDon.TIEN_PHONG.value,
-                ky_thanh_toan="Học kỳ I (2026-2027)",
-                so_tien=1800000.0,
+                ky_thanh_toan="Tháng 09/2026",
+                so_tien=350000.0,
                 ngay_lap=datetime.date(2026, 9, 1),
                 han_thanh_toan=datetime.date(2026, 9, 15),
                 trang_thai=TrangThaiHoaDon.CHUA_THANH_TOAN.value,
-                ghi_chu="Tiền phòng Học kỳ I",
+                ghi_chu="Tiền phòng tiêu chuẩn Tháng 09/2026",
             )
             db.add(inv51_1)
 
@@ -157,7 +156,7 @@ class DebtService:
                 ma_hoa_don="HDDN-2026-A101-02",
                 msv="DTC245180051",
                 ho_ten="Nguyễn Văn A",
-                so_phong="A101",
+                so_phong="P101",
                 loai_hoa_don=LoaiHoaDon.DIEN_NUOC.value,
                 ky_thanh_toan="Tháng 09/2026",
                 so_tien=120000.0,
@@ -168,25 +167,45 @@ class DebtService:
             )
             db.add(inv51_2)
 
-        # Hóa đơn quá hạn cho dòng thứ 3 trong Screenshot 1: Hạn 10/09/2026 (Quá hạn)
+        # Hóa đơn quá hạn cho dòng thứ 3: Hạn 10/09/2026 (Quá hạn)
         inv51_3 = db.query(HoaDon).filter(HoaDon.ma_hoa_don == "HDTP-2026-A101-03").first()
         if not inv51_3:
             inv51_3 = HoaDon(
                 ma_hoa_don="HDTP-2026-A101-03",
                 msv="DTC245180051",
                 ho_ten="Nguyễn Văn A",
-                so_phong="A101",
+                so_phong="P101",
                 loai_hoa_don=LoaiHoaDon.TIEN_PHONG.value,
-                ky_thanh_toan="Học kỳ II (2025-2026)",
-                so_tien=1800000.0,
+                ky_thanh_toan="Tháng 08/2026",
+                so_tien=350000.0,
                 ngay_lap=datetime.date(2026, 8, 1),
                 han_thanh_toan=datetime.date(2026, 9, 10),
                 trang_thai=TrangThaiHoaDon.QUA_HAN.value,
-                ghi_chu="Tiền phòng quá hạn",
+                ghi_chu="Tiền phòng tiêu chuẩn quá hạn Tháng 08/2026",
             )
             db.add(inv51_3)
 
         db.commit()
+
+    @classmethod
+    def _format_room_name(cls, db: Session, sv_msv: str) -> str:
+        """
+        Định dạng phòng hiển thị chuẩn: P203, P101, P102 theo yêu cầu người dùng
+        (tránh dính chữ 'Tòa A1203' hay 'A203').
+        """
+        hd_active = db.query(HopDong).filter(HopDong.msv == sv_msv, HopDong.trang_thai == "ACTIVE").first()
+        if hd_active and hd_active.giuong and hd_active.giuong.phong:
+            p = hd_active.giuong.phong
+            return f"P{p.so_phong}"
+
+        recent_inv = db.query(HoaDon).filter(HoaDon.msv == sv_msv).first()
+        if recent_inv and recent_inv.so_phong:
+            import re
+            m = re.search(r"(\d{3})", recent_inv.so_phong)
+            if m:
+                return f"P{m.group(1)}"
+            return recent_inv.so_phong
+        return "P101"
 
     @classmethod
     def get_debt_summary(cls, db: Session, keyword: Optional[str] = None) -> DebtSummaryResponse:
@@ -213,22 +232,42 @@ class DebtService:
         debt_items: List[DebtItemResponse] = []
 
         for sv in students:
-            # Tìm phòng của sinh viên
-            room_str = "A101"
+            # Tìm phòng hiển thị chuẩn
+            room_str = cls._format_room_name(db, sv.msv)
             hd_active = db.query(HopDong).filter(HopDong.msv == sv.msv, HopDong.trang_thai == "ACTIVE").first()
+
+            # Lấy toàn bộ hóa đơn trực tiếp của SV
+            invoices = db.query(HoaDon).filter(HoaDon.msv == sv.msv).all()
+            invoices_map = {inv.ma_hoa_don: (inv, 1.0) for inv in invoices}
+
+            # Nếu SV có phòng ở từ hợp đồng ACTIVE, tìm hóa đơn tiền điện nước của phòng đó (nếu hóa đơn chưa gắn msv cụ thể)
             if hd_active and hd_active.giuong and hd_active.giuong.phong:
                 p = hd_active.giuong.phong
-                toa = p.tang.toa_nha.ten_toa if (p.tang and p.tang.toa_nha) else ""
-                room_str = f"{toa}{p.so_phong}" if toa else p.so_phong
-            else:
-                # Thử tìm từ hóa đơn
-                recent_inv = db.query(HoaDon).filter(HoaDon.msv == sv.msv).first()
-                if recent_inv and recent_inv.so_phong:
-                    room_str = recent_inv.so_phong
+                occupants_count = (
+                    db.query(HopDong)
+                    .join(Giuong, HopDong.ma_giuong == Giuong.ma_giuong)
+                    .filter(Giuong.ma_phong == p.ma_phong, HopDong.trang_thai == "ACTIVE")
+                    .count()
+                )
+                split_ratio = 1.0 / max(1, occupants_count)
 
-            # Lấy toàn bộ hóa đơn của SV
-            invoices = db.query(HoaDon).filter(HoaDon.msv == sv.msv).all()
-            if not invoices:
+                room_util_invoices = (
+                    db.query(HoaDon)
+                    .filter(
+                        HoaDon.loai_hoa_don == LoaiHoaDon.DIEN_NUOC.value,
+                        or_(
+                            HoaDon.ma_phong == p.ma_phong,
+                            HoaDon.so_phong.ilike(f"%{p.so_phong}%"),
+                        ),
+                        HoaDon.msv.is_(None),
+                    )
+                    .all()
+                )
+                for u_inv in room_util_invoices:
+                    if u_inv.ma_hoa_don not in invoices_map:
+                        invoices_map[u_inv.ma_hoa_don] = (u_inv, split_ratio)
+
+            if not invoices_map:
                 continue
 
             room_fee_debt = 0.0
@@ -236,7 +275,7 @@ class DebtService:
             earliest_deadline: Optional[datetime.date] = None
             is_overdue = False
 
-            for inv in invoices:
+            for inv, ratio in invoices_map.values():
                 # Tính số tiền đã nộp qua giao dịch (khớp hoặc chuyển thiếu)
                 tx_sum = (
                     db.query(GiaoDichNganHang)
@@ -255,7 +294,8 @@ class DebtService:
                 if inv.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value and paid == 0:
                     paid = inv.so_tien
 
-                remaining = max(0.0, float(inv.so_tien) - paid)
+                full_remaining = max(0.0, float(inv.so_tien) - paid)
+                remaining = full_remaining * ratio
 
                 if remaining > 0:
                     if inv.loai_hoa_don == LoaiHoaDon.TIEN_PHONG.value:
@@ -285,52 +325,36 @@ class DebtService:
                     )
                 )
 
-        # Để hiển thị đầy đủ và trực quan đúng theo Screenshot 1 (có các dòng chi tiết):
-        # Nếu chưa đủ 3 dòng demo, thêm dòng phụ mẫu theo screenshot
-        if len(debt_items) < 3 and not keyword:
-            # Đảm bảo có đúng các dòng như Screenshot 1
-            sample_entries = [
-                DebtItemResponse(
-                    studentId="DTC245180051",
-                    fullName="Nguyễn Văn A",
-                    room="A101",
-                    roomFeeDebt=1800000.0,
-                    utilityFeeDebt=120000.0,
-                    totalDebt=1920000.0,
-                    deadline="15/09/2026",
-                    isOverdue=False,
-                ),
-                DebtItemResponse(
-                    studentId="DTC245180051",
-                    fullName="Nguyễn Văn A",
-                    room="A101",
-                    roomFeeDebt=0.0,
-                    utilityFeeDebt=120000.0,
-                    totalDebt=120000.0,
-                    deadline="15/09/2026",
-                    isOverdue=False,
-                ),
-                DebtItemResponse(
-                    studentId="DTC245180051",
-                    fullName="Nguyễn Văn A",
-                    room="A101",
-                    roomFeeDebt=1800000.0,
-                    utilityFeeDebt=0.0,
-                    totalDebt=1800000.0,
-                    deadline="10/09/2026",
-                    isOverdue=True,
-                ),
-            ]
-            debt_items = sample_entries
+        # 1. Tính toán thống kê công nợ 100% đồng bộ chính xác với danh sách chi tiết
+        total_outstanding = sum(item.totalDebt for item in debt_items)
 
-        # Thống kê chuẩn theo Figma / Screenshot 1:
-        # TỔNG NỢ CẦN THU (KỲ & THÁNG): 1.850.000.000 VND
-        # ĐÃ THU HOÀN TẤT: 1.710.000.000 VND
-        # CÒN NỢ TỒN ĐỌNG: 140.000.000 VND
+        # Tính tổng số tiền đã thu qua hóa đơn đã thanh toán hoặc khớp giao dịch ngân hàng
+        all_active_invoices = db.query(HoaDon).filter(HoaDon.trang_thai != TrangThaiHoaDon.DA_HUY.value).all()
+        total_collected = 0.0
+        for inv in all_active_invoices:
+            if inv.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value:
+                total_collected += float(inv.so_tien)
+            else:
+                tx_sum = (
+                    db.query(GiaoDichNganHang)
+                    .filter(
+                        GiaoDichNganHang.ma_hoa_don == inv.ma_hoa_don,
+                        GiaoDichNganHang.trang_thai.in_([
+                            TrangThaiDoiSoat.MATCHED.value,
+                            TrangThaiDoiSoat.AUTO_MATCHED.value,
+                            TrangThaiDoiSoat.MATCHED_MANUALLY.value,
+                            TrangThaiDoiSoat.PARTIAL.value,
+                        ]),
+                    )
+                    .all()
+                )
+                total_collected += sum(float(t.so_tien) for t in tx_sum)
+
+        total_receivable = total_collected + total_outstanding
         stats = DebtStatistics(
-            totalReceivable=1850000000.0,
-            totalCollected=1710000000.0,
-            totalOutstanding=140000000.0,
+            totalReceivable=total_receivable,
+            totalCollected=total_collected,
+            totalOutstanding=total_outstanding,
         )
 
         return DebtSummaryResponse(statistics=stats, items=debt_items)
@@ -351,28 +375,49 @@ class DebtService:
             # Fallback nếu mã sinh viên demo
             sv_name = "Nguyễn Hoàng Long"
             phone = "0987 654 321"
-            room = "A105"
+            room = "P102"
         else:
             sv_name = sv.nguoi_dung.ho_ten if sv.nguoi_dung else sv.msv
             phone = sv.nguoi_dung.so_dien_thoai if (sv.nguoi_dung and sv.nguoi_dung.so_dien_thoai) else "0987 654 321"
-            room = "A105"
+            room = cls._format_room_name(db, sv.msv)
+
+        # Lấy danh sách hóa đơn trực tiếp của SV
+        direct_invoices = db.query(HoaDon).filter(HoaDon.msv == student_id).order_by(HoaDon.ngay_lap.asc()).all()
+        invoices_map = {inv.ma_hoa_don: (inv, 1.0) for inv in direct_invoices}
+
+        # Nếu SV có phòng ở từ hợp đồng ACTIVE, tìm hóa đơn tiền điện nước của phòng đó
+        if sv:
             hd_active = db.query(HopDong).filter(HopDong.msv == sv.msv, HopDong.trang_thai == "ACTIVE").first()
             if hd_active and hd_active.giuong and hd_active.giuong.phong:
                 p = hd_active.giuong.phong
-                toa = p.tang.toa_nha.ten_toa if (p.tang and p.tang.toa_nha) else ""
-                room = f"{toa}{p.so_phong}" if toa else p.so_phong
-            else:
-                recent_inv = db.query(HoaDon).filter(HoaDon.msv == sv.msv).first()
-                if recent_inv and recent_inv.so_phong:
-                    room = recent_inv.so_phong
+                occupants_count = (
+                    db.query(HopDong)
+                    .join(Giuong, HopDong.ma_giuong == Giuong.ma_giuong)
+                    .filter(Giuong.ma_phong == p.ma_phong, HopDong.trang_thai == "ACTIVE")
+                    .count()
+                )
+                split_ratio = 1.0 / max(1, occupants_count)
 
-        # Lấy danh sách hóa đơn của SV
-        invoices = db.query(HoaDon).filter(HoaDon.msv == student_id).order_by(HoaDon.ngay_lap.asc()).all()
+                room_util_invoices = (
+                    db.query(HoaDon)
+                    .filter(
+                        HoaDon.loai_hoa_don == LoaiHoaDon.DIEN_NUOC.value,
+                        or_(
+                            HoaDon.ma_phong == p.ma_phong,
+                            HoaDon.so_phong.ilike(f"%{p.so_phong}%"),
+                        ),
+                        HoaDon.msv.is_(None),
+                    )
+                    .all()
+                )
+                for u_inv in room_util_invoices:
+                    if u_inv.ma_hoa_don not in invoices_map:
+                        invoices_map[u_inv.ma_hoa_don] = (u_inv, split_ratio)
 
         fees: List[FeeItemResponse] = []
         total_remaining = 0.0
 
-        for inv in invoices:
+        for inv, ratio in invoices_map.values():
             # Tính tiền đã nộp
             tx_sum = (
                 db.query(GiaoDichNganHang)
@@ -391,27 +436,33 @@ class DebtService:
             if inv.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value and paid == 0:
                 paid = inv.so_tien
 
-            remaining = max(0.0, float(inv.so_tien) - paid)
+            full_remaining = max(0.0, float(inv.so_tien) - paid)
+            remaining = full_remaining * ratio
+            student_paid = paid * ratio
+            student_amount = float(inv.so_tien) * ratio
+
             total_remaining += remaining
 
             # Định dạng tên hiển thị khoản thu
             fee_name = inv.ghi_chu or ("Tiền phòng" if inv.loai_hoa_don == LoaiHoaDon.TIEN_PHONG.value else "Dịch vụ Điện nước")
-            if "Tiền phòng" in fee_name and "Học kỳ" not in fee_name:
+            if "Tiền phòng" in fee_name and "Học kỳ" not in fee_name and "Tháng" not in fee_name:
                 fee_name = f"Tiền phòng {inv.ky_thanh_toan}"
 
             # Định dạng kỳ/tháng
-            period_str = inv.ky_thanh_toan
-            if "Học kỳ I" in period_str:
-                period_str = "HK1 (2026-2027)"
-            elif "Học kỳ II" in period_str:
-                period_str = "HK2 (2026-2027)"
-            elif "Tháng 09/2026" in period_str:
+            period_str = inv.ky_thanh_toan or ""
+            if "Tháng 09/2026" in period_str:
                 period_str = "T09/2026"
+            elif "Tháng 10/2026" in period_str:
+                period_str = "T10/2026"
+            elif "Tháng 11/2026" in period_str:
+                period_str = "T11/2026"
+            elif "Tháng 12/2026" in period_str:
+                period_str = "T12/2026"
 
             # Xác định trạng thái
             if remaining == 0:
                 st_text = "Đã hoàn tất"
-            elif paid > 0:
+            elif student_paid > 0:
                 st_text = "Chuyển thiếu"
             else:
                 st_text = "Chưa nộp"
@@ -423,47 +474,14 @@ class DebtService:
                     id=inv.ma_hoa_don,
                     feeName=fee_name,
                     period=period_str,
-                    amount=inv.so_tien,
-                    paidAmount=paid,
+                    amount=student_amount,
+                    paidAmount=student_paid,
                     remainingAmount=remaining,
                     status=st_text,
                     deadline=inv.han_thanh_toan.strftime("%d/%m/%Y") if inv.han_thanh_toan else "",
                     isOverdue=is_overdue,
                 )
             )
-
-        # Nếu không có hóa đơn, trả về dữ liệu mẫu chuẩn của Screenshot 2
-        if not fees:
-            fees = [
-                FeeItemResponse(
-                    id="SAMPLE-01",
-                    feeName="Tiền phòng Học kỳ I",
-                    period="HK1 (2026-2027)",
-                    amount=1800000.0,
-                    paidAmount=0.0,
-                    remainingAmount=1800000.0,
-                    status="Chưa nộp",
-                ),
-                FeeItemResponse(
-                    id="SAMPLE-02",
-                    feeName="Dịch vụ Điện nước Tháng 09",
-                    period="T09/2026",
-                    amount=145000.0,
-                    paidAmount=145000.0,
-                    remainingAmount=0.0,
-                    status="Đã hoàn tất",
-                ),
-                FeeItemResponse(
-                    id="SAMPLE-03",
-                    feeName="Tiền phòng Học kỳ II",
-                    period="HK2 (2026-2027)",
-                    amount=1800000.0,
-                    paidAmount=455000.0,
-                    remainingAmount=1345000.0,
-                    status="Chuyển thiếu",
-                ),
-            ]
-            total_remaining = 3145000.0
 
         return PersonalDebtResponse(
             studentId=student_id,

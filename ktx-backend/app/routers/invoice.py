@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -15,6 +15,7 @@ from app.schemas.invoice import (
     RoomInvoicePublishRequest,
     UtilityBillingCandidate,
     UtilityInvoicePublishRequest,
+    UtilityMeterUploadResponse,
 )
 from app.services.invoice_service import InvoiceService
 
@@ -130,6 +131,54 @@ def publish_utility_invoices(
         db=db,
         request=payload,
         creator_username=current_user.ten_dang_nhap,
+    )
+
+
+@router.post(
+    "/utility/upload-readings",
+    response_model=UtilityMeterUploadResponse,
+    summary="[Kế toán] Upload file Excel/CSV chỉ số điện nước để tự động tính toán",
+)
+async def upload_utility_readings(
+    file: UploadFile = File(...),
+    thang: str = Form("Tháng 09/2026"),
+    don_gia_dien: float = Form(3000.0),
+    don_gia_nuoc: float = Form(15000.0),
+    current_user: TaiKhoan = Depends(require_ke_toan),
+    db: Session = Depends(get_db),
+):
+    """
+    Dành riêng cho Kế toán.
+    Upload file Excel (.xlsx) hoặc CSV chỉ số điện nước, hệ thống tự động bóc tách và tính toán:
+    - Tiêu thụ điện (kWh) = Chỉ số mới - Chỉ số cũ
+    - Tiêu thụ nước (m3) = Chỉ số mới - Chỉ số cũ
+    - Thành tiền từng phòng = (Điện * đơn giá) + (Nước * đơn giá)
+    """
+    contents = await file.read()
+    return InvoiceService.upload_utility_readings(
+        db=db,
+        file_bytes=contents,
+        filename=file.filename or "chi_so_dien_nuoc.xlsx",
+        thang=thang,
+        don_gia_dien=don_gia_dien,
+        don_gia_nuoc=don_gia_nuoc,
+    )
+
+
+@router.get(
+    "/utility/template",
+    summary="[Kế toán] Tải file Excel mẫu nhập chỉ số điện nước",
+)
+def download_utility_template():
+    """
+    Dành riêng cho Kế toán.
+    Tải file Excel mẫu gồm các cột: STT, Phòng, Chỉ số điện cũ, Chỉ số điện mới, Chỉ số nước cũ, Chỉ số nước mới.
+    """
+    data = InvoiceService.generate_utility_template()
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=Mau_nhap_chi_so_dien_nuoc_KTX.xlsx"},
     )
 
 
