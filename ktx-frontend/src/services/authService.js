@@ -34,6 +34,9 @@ export const authService = {
         localStorage.setItem('ktx_token', data.access_token);
         localStorage.setItem('ktx_user_role', data.role);
         localStorage.setItem('ktx_username', data.username);
+        if (data.full_name) {
+          localStorage.setItem('ktx_fullname', data.full_name);
+        }
       }
 
       return { success: true, data };
@@ -50,21 +53,21 @@ export const authService = {
    * Đăng ký tài khoản Sinh viên mới
    * @param {Object} registerData
    */
-  async register({ fullName, gender, email, emailOrPhone, password }) {
+  async register({ fullName, username, gender, email, emailOrPhone, password }) {
     try {
       const emailVal = (email || emailOrPhone || '').trim();
       const isEmail = emailVal.includes('@');
 
-      // Tạo username từ mã sinh viên (phần trước @ của email trường DTCxxxxxxxxx)
-      let username = isEmail ? emailVal.split('@')[0] : emailVal;
+      // Ưu tiên username từ form, nếu không có mới fallback từ phần trước @ của email
+      let finalUsername = username ? username.trim() : (isEmail ? emailVal.split('@')[0] : emailVal);
 
       const payload = {
-        username: username,
+        username: finalUsername,
         password: password,
         role: 'SinhVien',
         full_name: fullName.trim(),
         email: emailVal,
-        gender: gender || 'Nữ',
+        gender: gender || 'Nam',
       };
 
       const response = await fetch(`${API_BASE_URL}/auth/register`, {

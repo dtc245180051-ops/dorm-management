@@ -8,6 +8,7 @@ class Token(BaseModel):
     token_type: str = "bearer"
     role: str
     username: str
+    full_name: Optional[str] = None
 
 
 class TokenData(BaseModel):
