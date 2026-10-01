@@ -11,8 +11,8 @@ const isValidSchoolEmail = (val) => {
   return /^[^\s@]+@ictu\.edu\.vn$/i.test(val.trim());
 };
 
-export default function Login() {
-  const [activeTab, setActiveTab] = useState('login'); // 'login' | 'register'
+export default function Login({ initialTab = 'login', onLoginSuccess }) {
+  const [activeTab, setActiveTab] = useState(initialTab); // 'login' | 'register'
 
   // State form Đăng nhập
   const [loginForm, setLoginForm] = useState({
@@ -81,13 +81,25 @@ export default function Login() {
     setLoading(false);
 
     if (result.success) {
+      const greetingName = result.data.full_name || localStorage.getItem('ktx_fullname') || result.data.username;
       setMessage({
         type: 'success',
-        text: `Đăng nhập thành công! Xin chào ${result.data.username} (${result.data.role}).`,
+        text: `Đăng nhập thành công! Xin chào ${greetingName} (${result.data.role}).`,
       });
       setCurrentUser(result.data);
       // Chuyển hướng hoặc làm mới phiên đăng nhập
-      window.location.reload();
+      if (onLoginSuccess) {
+        onLoginSuccess(result.data);
+      } else {
+        const role = result.data.role;
+        if (role === 'CanBo' || role === 'Admin' || role === 'QuanLy') {
+          window.location.href = '/admin';
+        } else if (role === 'KeToan') {
+          window.location.href = '/lap-hoa-don';
+        } else {
+          window.location.href = '/student/dashboard';
+        }
+      }
     } else {
       setMessage({
         type: 'error',
@@ -133,6 +145,7 @@ export default function Login() {
       fullName,
       gender,
       email: emailVal,
+      emailOrPhone: emailVal,
       password,
     });
     setLoading(false);

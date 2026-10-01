@@ -11,8 +11,10 @@ import occupancyService from '../../services/occupancyService';
 import { VIETNAM_PROVINCES } from '../../data/vietnamAddressData';
 
 export default function RoomRegistrationPage({
+  userName,
   onNavigateHistory,
   onNavigateDashboard,
+  onLogout,
 }) {
   // State chuyển đổi mượt mà giữa Form và Màn hình thành công (không chuyển URL)
   const [isSuccess, setIsSuccess] = useState(false);
@@ -193,8 +195,24 @@ export default function RoomRegistrationPage({
   return (
     <StudentLayout
       activeTab="register"
-      userName={formData.ho_ten || 'Sinh viên'}
+      onSelectTab={(tabId) => {
+        if (tabId === 'dashboard') {
+          handleGoToDashboard();
+        } else if (tabId === 'history') {
+          handleGoToHistory();
+        } else if (tabId === 'feedback') {
+          window.history.pushState({}, '', '/student/feedback');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }
+      }}
+      userName={
+        userName ||
+        localStorage.getItem('ktx_fullname') ||
+        localStorage.getItem('ktx_username') ||
+        'Sinh viên'
+      }
       userRole="Sinh viên"
+      onLogout={onLogout}
     >
       {/* Khung nội dung chính nền trắng bo góc lớn */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 lg:p-8 flex-1 flex flex-col justify-between transition-all duration-300">

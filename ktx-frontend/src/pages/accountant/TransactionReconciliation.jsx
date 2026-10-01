@@ -79,13 +79,14 @@ export default function TransactionReconciliation({ searchTerm = '' }) {
   // 7. Xử lý tải danh sách giao dịch từ Backend API khi đã upload file
   const loadTransactions = useCallback(
     async (customParams = {}) => {
+      setApiError('');
+
       // Nếu chưa upload file sao kê và không ép buộc thì giữ nguyên state ban đầu
       if (!isUploaded && customParams.force !== true && customParams.hasUploaded !== true) {
         return;
       }
 
       setIsLoading(true);
-      setApiError('');
 
       const activeSearch =
         customParams.search !== undefined
@@ -345,14 +346,35 @@ export default function TransactionReconciliation({ searchTerm = '' }) {
             </svg>
             <span>{apiError}</span>
           </div>
-          <button
-            type="button"
-            className="recon-btn recon-btn-outline"
-            style={{ height: '32px', padding: '0 12px', fontSize: '13px' }}
-            onClick={() => loadTransactions()}
-          >
-            Thử lại
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              className="recon-btn recon-btn-outline"
+              style={{ height: '32px', padding: '0 12px', fontSize: '13px' }}
+              onClick={() => {
+                setApiError('');
+                loadTransactions({ force: true });
+              }}
+            >
+              Thử lại
+            </button>
+            <button
+              type="button"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#991b1b',
+                padding: '4px 8px',
+                fontSize: '16px',
+                lineHeight: 1,
+              }}
+              title="Đóng thông báo"
+              onClick={() => setApiError('')}
+            >
+              ✕
+            </button>
+          </div>
         </div>
       )}
 

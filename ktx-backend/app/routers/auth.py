@@ -169,11 +169,18 @@ def login(
         data={"sub": account.ten_dang_nhap, "role": role_value}
     )
 
+    full_name = (
+        account.nguoi_dung.ho_ten
+        if account.nguoi_dung and account.nguoi_dung.ho_ten
+        else account.ten_dang_nhap
+    )
+
     return Token(
         access_token=access_token,
         token_type="bearer",
         role=role_value,
         username=account.ten_dang_nhap,
+        full_name=full_name,
     )
 
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LayoutGrid,
   Building2,
@@ -8,6 +8,7 @@ import {
   FileText,
   LogOut,
 } from 'lucide-react';
+import LogoutModal from './LogoutModal';
 
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
@@ -19,6 +20,13 @@ const menuItems = [
 ];
 
 export default function Sidebar({ activeTab = 'rooms', onSelectTab }) {
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const handleConfirmLogout = () => {
+    localStorage.clear();
+    window.location.href = '/login';
+  };
+
   return (
     <aside className="w-64 min-h-[calc(100vh-1.75rem)] bg-[#f4f5f7] rounded-2xl border border-slate-200/60 p-6 select-none shrink-0 flex flex-col">
       {/* Logo iDORM */}
@@ -68,18 +76,22 @@ export default function Sidebar({ activeTab = 'rooms', onSelectTab }) {
         </div>
         <button
           type="button"
-          onClick={() => {
-            if (window.confirm('Bạn có chắc chắn muốn đăng xuất không?')) {
-              localStorage.clear();
-              window.location.reload();
-            }
-          }}
+          onClick={() => setShowLogoutModal(true)}
           className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-[8px] text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors text-left cursor-pointer"
         >
           <LogOut className="w-5 h-5 text-slate-500 hover:text-red-500" />
           <span>Đăng xuất</span>
         </button>
       </div>
+
+      {/* Modal xác nhận đăng xuất đẹp */}
+      <LogoutModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleConfirmLogout}
+        userName={localStorage.getItem('ktx_fullname') || localStorage.getItem('ktx_username') || 'Cán bộ'}
+        userRole="Ban Quản lý"
+      />
     </aside>
   );
 }

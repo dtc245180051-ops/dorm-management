@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+export const API_BASE_URL = 'http://localhost:8000/api/v1';
 
 /**
  * Service gọi API xác thực (Authentication) cho KTX ICTU
@@ -34,6 +34,27 @@ export const authService = {
         localStorage.setItem('ktx_token', data.access_token);
         localStorage.setItem('ktx_user_role', data.role);
         localStorage.setItem('ktx_username', data.username);
+
+        // Lưu họ và tên thật khi đăng nhập
+        const fullName = data.full_name || (data.nguoi_dung && data.nguoi_dung.ho_ten);
+        if (fullName) {
+          localStorage.setItem('ktx_fullname', fullName);
+        } else {
+          try {
+            const meRes = await fetch(`${API_BASE_URL}/auth/me`, {
+              headers: { Authorization: `Bearer ${data.access_token}` },
+            });
+            if (meRes.ok) {
+              const meData = await meRes.json();
+              if (meData?.nguoi_dung?.ho_ten) {
+                localStorage.setItem('ktx_fullname', meData.nguoi_dung.ho_ten);
+                data.full_name = meData.nguoi_dung.ho_ten;
+              }
+            }
+          } catch (e) {
+            console.error('Error fetching user profile:', e);
+          }
+        }
       }
 
       return { success: true, data };
@@ -50,24 +71,25 @@ export const authService = {
    * Đăng ký tài khoản Sinh viên mới
    * @param {Object} registerData
    */
-  async register({ fullName, gender, emailOrPhone, password }) {
+  async register({ fullName, gender, email, emailOrPhone, password }) {
     try {
-      const isEmail = emailOrPhone.includes('@');
-      const isPhone = /^[0-9+() -]+$/.test(emailOrPhone.trim());
+      const contactVal = (email || emailOrPhone || '').trim();
+      const isEmail = contactVal.includes('@');
+      const isPhone = /^[0-9+() -]+$/.test(contactVal);
 
       // Tạo username hợp lệ từ email/sđt
-      let username = emailOrPhone.trim();
+      let username = contactVal;
       if (isEmail) {
-        username = emailOrPhone.split('@')[0];
+        username = contactVal.split('@')[0];
       }
 
       const payload = {
         username: username,
         password: password,
         role: 'SinhVien',
-        full_name: fullName.trim(),
-        email: isEmail ? emailOrPhone.trim() : null,
-        phone: isPhone && !isEmail ? emailOrPhone.trim() : null,
+        full_name: (fullName || '').trim(),
+        email: isEmail ? contactVal : null,
+        phone: isPhone && !isEmail ? contactVal : null,
       };
 
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
@@ -82,6 +104,13 @@ export const authService = {
 
       if (!response.ok) {
         throw new Error(data.detail || 'Đăng ký không thành công');
+      }
+
+      if (data) {
+        const registeredName = (data.nguoi_dung && data.nguoi_dung.ho_ten) || fullName;
+        if (registeredName) {
+          localStorage.setItem('ktx_fullname', registeredName.trim());
+        }
       }
 
       return { success: true, data };
@@ -113,7 +142,11 @@ export const authService = {
         return null;
       }
 
-      return await response.json();
+      const userData = await response.json();
+      if (userData?.nguoi_dung?.ho_ten) {
+        localStorage.setItem('ktx_fullname', userData.nguoi_dung.ho_ten);
+      }
+      return userData;
     } catch (error) {
       console.error('Lỗi lấy thông tin người dùng:', error);
       return null;
@@ -127,5 +160,6 @@ export const authService = {
     localStorage.removeItem('ktx_token');
     localStorage.removeItem('ktx_user_role');
     localStorage.removeItem('ktx_username');
+    localStorage.removeItem('ktx_fullname');
   },
 };

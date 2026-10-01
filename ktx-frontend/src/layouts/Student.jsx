@@ -16,6 +16,7 @@ import {
   X,
   Send,
 } from 'lucide-react';
+import LogoutModal from '../components/LogoutModal';
 
 export default function StudentLayout({
   children,
@@ -23,14 +24,31 @@ export default function StudentLayout({
   onSelectTab,
   searchTerm = '',
   onSearchChange,
-  userName = 'Nguyễn Văn A',
+  userName,
   userRole = 'Sinh viên',
+  onLogout,
 }) {
+  const resolvedUserName =
+    userName ||
+    localStorage.getItem('ktx_fullname') ||
+    localStorage.getItem('ktx_username') ||
+    'Nguyễn Văn A';
+
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showChatbotModal, setShowChatbotModal] = useState(false);
+
+  const handleConfirmLogout = () => {
+    localStorage.clear();
+    if (onLogout) {
+      onLogout();
+    } else {
+      window.location.href = '/login';
+    }
+  };
   const [chatMessages, setChatMessages] = useState([
     {
       sender: 'bot',
-      text: 'Xin chào Nguyễn Văn A! Mình là Trợ lý AI KTX. Bạn cần hỗ trợ gì về đăng ký phòng, thủ tục hay nội quy KTX không?',
+      text: `Xin chào ${resolvedUserName}! Mình là Trợ lý AI KTX. Bạn cần hỗ trợ gì về đăng ký phòng, thủ tục hay nội quy KTX không?`,
     },
   ]);
   const [inputQuestion, setInputQuestion] = useState('');
@@ -81,9 +99,12 @@ export default function StudentLayout({
         window.history.pushState({}, '', '/student/register');
       } else if (tabId === 'history') {
         window.history.pushState({}, '', '/student/history');
+      } else if (tabId === 'feedback') {
+        window.history.pushState({}, '', '/student/feedback');
       } else if (tabId === 'dashboard') {
         window.history.pushState({}, '', '/student/dashboard');
       }
+      window.dispatchEvent(new PopStateEvent('popstate'));
     }
   };
 
@@ -151,7 +172,7 @@ export default function StudentLayout({
             </div>
             <div className="flex flex-col text-left">
               <span className="text-sm font-bold text-slate-800 leading-tight">
-                {userName}
+                {resolvedUserName}
               </span>
               <span className="text-xs text-slate-500 font-medium">
                 {userRole}
@@ -165,86 +186,90 @@ export default function StudentLayout({
       <div className="flex-1 flex gap-5 p-5 max-w-[1600px] w-full mx-auto box-border">
         {/* Sidebar Sinh Viên */}
         <aside className="w-64 bg-white rounded-2xl border border-slate-200/80 p-4 shrink-0 flex flex-col justify-between shadow-xs select-none">
-          <nav className="space-y-4">
+          <nav className={activeTab === 'dashboard' ? 'space-y-6' : 'space-y-4'}>
             {/* Mục Trang chủ */}
             <div>
               <button
                 type="button"
                 onClick={() => handleTabClick('dashboard')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition cursor-pointer ${
                   activeTab === 'dashboard'
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    ? 'bg-[#e0f2fe] text-[#0284c7] font-bold shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
                 }`}
               >
-                <Home className="w-4 h-4 shrink-0 text-slate-500" />
+                <Home className={`w-4 h-4 shrink-0 ${activeTab === 'dashboard' ? 'text-[#0284c7]' : 'text-slate-500'}`} />
                 <span>Trang chủ</span>
               </button>
             </div>
 
-            {/* Mục QUẢN LÝ PHÒNG */}
-            <div>
-              <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase px-3 mb-1.5">
-                QUẢN LÝ PHÒNG
-              </div>
-              <div className="space-y-1">
-                {navItems
-                  .filter((item) => item.section === 'room')
-                  .map((item) => {
-                    const Icon = item.icon;
-                    const isActive = activeTab === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => handleTabClick(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${
-                          isActive
-                            ? 'bg-[#e0f2fe] text-[#0284c7] font-bold shadow-2xs'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
-                        }`}
-                      >
-                        <Icon
-                          className={`w-4 h-4 shrink-0 ${
-                            isActive ? 'text-[#0284c7]' : 'text-slate-400'
+            {/* Mục QUẢN LÝ PHÒNG - Chỉ hiển thị khi sinh viên đã chọn chức năng con */}
+            {activeTab !== 'dashboard' && (
+              <div>
+                <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase px-3 mb-1.5">
+                  QUẢN LÝ PHÒNG
+                </div>
+                <div className="space-y-1">
+                  {navItems
+                    .filter((item) => item.section === 'room')
+                    .map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleTabClick(item.id)}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${
+                            isActive
+                              ? 'bg-[#e0f2fe] text-[#0284c7] font-bold shadow-2xs'
+                              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
                           }`}
-                        />
-                        <span>{item.label}</span>
-                      </button>
-                    );
-                  })}
+                        >
+                          <Icon
+                            className={`w-4 h-4 shrink-0 ${
+                              isActive ? 'text-[#0284c7]' : 'text-slate-400'
+                            }`}
+                          />
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Mục TÀI CHÍNH */}
-            <div>
-              <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase px-3 mb-1.5">
-                TÀI CHÍNH
+            {/* Mục TÀI CHÍNH - Chỉ hiển thị khi sinh viên đã chọn chức năng con */}
+            {activeTab !== 'dashboard' && (
+              <div>
+                <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase px-3 mb-1.5">
+                  TÀI CHÍNH
+                </div>
+                <div className="space-y-1">
+                  {navItems
+                    .filter((item) => item.section === 'finance')
+                    .map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleTabClick(item.id)}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${
+                            isActive
+                              ? 'bg-[#e0f2fe] text-[#0284c7] font-bold'
+                              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4 shrink-0 text-slate-400" />
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                </div>
               </div>
-              <div className="space-y-1">
-                {navItems
-                  .filter((item) => item.section === 'finance')
-                  .map((item) => {
-                    const Icon = item.icon;
-                    const isActive = activeTab === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => handleTabClick(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${
-                          isActive
-                            ? 'bg-[#e0f2fe] text-[#0284c7] font-bold'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
-                        }`}
-                      >
-                        <Icon className="w-4 h-4 shrink-0 text-slate-400" />
-                        <span>{item.label}</span>
-                      </button>
-                    );
-                  })}
-              </div>
-            </div>
+            )}
 
             {/* Mục CÁ NHÂN */}
             <div>
@@ -307,12 +332,7 @@ export default function StudentLayout({
                 {/* Đăng xuất */}
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm('Bạn có chắc chắn muốn đăng xuất không?')) {
-                      localStorage.clear();
-                      window.location.href = '/';
-                    }
-                  }}
+                  onClick={() => setShowLogoutModal(true)}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition text-left cursor-pointer"
                 >
                   <LogOut className="w-4 h-4 shrink-0 text-slate-400 hover:text-red-500" />
@@ -419,6 +439,15 @@ export default function StudentLayout({
           </div>
         )}
       </div>
+
+      {/* Modal xác nhận đăng xuất đẹp và hiện đại */}
+      <LogoutModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleConfirmLogout}
+        userName={resolvedUserName}
+        userRole={userRole}
+      />
     </div>
   );
 }

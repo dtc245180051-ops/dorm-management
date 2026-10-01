@@ -364,8 +364,7 @@
    -------------------------------------------------------------------------- */
 .student-main-content {
   flex: 1;
-  /* Căn lề: Trên 20px | Phải 32px | DƯỚI 24PX | Trái 24px */
-  padding: 20px 32px 24px 24px !important;
+  padding: 0 0 24px 0;
   overflow-y: visible;
   display: flex;
   flex-direction: column;
