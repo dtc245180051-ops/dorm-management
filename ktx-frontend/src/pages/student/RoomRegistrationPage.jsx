@@ -49,9 +49,34 @@ export default function RoomRegistrationPage({
     loai_phong: '',
     tang_mong_muon: '',
     muc_gia_mong_muon: '',
+    nguyen_vong_phong: '',
+    ma_toa_mong_muon: '',
   };
 
   const [formData, setFormData] = useState(initialFormState);
+
+  // Tự động điền thông tin phòng nếu sinh viên bấm "Đăng ký phòng này" từ Tra cứu phòng
+  useEffect(() => {
+    try {
+      const preferredStr = sessionStorage.getItem('preferred_room_registration');
+      if (preferredStr) {
+        const pref = JSON.parse(preferredStr);
+        if (pref && (pref.so_phong || pref.ma_phong)) {
+          const roomCode = pref.so_phong || pref.ma_phong;
+          setFormData((prev) => ({
+            ...prev,
+            nguyen_vong_phong: roomCode,
+            loai_phong: pref.loai_phong || prev.loai_phong || 'Phòng tiêu chuẩn',
+            tang_mong_muon: pref.tang || prev.tang_mong_muon || 'Tầng 3',
+            muc_gia_mong_muon: pref.gia_thue || prev.muc_gia_mong_muon || '',
+            ma_toa_mong_muon: pref.toa || pref.ma_toa || '',
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn('Error loading preferred room:', e);
+    }
+  }, []);
 
   // Danh sách các phòng/giường trống khả dụng lấy từ API
   const [availableOptions, setAvailableOptions] = useState([]);
@@ -125,6 +150,7 @@ export default function RoomRegistrationPage({
 
   // Reset toàn bộ form về trống
   const handleResetForm = () => {
+    sessionStorage.removeItem('preferred_room_registration');
     setFormData(initialFormState);
     setSelectedProvince('');
     setSelectedDistrict('');
@@ -141,6 +167,7 @@ export default function RoomRegistrationPage({
     setIsSubmitting(true);
     try {
       const wishParts = [
+        formData.nguyen_vong_phong ? `Phòng ${formData.nguyen_vong_phong}` : null,
         formData.loai_phong,
         formData.tang_mong_muon,
         formData.muc_gia_mong_muon,
@@ -155,6 +182,7 @@ export default function RoomRegistrationPage({
         muc_gia_mong_muon: formData.muc_gia_mong_muon,
         nguyen_vong: wishText,
         nguyen_vong_label: wishText,
+        nguyen_vong_phong: formData.nguyen_vong_phong,
         xac_nhan: true,
       };
 
@@ -513,11 +541,41 @@ export default function RoomRegistrationPage({
               {/* CARD 3: NGUYỆN VỌNG */}
               <div className="rounded-2xl border border-sky-100 bg-[#f8fbff] p-5 sm:p-6 shadow-2xs flex flex-col justify-between">
                 <div>
-                  <div className="text-xs font-bold text-blue-700 tracking-wider uppercase mb-5">
-                    NGUYỆN VỌNG
+                  <div className="text-xs font-bold text-blue-700 tracking-wider uppercase mb-5 flex items-center justify-between">
+                    <span>NGUYỆN VỌNG</span>
+                    {formData.nguyen_vong_phong && (
+                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/90 px-2.5 py-0.5 rounded-full border border-emerald-300">
+                        Đã chọn phòng: {formData.nguyen_vong_phong}
+                      </span>
+                    )}
                   </div>
 
                   <div className="space-y-4">
+                    {/* Báo hiệu phòng đã chọn trước từ Tra cứu phòng */}
+                    {formData.nguyen_vong_phong && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-3 text-xs">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-blue-600 block">
+                            Phòng đã chọn từ mục Tra cứu:
+                          </span>
+                          <span className="font-extrabold text-slate-800 text-sm">
+                            Phòng {formData.nguyen_vong_phong} {formData.ma_toa_mong_muon ? `- ${formData.ma_toa_mong_muon}` : ''}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sessionStorage.removeItem('preferred_room_registration');
+                            setFormData((prev) => ({ ...prev, nguyen_vong_phong: '', ma_toa_mong_muon: '' }));
+                          }}
+                          className="text-xs text-rose-600 hover:text-rose-800 font-semibold cursor-pointer underline"
+                          title="Bỏ chọn phòng này để chọn tự do"
+                        >
+                          Bỏ chọn
+                        </button>
+                      </div>
+                    )}
+
                     {/* Mục 1: Loại phòng (Phòng tiêu chuẩn & Phòng dịch vụ) */}
                     <div>
                       <label className="block text-xs font-semibold text-slate-600 mb-1.5">

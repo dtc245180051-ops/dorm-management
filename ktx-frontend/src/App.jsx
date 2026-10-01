@@ -16,6 +16,7 @@ import RequestHistoryPage from './pages/student/RequestHistoryPage';
 import FeedbackPage from './pages/student/FeedbackPage';
 import StudentDashboard from './pages/student/StudentDashboard';
 import StudentProfilePage from './pages/student/StudentProfilePage';
+import RoomSearchPage from './pages/student/RoomSearchPage';
 import TransactionReconciliation from './pages/accountant/TransactionReconciliation';
 import PeriodicBilling from './pages/accountant/PeriodicBilling';
 import DebtLedger from './pages/accountant/DebtLedger';
@@ -130,6 +131,12 @@ export default function App() {
       case 'transfer':
       case 'chuyen-phong':
         navigateTo('/student/transfer-room');
+        break;
+      case 'lookup':
+      case 'tra-cuu':
+      case 'search-rooms':
+      case 'search-room':
+        navigateTo('/student/lookup');
         break;
       case 'history':
       case 'lich-su':
@@ -390,6 +397,29 @@ export default function App() {
     return (
       <div className="relative">
         <RoomTransferPage
+          onSelectTab={handleStudentTabSelect}
+          onNavigate={navigateTo}
+        />
+        <RoleSwitcher
+          currentRole="student"
+          onSwitchRole={(r) => {
+            loadRequests();
+            navigateTo(r === 'admin' ? '/admin' : r === 'student' ? '/student/dashboard' : '/doi-soat');
+          }}
+        />
+      </div>
+    );
+  }
+
+  // 3b. Tra cứu phòng (Room Lookup / Search theo chuẩn Figma)
+  if (
+    currentPath === '/student/lookup' ||
+    currentPath === '/student/search-rooms' ||
+    currentPath === '/student/tra-cuu'
+  ) {
+    return (
+      <div className="relative">
+        <RoomSearchPage
           onSelectTab={handleStudentTabSelect}
           onNavigate={navigateTo}
         />

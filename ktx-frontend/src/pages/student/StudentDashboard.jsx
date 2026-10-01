@@ -135,6 +135,10 @@ export default function StudentDashboard({ user, onNavigate }) {
         onNavigate('/student/history');
         return;
       }
+      if (service.id === 'search-room' || service.id === 'lookup') {
+        onNavigate('/student/lookup');
+        return;
+      }
       if (service.id === 'feedback') {
         onNavigate('/student/feedback');
         return;
