@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Home,
   FileEdit,
@@ -18,6 +18,8 @@ import {
   Menu,
 } from "lucide-react";
 
+const STUDENT_AVATAR_STORAGE_KEY = "ktx_student_avatar";
+
 export default function StudentLayout({
   children,
   activeTab = "register",
@@ -29,6 +31,9 @@ export default function StudentLayout({
 }) {
   const [showChatbotModal, setShowChatbotModal] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(
+    () => localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY) || "",
+  );
   const [chatMessages, setChatMessages] = useState([
     {
       sender: "bot",
@@ -36,6 +41,22 @@ export default function StudentLayout({
     },
   ]);
   const [inputQuestion, setInputQuestion] = useState("");
+
+  useEffect(() => {
+    const syncAvatar = (event) => {
+      setAvatarUrl(
+        event.detail?.avatarUrl ||
+          localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY) ||
+          "",
+      );
+    };
+    window.addEventListener("student-avatar-updated", syncAvatar);
+    window.addEventListener("storage", syncAvatar);
+    return () => {
+      window.removeEventListener("student-avatar-updated", syncAvatar);
+      window.removeEventListener("storage", syncAvatar);
+    };
+  }, []);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -222,11 +243,11 @@ export default function StudentLayout({
           >
             <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm shadow-sm border border-blue-200 overflow-hidden shrink-0">
               <img
-                src="/avatar.png"
+                src={avatarUrl || "/avatar.png"}
                 alt="Avatar"
                 className="w-full h-full object-cover"
                 onError={(e) => {
-                  e.currentTarget.style.display = "none";
+                  e.currentTarget.src = "/avatar.png";
                 }}
               />
               <User className="w-5 h-5 text-blue-600" />
