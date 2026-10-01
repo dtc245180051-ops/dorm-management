@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -23,7 +24,36 @@ def register(
 ):
     """
     Tiếp nhận dữ liệu đăng ký, băm mật khẩu, đồng thời tạo bản ghi TaiKhoan và NguoiDung.
+    Tương thích với form đăng ký: hỗ trợ tự động xử lý email, số điện thoại, tên đăng nhập và vai trò mặc định.
     """
+    # 0. Tiền xử lý dữ liệu: phân tách email / phone / username
+    email = user_in.email
+    phone = user_in.phone
+
+    if user_in.email_or_phone:
+        raw_val = user_in.email_or_phone.strip()
+        if "@" in raw_val:
+            if not email:
+                email = raw_val
+        else:
+            if not phone:
+                phone = raw_val
+
+    # Tự động gán username nếu người dùng không truyền trực tiếp
+    username = user_in.username
+    if not username:
+        if email:
+            username = email.split("@")[0][:50]
+        elif phone:
+            username = phone[:50]
+        elif user_in.email_or_phone:
+            username = user_in.email_or_phone.strip()[:50]
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cần cung cấp Email, Số điện thoại hoặc Tên đăng nhập",
+            )
+
     # 1. Kiểm tra tính hợp lệ của vai trò
     valid_roles = {vt.value: vt for vt in VaiTro}
     if user_in.role not in valid_roles:
@@ -35,7 +65,7 @@ def register(
     # 2. Kiểm tra tên đăng nhập đã tồn tại chưa
     existing_username = (
         db.query(TaiKhoan)
-        .filter(TaiKhoan.ten_dang_nhap == user_in.username)
+        .filter(TaiKhoan.ten_dang_nhap == username)
         .first()
     )
     if existing_username:
@@ -45,10 +75,18 @@ def register(
         )
 
     # 3. Kiểm tra email đã tồn tại chưa nếu có cung cấp
-    if user_in.email:
+    if email:
+        if user_in.role == "SinhVien":
+            import re
+            if not re.match(r"^[^@\s]+@ictu\.edu\.vn$", email.strip(), re.IGNORECASE):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email sinh viên phải có định dạng @ictu.edu.vn",
+                )
+
         existing_email = (
             db.query(NguoiDung)
-            .filter(NguoiDung.email == user_in.email)
+            .filter(NguoiDung.email == email)
             .first()
         )
         if existing_email:
@@ -57,26 +95,55 @@ def register(
                 detail="Email đã được sử dụng trong hệ thống",
             )
 
-    # 4. Băm mật khẩu bằng bcrypt
+    # 4. Kiểm tra số điện thoại đã tồn tại chưa nếu có cung cấp
+    if phone:
+        existing_phone = (
+            db.query(NguoiDung)
+            .filter(NguoiDung.so_dien_thoai == phone)
+            .first()
+        )
+        if existing_phone:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Số điện thoại đã được sử dụng trong hệ thống",
+            )
+
+    # 5. Băm mật khẩu bằng bcrypt
     hashed_password = get_password_hash(user_in.password)
 
-    # 5. Khởi tạo thực thể TaiKhoan
+    # 6. Khởi tạo thực thể TaiKhoan
     new_account = TaiKhoan(
-        ten_dang_nhap=user_in.username,
+        ten_dang_nhap=username,
         mat_khau=hashed_password,
         vai_tro=valid_roles[user_in.role],
     )
     db.add(new_account)
     db.flush()  # Sinh ma_tai_khoan trước khi tạo NguoiDung
 
-    # 6. Khởi tạo thực thể NguoiDung liên kết 1-1
+    # 7. Khởi tạo thực thể NguoiDung liên kết 1-1
     new_user = NguoiDung(
         ma_tai_khoan=new_account.ma_tai_khoan,
         ho_ten=user_in.full_name,
-        email=user_in.email,
-        so_dien_thoai=user_in.phone,
+        email=email,
+        so_dien_thoai=phone,
     )
     db.add(new_user)
+    db.flush()
+
+    # 8. Tự động liên kết vào bảng sinh_vien nếu là vai trò SinhVien
+    if new_account.vai_tro == VaiTro.SINH_VIEN and username.upper().startswith("DTC"):
+        from app.models.user import SinhVien
+        msv_val = username.upper()
+        existing_sv = db.query(SinhVien).filter(SinhVien.msv == msv_val).first()
+        if not existing_sv:
+            sv = SinhVien(
+                msv=msv_val,
+                ma_nguoi_dung=new_user.ma_nguoi_dung,
+                lop="DTC-KTX",
+                gioi_tinh=user_in.gender or "Nữ",
+            )
+            db.add(sv)
+
     db.commit()
     db.refresh(new_account)
 
@@ -94,17 +161,32 @@ def login(
 ):
     """
     Xác thực thông tin đăng nhập với OAuth2PasswordRequestForm.
+    Hỗ trợ đăng nhập linh hoạt bằng: Tên đăng nhập, Email hoặc Số điện thoại.
     Trả về Access Token chứa username (sub) và vai trò (role).
     """
+    raw_username = form_data.username.strip()
+    prefix_username = raw_username.split("@")[0] if "@" in raw_username else raw_username
+
     account = (
         db.query(TaiKhoan)
-        .filter(TaiKhoan.ten_dang_nhap == form_data.username)
+        .outerjoin(NguoiDung, TaiKhoan.ma_tai_khoan == NguoiDung.ma_tai_khoan)
+        .filter(
+            or_(
+                TaiKhoan.ten_dang_nhap == raw_username,
+                TaiKhoan.ten_dang_nhap.ilike(raw_username),
+                TaiKhoan.ten_dang_nhap == prefix_username,
+                TaiKhoan.ten_dang_nhap.ilike(prefix_username),
+                NguoiDung.email == raw_username,
+                NguoiDung.email.ilike(raw_username),
+                NguoiDung.so_dien_thoai == raw_username,
+            )
+        )
         .first()
     )
     if not account or not verify_password(form_data.password, account.mat_khau):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Tên đăng nhập hoặc mật khẩu không chính xác",
+            detail="Tên đăng nhập, email hoặc mật khẩu không chính xác",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

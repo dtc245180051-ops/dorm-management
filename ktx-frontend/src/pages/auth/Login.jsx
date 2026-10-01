@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './Auth.css';
 import { authService } from '../../services/authService';
 
@@ -11,8 +11,14 @@ const isValidSchoolEmail = (val) => {
   return /^[^\s@]+@ictu\.edu\.vn$/i.test(val.trim());
 };
 
-export default function Login() {
-  const [activeTab, setActiveTab] = useState('login'); // 'login' | 'register'
+export default function Login({ onLoginSuccess, initialTab = 'login', onTabChange }) {
+  const [activeTab, setActiveTab] = useState(initialTab || 'login'); // 'login' | 'register'
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // State form Đăng nhập
   const [loginForm, setLoginForm] = useState({
@@ -81,13 +87,26 @@ export default function Login() {
     setLoading(false);
 
     if (result.success) {
+      if (result.data?.full_name) {
+        localStorage.setItem('ktx_fullname', result.data.full_name);
+      }
       setMessage({
         type: 'success',
         text: `Đăng nhập thành công! Xin chào ${result.data.username} (${result.data.role}).`,
       });
       setCurrentUser(result.data);
-      // Chuyển hướng hoặc làm mới phiên đăng nhập
-      window.location.reload();
+      if (onLoginSuccess) {
+        onLoginSuccess(result.data.role);
+      } else {
+        const targetPath =
+          result.data.role === 'KeToan'
+            ? '/doi-soat'
+            : result.data.role === 'Admin'
+            ? '/admin'
+            : '/student/dashboard';
+        window.history.pushState({}, '', targetPath);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
     } else {
       setMessage({
         type: 'error',
@@ -138,15 +157,23 @@ export default function Login() {
     setLoading(false);
 
     if (result.success) {
+      localStorage.setItem('ktx_fullname', fullName.trim());
+      // Tự động đăng nhập tài khoản vừa tạo để lưu token
+      await authService.login(emailVal, password);
+
       setMessage({
         type: 'success',
-        text: 'Đăng ký tài khoản thành công! Bạn có thể chuyển sang tab Đăng nhập ngay bây giờ.',
+        text: 'Đăng ký tài khoản thành công! Đang chuyển đến trang chủ sinh viên...',
       });
-      // Điền sẵn thông tin vào login form và chuyển tab
-      setLoginForm({ email: emailVal, password: '' });
+
       setTimeout(() => {
-        setActiveTab('login');
-      }, 1500);
+        if (onLoginSuccess) {
+          onLoginSuccess('SinhVien');
+        } else {
+          window.history.pushState({}, '', '/student/dashboard');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }
+      }, 700);
     } else {
       setMessage({
         type: 'error',
@@ -272,6 +299,7 @@ export default function Login() {
               onClick={() => {
                 setActiveTab('login');
                 setMessage({ type: '', text: '' });
+                if (onTabChange) onTabChange('login');
               }}
             >
               Đăng nhập
@@ -282,6 +310,7 @@ export default function Login() {
               onClick={() => {
                 setActiveTab('register');
                 setMessage({ type: '', text: '' });
+                if (onTabChange) onTabChange('register');
               }}
             >
               Đăng ký
@@ -416,6 +445,7 @@ export default function Login() {
                       onClick={() => {
                         setActiveTab('register');
                         setMessage({ type: '', text: '' });
+                        if (onTabChange) onTabChange('register');
                       }}
                     >
                       Đăng ký
@@ -603,6 +633,7 @@ export default function Login() {
                       onClick={() => {
                         setActiveTab('login');
                         setMessage({ type: '', text: '' });
+                        if (onTabChange) onTabChange('login');
                       }}
                     >
                       Đăng nhập
