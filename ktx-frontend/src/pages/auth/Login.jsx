@@ -29,7 +29,7 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
   // State form Đăng ký
   const [registerForm, setRegisterForm] = useState({
     fullName: '',
-    gender: 'Nữ',
+    username: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -59,31 +59,17 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
   // Submit Đăng nhập
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    const emailVal = loginForm.email.trim();
+    const identifier = loginForm.email.trim();
 
-    if (!emailVal || !loginForm.password) {
-      setMessage({ type: 'error', text: 'Vui lòng nhập đầy đủ email và mật khẩu.' });
-      return;
-    }
-
-    // Cho phép tài khoản đặc biệt của quản trị viên / kế toán (KT_Hoa, QL_Nam)
-    const isSpecialAccount =
-      ['kt_hoa', 'admin', 'ql_nam'].includes(emailVal.toLowerCase()) ||
-      emailVal.toLowerCase().startsWith('kt_') ||
-      emailVal.toLowerCase().startsWith('ql_');
-
-    if (!isValidSchoolEmail(emailVal) && !isSpecialAccount) {
-      setMessage({
-        type: 'error',
-        text: 'Email đăng nhập phải có định dạng @ictu.edu.vn.',
-      });
+    if (!identifier || !loginForm.password) {
+      setMessage({ type: 'error', text: 'Vui lòng nhập email hoặc username và mật khẩu.' });
       return;
     }
 
     setLoading(true);
     setMessage({ type: '', text: '' });
 
-    const result = await authService.login(emailVal, loginForm.password);
+    const result = await authService.login(identifier, loginForm.password);
     setLoading(false);
 
     if (result.success) {
@@ -118,11 +104,17 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
   // Submit Đăng ký
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-    const { fullName, gender, email, password, confirmPassword } = registerForm;
+    const { fullName, username, email, password, confirmPassword } = registerForm;
     const emailVal = email.trim();
+    const usernameVal = username.trim();
 
-    if (!fullName.trim() || !emailVal || !password) {
+    if (!fullName.trim() || !usernameVal || !emailVal || !password) {
       setMessage({ type: 'error', text: 'Vui lòng điền đầy đủ các thông tin bắt buộc.' });
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9._-]{3,50}$/.test(usernameVal)) {
+      setMessage({ type: 'error', text: 'Username dài 3–50 ký tự, chỉ gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang.' });
       return;
     }
 
@@ -150,7 +142,7 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
 
     const result = await authService.register({
       fullName,
-      gender,
+      username: usernameVal,
       email: emailVal,
       password,
     });
@@ -158,8 +150,9 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
 
     if (result.success) {
       localStorage.setItem('ktx_fullname', fullName.trim());
+      localStorage.setItem('ktx_email', emailVal);
       // Tự động đăng nhập tài khoản vừa tạo để lưu token
-      await authService.login(emailVal, password);
+      await authService.login(usernameVal, password);
 
       setMessage({
         type: 'success',
@@ -332,14 +325,14 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
                 <div className="form-fields login-fields">
                   {/* Email */}
                   <div className="form-group">
-                    <label className="form-label" htmlFor="login-email">Email</label>
+                    <label className="form-label" htmlFor="login-email">Email hoặc username</label>
                     <div className="input-wrapper">
                       <input
                         id="login-email"
                         name="email"
                         type="text"
                         className="form-input"
-                        placeholder="@ictu.edu.vn"
+                        placeholder="Nhập email hoặc username"
                         value={loginForm.email}
                         onChange={handleLoginChange}
                         required
@@ -457,7 +450,7 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
               /* ================= FORM ĐĂNG KÝ ================= */
               <form className="auth-form register-form" onSubmit={handleRegisterSubmit}>
                 <div className="form-fields register-fields">
-                  {/* Họ tên & Giới tính */}
+                  {/* Họ tên & Username */}
                   <div className="form-row-2col-equal">
                     <div className="form-group">
                       <label className="form-label" htmlFor="register-fullname">Họ tên</label>
@@ -475,18 +468,20 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
                       </div>
                     </div>
                     <div className="form-group">
-                      <label className="form-label" htmlFor="register-gender">Giới tính</label>
+                      <label className="form-label" htmlFor="register-username">Username</label>
                       <div className="input-wrapper">
-                        <select
-                          id="register-gender"
-                          name="gender"
-                          className="form-select"
-                          value={registerForm.gender}
+                        <input
+                          id="register-username"
+                          name="username"
+                          type="text"
+                          className="form-input"
+                          placeholder="Nhập username"
+                          value={registerForm.username}
                           onChange={handleRegisterChange}
-                        >
-                          <option value="Nữ">Nữ</option>
-                          <option value="Nam">Nam</option>
-                        </select>
+                          minLength={3}
+                          maxLength={50}
+                          required
+                        />
                       </div>
                     </div>
                   </div>

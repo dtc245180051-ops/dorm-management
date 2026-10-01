@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -65,7 +65,7 @@ def register(
     # 2. Kiểm tra tên đăng nhập đã tồn tại chưa
     existing_username = (
         db.query(TaiKhoan)
-        .filter(TaiKhoan.ten_dang_nhap == username)
+        .filter(func.lower(TaiKhoan.ten_dang_nhap) == username.lower())
         .first()
     )
     if existing_username:
@@ -131,9 +131,10 @@ def register(
     db.flush()
 
     # 8. Tự động liên kết vào bảng sinh_vien nếu là vai trò SinhVien
-    if new_account.vai_tro == VaiTro.SINH_VIEN and username.upper().startswith("DTC"):
+    student_code = email.split("@", 1)[0] if email and "@" in email else username
+    if new_account.vai_tro == VaiTro.SINH_VIEN and student_code.upper().startswith("DTC"):
         from app.models.user import SinhVien
-        msv_val = username.upper()
+        msv_val = student_code.upper()
         existing_sv = db.query(SinhVien).filter(SinhVien.msv == msv_val).first()
         if not existing_sv:
             sv = SinhVien(

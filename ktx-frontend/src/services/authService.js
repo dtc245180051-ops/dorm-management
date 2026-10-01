@@ -56,21 +56,20 @@ export const authService = {
    * Đăng ký tài khoản Sinh viên mới
    * @param {Object} registerData
    */
-  async register({ fullName, gender, email, emailOrPhone, password }) {
+  async register({ fullName, username, email, emailOrPhone, password }) {
     try {
       const emailVal = (email || emailOrPhone || "").trim();
       const isEmail = emailVal.includes("@");
 
-      // Tạo username từ mã sinh viên (phần trước @ của email trường DTCxxxxxxxxx)
-      let username = isEmail ? emailVal.split("@")[0] : emailVal;
+      // Giữ username do người đăng ký chọn; tương thích với các lời gọi cũ bằng cách suy ra từ email.
+      const usernameVal = (username || (isEmail ? emailVal.split("@")[0] : emailVal)).trim();
 
       const payload = {
-        username: username,
+        username: usernameVal,
         password: password,
         role: "SinhVien",
         full_name: fullName.trim(),
         email: emailVal,
-        gender: gender || "Nữ",
       };
 
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
