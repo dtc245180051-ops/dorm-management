@@ -18,6 +18,8 @@ import {
 import StudentLayout from '../../layouts/Student';
 import occupancyService from '../../services/occupancyService';
 
+const STUDENT_AVATAR_STORAGE_KEY = 'ktx_student_avatar';
+
 export default function StudentProfilePage({ onSelectTab }) {
   // 1. Dữ liệu hồ sơ sinh viên
   const [profile, setProfile] = useState({
@@ -78,8 +80,21 @@ export default function StudentProfilePage({ onSelectTab }) {
       if (occupancyService.getStudentProfile) {
         const student = await occupancyService.getStudentProfile();
         if (student) {
-          setProfile(student);
-          setEditFormData(student);
+          const savedAvatar = localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY);
+          const studentProfile = {
+            ...student,
+            avatar_url: savedAvatar || student.avatar_url || '/avatar.png',
+          };
+          setProfile(studentProfile);
+          setEditFormData(studentProfile);
+          if (studentProfile.avatar_url) {
+            localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, studentProfile.avatar_url);
+            window.dispatchEvent(
+              new CustomEvent('student-avatar-updated', {
+                detail: { avatarUrl: studentProfile.avatar_url },
+              }),
+            );
+          }
         }
       }
 
@@ -120,6 +135,12 @@ export default function StudentProfilePage({ onSelectTab }) {
         const updated = { ...profile, avatar_url: newAvatarUrl };
         setProfile(updated);
         setEditFormData((prev) => ({ ...prev, avatar_url: newAvatarUrl }));
+        localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, newAvatarUrl);
+        window.dispatchEvent(
+          new CustomEvent('student-avatar-updated', {
+            detail: { avatarUrl: newAvatarUrl },
+          }),
+        );
 
         if (occupancyService.updateStudentProfile) {
           await occupancyService.updateStudentProfile(updated);
@@ -157,6 +178,14 @@ export default function StudentProfilePage({ onSelectTab }) {
       };
 
       setProfile(updatedProfile);
+      if (updatedProfile.avatar_url) {
+        localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, updatedProfile.avatar_url);
+        window.dispatchEvent(
+          new CustomEvent('student-avatar-updated', {
+            detail: { avatarUrl: updatedProfile.avatar_url },
+          }),
+        );
+      }
 
       if (occupancyService.updateStudentProfile) {
         await occupancyService.updateStudentProfile(updatedProfile);
