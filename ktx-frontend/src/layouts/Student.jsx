@@ -8,7 +8,6 @@ import {
   FileText,
   CreditCard,
   User,
-  HelpCircle,
   LogOut,
   Bell,
   MessageSquare,
@@ -121,12 +120,6 @@ export default function StudentLayout({
       label: "Thông tin cá nhân",
       icon: User,
       section: "personal",
-    },
-    {
-      id: "help",
-      label: "Trợ giúp và hỗ trợ",
-      icon: HelpCircle,
-      section: "system",
     },
   ];
 
@@ -242,15 +235,19 @@ export default function StudentLayout({
             title="Xem thông tin cá nhân"
           >
             <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm shadow-sm border border-blue-200 overflow-hidden shrink-0">
-              <img
-                src={avatarUrl || "/avatar.png"}
-                alt="Avatar"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.src = "/avatar.png";
-                }}
-              />
-              <User className="w-5 h-5 text-blue-600" />
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="Avatar"
+                  className="h-full w-full object-cover"
+                  onError={() => {
+                    localStorage.removeItem(STUDENT_AVATAR_STORAGE_KEY);
+                    setAvatarUrl("");
+                  }}
+                />
+              ) : (
+                <User aria-hidden="true" className="h-5 w-5 text-blue-600" />
+              )}
             </div>
             <div className="hidden sm:flex flex-col text-left">
               <span className="text-sm font-bold text-slate-800 leading-tight">

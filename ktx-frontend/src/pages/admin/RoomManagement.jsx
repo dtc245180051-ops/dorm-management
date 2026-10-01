@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Users,
   Filter,
@@ -8,19 +8,19 @@ import {
   CheckCircle2,
   Eye,
   X,
-} from 'lucide-react';
-import { dormService } from '../../services/api';
-import AddRoomModal from '../../components/room/AddRoomModal';
-import RoomDetailModal from '../../components/room/RoomDetailModal';
-import RoomDetailPage from './RoomDetailPage';
-import BuildingDetailPage from '../../components/room/BuildingDetailPage';
+} from "lucide-react";
+import { dormService } from "../../services/api";
+import AddRoomModal from "../../components/room/AddRoomModal";
+import RoomDetailModal from "../../components/room/RoomDetailModal";
+import RoomDetailPage from "./RoomDetailPage";
+import BuildingDetailPage from "../../components/room/BuildingDetailPage";
 
-export default function RoomManagement({ searchTerm = '' }) {
+export default function RoomManagement({ searchTerm = "" }) {
   // States
   const [buildings, setBuildings] = useState([]);
-  const [activeBuilding, setActiveBuilding] = useState('A1');
-  const [activeRoomFilter, setActiveRoomFilter] = useState('all');
-  const [filterMode, setFilterMode] = useState('all');
+  const [activeBuilding, setActiveBuilding] = useState("A1");
+  const [activeRoomFilter, setActiveRoomFilter] = useState("all");
+  const [filterMode, setFilterMode] = useState("all");
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
 
   // Xem trang chi tiết phòng (theo mẫu mockup iDORM)
@@ -37,11 +37,11 @@ export default function RoomManagement({ searchTerm = '' }) {
 
   // Loading & Toast
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState('');
+  const [toastMessage, setToastMessage] = useState("");
 
   const showToast = (msg) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 3500);
+    setTimeout(() => setToastMessage(""), 3500);
   };
 
   // 1. Fetch buildings and rooms from backend API
@@ -56,7 +56,7 @@ export default function RoomManagement({ searchTerm = '' }) {
         }
       }
     } catch (err) {
-      console.error('Error fetching buildings:', err);
+      console.error("Error fetching buildings:", err);
     } finally {
       setLoading(false);
     }
@@ -70,12 +70,12 @@ export default function RoomManagement({ searchTerm = '' }) {
   const displayedBuildings = useMemo(() => {
     if (!buildings || buildings.length === 0) {
       return [
-        { ma_toa: 'A1', ten_toa: 'Tòa A1', gioi_tinh: 'Nam' },
-        { ma_toa: 'A2', ten_toa: 'Tòa A2', gioi_tinh: 'Nam' },
-        { ma_toa: 'A3', ten_toa: 'Tòa A3', gioi_tinh: 'Nữ' },
-        { ma_toa: 'A4', ten_toa: 'Tòa A4', gioi_tinh: 'Nữ' },
-        { ma_toa: 'A5', ten_toa: 'Tòa A5', gioi_tinh: 'Nam' },
-        { ma_toa: 'A6', ten_toa: 'Tòa A6', gioi_tinh: 'Nữ' },
+        { ma_toa: "A1", ten_toa: "Tòa A1", gioi_tinh: "Nam" },
+        { ma_toa: "A2", ten_toa: "Tòa A2", gioi_tinh: "Nam" },
+        { ma_toa: "A3", ten_toa: "Tòa A3", gioi_tinh: "Nữ" },
+        { ma_toa: "A4", ten_toa: "Tòa A4", gioi_tinh: "Nữ" },
+        { ma_toa: "A5", ten_toa: "Tòa A5", gioi_tinh: "Nam" },
+        { ma_toa: "A6", ten_toa: "Tòa A6", gioi_tinh: "Nữ" },
       ];
     }
     return buildings;
@@ -100,7 +100,9 @@ export default function RoomManagement({ searchTerm = '' }) {
       }
     });
 
-    return roomsList.sort((a, b) => a.so_phong.localeCompare(b.so_phong, undefined, { numeric: true }));
+    return roomsList.sort((a, b) =>
+      a.so_phong.localeCompare(b.so_phong, undefined, { numeric: true }),
+    );
   }, [buildings, activeBuilding]);
 
   // Unique room numbers for second pill filter row
@@ -115,20 +117,23 @@ export default function RoomManagement({ searchTerm = '' }) {
         const query = searchTerm.toLowerCase();
         const matchRoom = room.so_phong?.toLowerCase().includes(query);
         const matchType = room.loai_phong?.toLowerCase().includes(query);
-        const matchCapacity = `${room.suc_chua || ''} người`.toLowerCase().includes(query);
+        const matchCapacity = `${room.suc_chua || ""} người`
+          .toLowerCase()
+          .includes(query);
         if (!matchRoom && !matchType && !matchCapacity) return false;
       }
 
-      if (activeRoomFilter !== 'all' && room.so_phong !== activeRoomFilter) {
+      if (activeRoomFilter !== "all" && room.so_phong !== activeRoomFilter) {
         return false;
       }
 
-      const emptyBeds = room.giuongs?.filter((g) => g.trang_thai === 'TRONG').length || 0;
+      const emptyBeds =
+        room.giuongs?.filter((g) => g.trang_thai === "TRONG").length || 0;
 
-      if (filterMode === 'available') {
+      if (filterMode === "available") {
         return emptyBeds > 0;
       }
-      if (filterMode === 'full') {
+      if (filterMode === "full") {
         return emptyBeds === 0;
       }
 
@@ -158,12 +163,14 @@ export default function RoomManagement({ searchTerm = '' }) {
         onBuildingUpdated={(updatedBuilding) => {
           setViewingBuildingDetail(updatedBuilding);
           fetchData();
-          showToast(`Cập nhật thông tin tòa ${updatedBuilding.ten_toa} thành công`);
+          showToast(
+            `Cập nhật thông tin tòa ${updatedBuilding.ten_toa} thành công`,
+          );
         }}
         onBuildingDeleted={(deletedBuildingId) => {
           setViewingBuildingDetail(null);
           fetchData();
-          setActiveBuilding('');
+          setActiveBuilding("");
           showToast(`Đã xóa tòa nhà thành công`);
         }}
         onOpenAddRoom={(buildingId, floorNum) => {
@@ -221,20 +228,10 @@ export default function RoomManagement({ searchTerm = '' }) {
           <button
             type="button"
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-sm font-semibold transition-all duration-150 shadow-sm cursor-pointer hover:shadow"
+            className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-blue-100 text-blue-600 rounded-full text-sm font-semibold transition-all duration-150 shadow-sm cursor-pointer hover:shadow"
           >
             <Plus className="w-4 h-4" />
             <span>Thêm phòng</span>
-          </button>
-
-          {/* Nút Quản lý đăng ký */}
-          <button
-            type="button"
-            onClick={() => showToast('Tính năng Quản lý đăng ký đang được cập nhật')}
-            className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-sky-50 text-sky-600 border border-sky-400 rounded-full text-sm font-medium transition-colors shadow-2xs cursor-pointer"
-          >
-            <Users className="w-4 h-4 text-sky-500" />
-            <span>Quản lý đăng ký</span>
           </button>
 
           {/* Nút Lọc và Dropdown */}
@@ -254,13 +251,13 @@ export default function RoomManagement({ searchTerm = '' }) {
                 <button
                   type="button"
                   onClick={() => {
-                    setFilterMode('all');
+                    setFilterMode("all");
                     setIsFilterDropdownOpen(false);
                   }}
                   className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition cursor-pointer ${
-                    filterMode === 'all'
-                      ? 'bg-sky-100 text-blue-700 font-bold'
-                      : 'text-slate-700 hover:bg-slate-50'
+                    filterMode === "all"
+                      ? "bg-sky-100 text-blue-700 font-bold"
+                      : "text-slate-700 hover:bg-slate-50"
                   }`}
                 >
                   Tất cả phòng
@@ -268,13 +265,13 @@ export default function RoomManagement({ searchTerm = '' }) {
                 <button
                   type="button"
                   onClick={() => {
-                    setFilterMode('available');
+                    setFilterMode("available");
                     setIsFilterDropdownOpen(false);
                   }}
                   className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition cursor-pointer ${
-                    filterMode === 'available'
-                      ? 'bg-sky-100 text-blue-700 font-bold'
-                      : 'text-slate-700 hover:bg-slate-50'
+                    filterMode === "available"
+                      ? "bg-sky-100 text-blue-700 font-bold"
+                      : "text-slate-700 hover:bg-slate-50"
                   }`}
                 >
                   Phòng còn trống
@@ -282,13 +279,13 @@ export default function RoomManagement({ searchTerm = '' }) {
                 <button
                   type="button"
                   onClick={() => {
-                    setFilterMode('full');
+                    setFilterMode("full");
                     setIsFilterDropdownOpen(false);
                   }}
                   className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition cursor-pointer ${
-                    filterMode === 'full'
-                      ? 'bg-sky-100 text-blue-700 font-bold'
-                      : 'text-slate-700 hover:bg-slate-50'
+                    filterMode === "full"
+                      ? "bg-sky-100 text-blue-700 font-bold"
+                      : "text-slate-700 hover:bg-slate-50"
                   }`}
                 >
                   Phòng đã đầy
@@ -305,12 +302,15 @@ export default function RoomManagement({ searchTerm = '' }) {
           {displayedBuildings.map((building) => {
             const isActive = activeBuilding === building.ma_toa;
             const rawName = building.ten_toa || building.ma_toa;
-            const displayName = rawName.startsWith('Tòa ') ? rawName : `Tòa ${rawName}`;
+            const displayName = rawName.startsWith("Tòa ")
+              ? rawName
+              : `Tòa ${rawName}`;
             const isFemale =
-              (building.gioi_tinh || '').toLowerCase().includes('nữ') ||
-              (building.gioi_tinh || '').toLowerCase().includes('nu');
+              (building.gioi_tinh || "").toLowerCase().includes("nữ") ||
+              (building.gioi_tinh || "").toLowerCase().includes("nu");
             const isMale =
-              (building.gioi_tinh || '').toLowerCase().includes('nam') && !isFemale;
+              (building.gioi_tinh || "").toLowerCase().includes("nam") &&
+              !isFemale;
 
             return (
               <button
@@ -318,12 +318,12 @@ export default function RoomManagement({ searchTerm = '' }) {
                 type="button"
                 onClick={() => {
                   setActiveBuilding(building.ma_toa);
-                  setActiveRoomFilter('all');
+                  setActiveRoomFilter("all");
                 }}
                 className={`px-5 py-2 rounded-full text-sm transition-all duration-150 whitespace-nowrap cursor-pointer shadow-2xs flex items-center gap-2 ${
                   isActive
-                    ? 'bg-sky-200 text-sky-900 font-bold border border-sky-300'
-                    : 'bg-white text-slate-700 hover:bg-slate-100 font-medium border border-slate-300'
+                    ? "bg-sky-200 text-sky-900 font-bold border border-sky-300"
+                    : "bg-white text-slate-700 hover:bg-slate-100 font-medium border border-slate-300"
                 }`}
               >
                 <span>{displayName}</span>
@@ -331,8 +331,8 @@ export default function RoomManagement({ searchTerm = '' }) {
                   <span
                     className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
                       isActive
-                        ? 'bg-blue-100/90 text-blue-900'
-                        : 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                        ? "bg-blue-100/90 text-blue-900"
+                        : "bg-blue-50 text-blue-700 border border-blue-200/60"
                     }`}
                   >
                     Nam
@@ -342,8 +342,8 @@ export default function RoomManagement({ searchTerm = '' }) {
                   <span
                     className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
                       isActive
-                        ? 'bg-rose-100/90 text-rose-900'
-                        : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                        ? "bg-rose-100/90 text-rose-900"
+                        : "bg-rose-50 text-rose-700 border border-rose-200/60"
                     }`}
                   >
                     Nữ
@@ -363,7 +363,10 @@ export default function RoomManagement({ searchTerm = '' }) {
             title={`Xem chi tiết tất cả các tầng, chỉnh sửa hoặc xóa ${currentActiveBuildingData.ten_toa || activeBuilding}`}
           >
             <Building2 className="w-4 h-4 text-blue-600" />
-            <span>Chi tiết {currentActiveBuildingData.ten_toa || `Tòa ${activeBuilding}`}</span>
+            <span>
+              Chi tiết{" "}
+              {currentActiveBuildingData.ten_toa || `Tòa ${activeBuilding}`}
+            </span>
           </button>
         )}
       </div>
@@ -372,11 +375,11 @@ export default function RoomManagement({ searchTerm = '' }) {
       <div className="flex items-center gap-3 overflow-x-auto pb-4 mb-6 scrollbar-none">
         <button
           type="button"
-          onClick={() => setActiveRoomFilter('all')}
+          onClick={() => setActiveRoomFilter("all")}
           className={`px-5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap cursor-pointer shadow-2xs ${
-            activeRoomFilter === 'all'
-              ? 'bg-sky-200 text-sky-900 border border-sky-300'
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-300'
+            activeRoomFilter === "all"
+              ? "bg-sky-200 text-sky-900 border border-sky-300"
+              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-300"
           }`}
         >
           Tất cả phòng
@@ -391,8 +394,8 @@ export default function RoomManagement({ searchTerm = '' }) {
               onClick={() => setActiveRoomFilter(roomNumber)}
               className={`px-5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap cursor-pointer shadow-2xs ${
                 isActive
-                  ? 'bg-sky-200 text-sky-900 border border-sky-300'
-                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
+                  ? "bg-sky-200 text-sky-900 border border-sky-300"
+                  : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-300"
               }`}
             >
               Phòng {roomNumber}
@@ -424,7 +427,10 @@ export default function RoomManagement({ searchTerm = '' }) {
           <div className="py-16 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
             <Building2 className="w-10 h-10 text-slate-300" />
             <span className="text-sm font-medium">
-              Chưa có phòng nào tại {displayedBuildings.find((b) => b.ma_toa === activeBuilding)?.ten_toa || activeBuilding}.
+              Chưa có phòng nào tại{" "}
+              {displayedBuildings.find((b) => b.ma_toa === activeBuilding)
+                ?.ten_toa || activeBuilding}
+              .
             </span>
             <button
               type="button"
@@ -439,32 +445,34 @@ export default function RoomManagement({ searchTerm = '' }) {
           <div className="divide-y divide-slate-200/70">
             {filteredRooms.map((room) => {
               // Sức chứa của phòng
-              const capacity = Number(room.suc_chua) || (room.giuongs?.length || 4);
+              const capacity =
+                Number(room.suc_chua) || room.giuongs?.length || 4;
               const beds = room.giuongs || [];
 
               // Tạo danh sách hiển thị đúng từng đấy giường (hình vuông) tương ứng với sức chứa
               const displayBeds = Array.from({ length: capacity }, (_, idx) => {
                 if (beds[idx]) return beds[idx];
                 return {
-                  ma_giuong: `${room.ma_phong}_G${String(idx + 1).padStart(2, '0')}`,
-                  trang_thai: 'TRONG',
+                  ma_giuong: `${room.ma_phong}_G${String(idx + 1).padStart(2, "0")}`,
+                  trang_thai: "TRONG",
                 };
               });
 
               // Phân loại phòng: tiêu chuẩn hay dịch vụ
               const isService =
-                (room.loai_phong || '').toLowerCase().includes('dịch vụ') ||
-                (room.loai_phong || '').toLowerCase().includes('dich vu');
+                (room.loai_phong || "").toLowerCase().includes("dịch vụ") ||
+                (room.loai_phong || "").toLowerCase().includes("dich vu");
 
               // Ảnh phòng đại diện
               const roomImage =
                 room.hinh_anh ||
                 (isService
-                  ? '/images/rooms/phong-dich-vu.jpg'
-                  : '/images/rooms/phong-tieu-chuan.jpg');
+                  ? "/images/rooms/phong-dich-vu.jpg"
+                  : "/images/rooms/phong-tieu-chuan.jpg");
 
               // Giá tiền / năm
-              const roomPrice = Number(room.gia_tien_nam) || (isService ? 9600000 : 4800000);
+              const roomPrice =
+                Number(room.gia_tien_nam) || (isService ? 9600000 : 4800000);
 
               return (
                 <div
@@ -489,9 +497,11 @@ export default function RoomManagement({ searchTerm = '' }) {
                       onClick={() =>
                         setPreviewImage({
                           url: roomImage,
-                          title: `Phòng ${room.so_phong} - ${isService ? 'Phòng dịch vụ' : 'Phòng tiêu chuẩn'}`,
+                          title: `Phòng ${room.so_phong} - ${isService ? "Phòng dịch vụ" : "Phòng tiêu chuẩn"}`,
                           capacity: capacity,
-                          roomType: isService ? 'Phòng dịch vụ' : 'Phòng tiêu chuẩn',
+                          roomType: isService
+                            ? "Phòng dịch vụ"
+                            : "Phòng tiêu chuẩn",
                         })
                       }
                       className="relative group w-14 h-10 lg:w-16 lg:h-11 rounded-xl overflow-hidden border border-slate-200/80 bg-slate-100 cursor-pointer shadow-2xs hover:shadow-md transition-all duration-200"
@@ -503,8 +513,8 @@ export default function RoomManagement({ searchTerm = '' }) {
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
                         onError={(e) => {
                           e.target.src = isService
-                            ? '/images/rooms/phong-dich-vu.jpg'
-                            : '/images/rooms/phong-tieu-chuan.jpg';
+                            ? "/images/rooms/phong-dich-vu.jpg"
+                            : "/images/rooms/phong-tieu-chuan.jpg";
                         }}
                       />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -536,26 +546,27 @@ export default function RoomManagement({ searchTerm = '' }) {
                   {/* Cột 5: Giá tiền / năm */}
                   <div className="col-span-2">
                     <div className="text-slate-900 font-bold text-sm tracking-tight">
-                      {roomPrice.toLocaleString('vi-VN')} đ
+                      {roomPrice.toLocaleString("vi-VN")} đ
                     </div>
                     <div className="text-[11px] text-slate-400 font-medium">
-                      ~{Math.round(roomPrice / 12).toLocaleString('vi-VN')} đ/tháng
+                      ~{Math.round(roomPrice / 12).toLocaleString("vi-VN")}{" "}
+                      đ/tháng
                     </div>
                   </div>
 
                   {/* Cột 6: Giường (Số lượng ô vuông đúng bằng sức chứa của phòng) */}
                   <div className="col-span-3 flex items-center gap-1.5 flex-wrap">
                     {displayBeds.map((bed, idx) => {
-                      const isFree = bed.trang_thai === 'TRONG';
+                      const isFree = bed.trang_thai === "TRONG";
                       return (
                         <div
                           key={bed.ma_giuong || idx}
-                          title={`Giường ${idx + 1}: ${isFree ? 'Còn trống' : 'Đã có người ở'} - Nhấp xem chi tiết phòng`}
+                          title={`Giường ${idx + 1}: ${isFree ? "Còn trống" : "Đã có người ở"} - Nhấp xem chi tiết phòng`}
                           onClick={() => setViewingRoomDetail(room)}
                           className={`w-7 h-7 lg:w-8 lg:h-8 rounded-lg cursor-pointer transition-all duration-150 transform hover:scale-110 shadow-2xs ${
                             isFree
-                              ? 'bg-[#79d78e] hover:bg-[#68c87e]' // Green
-                              : 'bg-[#f09898] hover:bg-[#e48383]' // Pink / Red
+                              ? "bg-[#79d78e] hover:bg-[#68c87e]" // Green
+                              : "bg-[#f09898] hover:bg-[#e48383]" // Pink / Red
                           }`}
                         />
                       );
@@ -587,7 +598,9 @@ export default function RoomManagement({ searchTerm = '' }) {
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded-sm bg-[#f09898]" />
-          <span className="text-xs font-medium text-slate-600">Đã có người ở</span>
+          <span className="text-xs font-medium text-slate-600">
+            Đã có người ở
+          </span>
         </div>
       </div>
 
@@ -617,9 +630,12 @@ export default function RoomManagement({ searchTerm = '' }) {
             </div>
             <div className="p-5 flex items-center justify-between">
               <div>
-                <h4 className="text-base font-bold text-slate-900">{previewImage.title}</h4>
+                <h4 className="text-base font-bold text-slate-900">
+                  {previewImage.title}
+                </h4>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Sức chứa: {previewImage.capacity} người • {previewImage.roomType}
+                  Sức chứa: {previewImage.capacity} người •{" "}
+                  {previewImage.roomType}
                 </p>
               </div>
               <button
@@ -645,7 +661,7 @@ export default function RoomManagement({ searchTerm = '' }) {
           if (newBuildingId) {
             setActiveBuilding(newBuildingId);
           }
-          showToast('Đã thêm phòng mới thành công!');
+          showToast("Đã thêm phòng mới thành công!");
         }}
       />
 
@@ -659,7 +675,7 @@ export default function RoomManagement({ searchTerm = '' }) {
         room={selectedRoom}
         onUpdateSuccess={() => {
           fetchData();
-          showToast('Cập nhật dữ liệu phòng thành công!');
+          showToast("Cập nhật dữ liệu phòng thành công!");
         }}
       />
     </div>

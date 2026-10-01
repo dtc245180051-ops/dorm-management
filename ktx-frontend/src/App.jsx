@@ -462,8 +462,7 @@ export default function App() {
   // 2. Đăng ký ở mới
   if (
     currentPath === "/student/register" ||
-    currentPath === "/student/register-room" ||
-    currentPath === "/student"
+    currentPath === "/student/register-room"
   ) {
     return (
       <div className="relative">
@@ -635,7 +634,7 @@ export default function App() {
   }
 
   // 6. Trang chủ Sinh viên (Dashboard)
-  if (currentPath === "/student/dashboard") {
+  if (currentPath === "/student/dashboard" || currentPath === "/student") {
     const studentName =
       localStorage.getItem("ktx_fullname") ||
       localStorage.getItem("ktx_username") ||

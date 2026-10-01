@@ -1,14 +1,42 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from "react";
 import {
   FileEdit,
   Calendar,
   ChevronDown,
   Loader2,
   CheckCircle2,
-} from 'lucide-react';
-import StudentLayout from '../../layouts/Student';
-import occupancyService from '../../services/occupancyService';
-import { VIETNAM_PROVINCES } from '../../data/vietnamAddressData';
+} from "lucide-react";
+import StudentLayout from "../../layouts/Student";
+import occupancyService from "../../services/occupancyService";
+import { authService } from "../../services/authService";
+import { VIETNAM_PROVINCES } from "../../data/vietnamAddressData";
+
+export const extractStudentCodeFromEmail = (email = "") => {
+  if (!email || !email.includes("@")) return "";
+  return email.split("@")[0].trim().toUpperCase();
+};
+
+const isIctuEmail = (email = "") =>
+  /^[^\s@]+@ictu\.edu\.vn$/i.test(email.trim());
+
+const getStudentCode = (email, username) => {
+  if (isIctuEmail(email)) return extractStudentCodeFromEmail(email);
+  if (!username) return "";
+  if (isIctuEmail(username)) return extractStudentCodeFromEmail(username);
+  return username.includes("@") ? "" : username.trim().toUpperCase();
+};
+
+const getStoredStudentAccount = () => {
+  const storedEmail = localStorage.getItem("ktx_email") || "";
+  const email = isIctuEmail(storedEmail) ? storedEmail.trim() : "";
+  const username = localStorage.getItem("ktx_username") || "";
+
+  return {
+    msv: getStudentCode(email, username),
+    ho_ten: localStorage.getItem("ktx_fullname") || "",
+    email,
+  };
+};
 
 export default function RoomRegistrationPage({
   onNavigateHistory,
@@ -21,44 +49,100 @@ export default function RoomRegistrationPage({
   const [confirmed, setConfirmed] = useState(false);
 
   // State quản lý Địa chỉ thường trú 3 ô (Tỉnh/Thành, Quận/Huyện, Số nhà/đường/xã)
-  const [selectedProvince, setSelectedProvince] = useState('');
-  const [selectedDistrict, setSelectedDistrict] = useState('');
-  const [detailStreet, setDetailStreet] = useState('');
+  const [selectedProvince, setSelectedProvince] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [detailStreet, setDetailStreet] = useState("");
 
-  // Form State: Mặc định TRỐNG HOÀN TOÀN khi ấn vào theo yêu cầu
+  const storedStudentAccount = getStoredStudentAccount();
+
+  // Form State
   const initialFormState = {
     // Thông tin sinh viên
-    msv: '',
-    ho_ten: '',
-    gioi_tinh: '',
-    ngay_sinh: '',
-    cccd: '',
-    so_dien_thoai: '',
-    email: '',
-    khoa: '',
-    lop: '',
-    dia_chi: '',
-    doi_tuong_uu_tien: '',
+    msv: storedStudentAccount.msv,
+    ho_ten: storedStudentAccount.ho_ten,
+    gioi_tinh: "",
+    ngay_sinh: "",
+    cccd: "",
+    so_dien_thoai: "",
+    email: storedStudentAccount.email,
+    khoa: "",
+    lop: "",
+    dia_chi: "",
+    doi_tuong_uu_tien: "",
 
     // Thông tin liên hệ khẩn cấp
-    nguoi_giam_ho: '',
-    moi_quan_he: '',
-    sdt_nguoi_giam_ho: '',
+    nguoi_giam_ho: "",
+    moi_quan_he: "",
+    sdt_nguoi_giam_ho: "",
 
     // Nguyện vọng
-    loai_phong: '',
-    tang_mong_muon: '',
-    muc_gia_mong_muon: '',
-    nguyen_vong_phong: '',
-    ma_toa_mong_muon: '',
+    loai_phong: "",
+    nguyen_vong: "",
+    nguyen_vong_phong: "",
+    ma_toa_mong_muon: "",
   };
 
   const [formData, setFormData] = useState(initialFormState);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCurrentUser = async () => {
+      if (!localStorage.getItem("ktx_token")) return;
+
+      const currentUser = await authService.getCurrentUser();
+      if (!isMounted || !currentUser) return;
+
+      const userProfile = currentUser.nguoi_dung || currentUser.user || {};
+      const accountEmail = userProfile.email || currentUser.email || "";
+      const email = isIctuEmail(accountEmail) ? accountEmail.trim() : "";
+      const studentCode =
+        currentUser.studentCode ||
+        currentUser.student_code ||
+        currentUser.msv ||
+        getStudentCode(email, currentUser.ten_dang_nhap) ||
+        "";
+      const fullName =
+        userProfile.ho_ten ||
+        currentUser.fullName ||
+        currentUser.full_name ||
+        "";
+
+      if (accountEmail) {
+        if (email) {
+          localStorage.setItem("ktx_email", email);
+        } else {
+          localStorage.removeItem("ktx_email");
+        }
+      }
+      if (fullName) localStorage.setItem("ktx_fullname", fullName);
+
+      setFormData((prev) => ({
+        ...prev,
+        msv: studentCode || prev.msv,
+        ho_ten: fullName || prev.ho_ten,
+        email: accountEmail ? email : prev.email,
+        gioi_tinh:
+          userProfile.gioi_tinh || currentUser.gender || prev.gioi_tinh,
+        so_dien_thoai:
+          userProfile.so_dien_thoai || currentUser.phone || prev.so_dien_thoai,
+        khoa: userProfile.khoa || currentUser.department || prev.khoa,
+        lop: userProfile.lop || currentUser.className || prev.lop,
+      }));
+    };
+
+    loadCurrentUser();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Tự động điền thông tin phòng nếu sinh viên bấm "Đăng ký phòng này" từ Tra cứu phòng
   useEffect(() => {
     try {
-      const preferredStr = sessionStorage.getItem('preferred_room_registration');
+      const preferredStr = sessionStorage.getItem(
+        "preferred_room_registration",
+      );
       if (preferredStr) {
         const pref = JSON.parse(preferredStr);
         if (pref && (pref.so_phong || pref.ma_phong)) {
@@ -66,25 +150,20 @@ export default function RoomRegistrationPage({
           setFormData((prev) => ({
             ...prev,
             nguyen_vong_phong: roomCode,
-            loai_phong: pref.loai_phong || prev.loai_phong || 'Phòng tiêu chuẩn',
-            tang_mong_muon: pref.tang || prev.tang_mong_muon || 'Tầng 3',
-            muc_gia_mong_muon: pref.gia_thue || prev.muc_gia_mong_muon || '',
-            ma_toa_mong_muon: pref.toa || pref.ma_toa || '',
+            loai_phong:
+              pref.loai_phong || prev.loai_phong || "Phòng tiêu chuẩn",
+            ma_toa_mong_muon: pref.toa || pref.ma_toa || "",
           }));
         }
       }
     } catch (e) {
-      console.warn('Error loading preferred room:', e);
+      console.warn("Error loading preferred room:", e);
     }
   }, []);
 
   // Danh sách các phòng/giường trống khả dụng lấy từ API
   const [availableOptions, setAvailableOptions] = useState([]);
   const [isLoadingOptions, setIsLoadingOptions] = useState(true);
-
-  // Danh sách các mức giá phòng/năm hiện có từ CSDL KTX
-  const [priceOptions, setPriceOptions] = useState([]);
-  const [isLoadingPrices, setIsLoadingPrices] = useState(true);
 
   // Danh sách Quận/Huyện theo Tỉnh/Thành được chọn
   const provinceObj = useMemo(() => {
@@ -99,9 +178,12 @@ export default function RoomRegistrationPage({
   // Cập nhật lại quận/huyện khi đổi tỉnh/thành
   useEffect(() => {
     if (!selectedProvince) {
-      setSelectedDistrict('');
-    } else if (availableDistricts.length > 0 && !availableDistricts.includes(selectedDistrict)) {
-      setSelectedDistrict('');
+      setSelectedDistrict("");
+    } else if (
+      availableDistricts.length > 0 &&
+      !availableDistricts.includes(selectedDistrict)
+    ) {
+      setSelectedDistrict("");
     }
   }, [selectedProvince, availableDistricts]);
 
@@ -111,32 +193,27 @@ export default function RoomRegistrationPage({
     if (detailStreet.trim()) parts.push(detailStreet.trim());
     if (selectedDistrict) parts.push(selectedDistrict);
     if (selectedProvince) parts.push(selectedProvince);
-    const fullAddress = parts.join(', ');
+    const fullAddress = parts.join(", ");
     setFormData((prev) => ({
       ...prev,
       dia_chi: fullAddress,
     }));
   }, [selectedProvince, selectedDistrict, detailStreet]);
 
-  // Tải danh sách phòng trống và các mức giá phòng/năm từ CSDL KTX
+  // Tải danh sách phòng trống từ CSDL KTX
   useEffect(() => {
-    const fetchOptionsAndPrices = async () => {
+    const fetchAvailableOptions = async () => {
       try {
-        const [rooms, prices] = await Promise.all([
-          occupancyService.getAvailableOptions(),
-          occupancyService.getPriceOptions(),
-        ]);
+        const rooms = await occupancyService.getAvailableOptions();
         setAvailableOptions(rooms || []);
-        setPriceOptions(prices || []);
       } catch (err) {
-        console.error('Error fetching options/prices:', err);
+        console.error("Error fetching available rooms:", err);
       } finally {
         setIsLoadingOptions(false);
-        setIsLoadingPrices(false);
       }
     };
 
-    fetchOptionsAndPrices();
+    fetchAvailableOptions();
   }, []);
 
   // Xử lý thay đổi input thông thường
@@ -150,11 +227,11 @@ export default function RoomRegistrationPage({
 
   // Reset toàn bộ form về trống
   const handleResetForm = () => {
-    sessionStorage.removeItem('preferred_room_registration');
+    sessionStorage.removeItem("preferred_room_registration");
     setFormData(initialFormState);
-    setSelectedProvince('');
-    setSelectedDistrict('');
-    setDetailStreet('');
+    setSelectedProvince("");
+    setSelectedDistrict("");
+    setDetailStreet("");
     setConfirmed(false);
     setIsSuccess(false);
   };
@@ -166,22 +243,25 @@ export default function RoomRegistrationPage({
 
     setIsSubmitting(true);
     try {
-      const wishParts = [
-        formData.nguyen_vong_phong ? `Phòng ${formData.nguyen_vong_phong}` : null,
-        formData.loai_phong,
-        formData.tang_mong_muon,
-        formData.muc_gia_mong_muon,
-      ].filter(Boolean);
-
-      const wishText = wishParts.length > 0 ? wishParts.join(' - ') : 'Phòng tiêu chuẩn';
+      const wishText = formData.nguyen_vong.trim();
+      const wishLabel =
+        [
+          formData.nguyen_vong_phong
+            ? `Phòng ${formData.nguyen_vong_phong}`
+            : null,
+          formData.loai_phong,
+        ]
+          .filter(Boolean)
+          .join(" - ") || wishText;
 
       const payload = {
         ...formData,
+        msv: formData.msv.trim().toUpperCase(),
+        ho_ten: formData.ho_ten.trim(),
+        email: formData.email.trim(),
         loai_phong: formData.loai_phong,
-        tang_mong_muon: formData.tang_mong_muon,
-        muc_gia_mong_muon: formData.muc_gia_mong_muon,
         nguyen_vong: wishText,
-        nguyen_vong_label: wishText,
+        nguyen_vong_label: wishLabel,
         nguyen_vong_phong: formData.nguyen_vong_phong,
         xac_nhan: true,
       };
@@ -191,7 +271,7 @@ export default function RoomRegistrationPage({
       // Chuyển sang màn hình thành công mượt mà không chuyển đổi URL
       setIsSuccess(true);
     } catch (err) {
-      console.error('Failed to submit room registration:', err);
+      console.error("Failed to submit room registration:", err);
       // Vẫn hỗ trợ chuyển thành công dạng demo nếu có lỗi mạng
       setIsSuccess(true);
     } finally {
@@ -204,8 +284,8 @@ export default function RoomRegistrationPage({
     if (onNavigateHistory) {
       onNavigateHistory();
     } else {
-      window.history.pushState({}, '', '/student/history');
-      window.dispatchEvent(new PopStateEvent('popstate'));
+      window.history.pushState({}, "", "/student/history");
+      window.dispatchEvent(new PopStateEvent("popstate"));
     }
   };
 
@@ -214,8 +294,8 @@ export default function RoomRegistrationPage({
     if (onNavigateDashboard) {
       onNavigateDashboard();
     } else {
-      window.history.pushState({}, '', '/student/dashboard');
-      window.dispatchEvent(new PopStateEvent('popstate'));
+      window.history.pushState({}, "", "/student/dashboard");
+      window.dispatchEvent(new PopStateEvent("popstate"));
     }
   };
 
@@ -223,7 +303,7 @@ export default function RoomRegistrationPage({
     <StudentLayout
       activeTab="register"
       onSelectTab={onSelectTab}
-      userName={formData.ho_ten || 'Sinh viên'}
+      userName={formData.ho_ten || "Sinh viên"}
       userRole="Sinh viên"
     >
       {/* Khung nội dung chính nền trắng bo góc lớn */}
@@ -268,7 +348,12 @@ export default function RoomRegistrationPage({
                       value={formData.msv}
                       onChange={handleChange}
                       placeholder="Nhập mã sinh viên"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                      readOnly={Boolean(formData.msv)}
+                      className={`w-full px-4 py-2.5 border rounded-xl text-sm placeholder-slate-400 focus:outline-none transition ${
+                        formData.msv
+                          ? "bg-slate-100 text-slate-700 cursor-not-allowed border-slate-200"
+                          : "bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                      }`}
                       required
                     />
                   </div>
@@ -316,7 +401,12 @@ export default function RoomRegistrationPage({
                       value={formData.email}
                       onChange={handleChange}
                       placeholder="Email"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                      readOnly={Boolean(formData.email)}
+                      className={`w-full px-4 py-2.5 border rounded-xl text-sm placeholder-slate-400 focus:outline-none transition ${
+                        formData.email
+                          ? "bg-slate-100 text-slate-700 cursor-not-allowed border-slate-200"
+                          : "bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                      }`}
                     />
                   </div>
 
@@ -412,13 +502,27 @@ export default function RoomRegistrationPage({
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition cursor-pointer"
                     >
                       <option value="">-- Chọn đối tượng ưu tiên --</option>
-                      <option value="Không thuộc diện ưu tiên">Không thuộc diện ưu tiên</option>
-                      <option value="Con liệt sĩ / Con thương binh, bệnh binh">Con liệt sĩ / Con thương binh, bệnh binh</option>
-                      <option value="Sinh viên khuyết tật">Sinh viên khuyết tật</option>
-                      <option value="Hộ nghèo / Hộ cận nghèo">Hộ nghèo / Hộ cận nghèo</option>
-                      <option value="Dân tộc thiểu số vùng sâu vùng xa">Dân tộc thiểu số vùng sâu vùng xa</option>
-                      <option value="Mồ côi cả cha lẫn mẹ">Mồ côi cả cha lẫn mẹ</option>
-                      <option value="Hoàn cảnh khó khăn đột xuất">Hoàn cảnh khó khăn đột xuất</option>
+                      <option value="Không thuộc diện ưu tiên">
+                        Không thuộc diện ưu tiên
+                      </option>
+                      <option value="Con liệt sĩ / Con thương binh, bệnh binh">
+                        Con liệt sĩ / Con thương binh, bệnh binh
+                      </option>
+                      <option value="Sinh viên khuyết tật">
+                        Sinh viên khuyết tật
+                      </option>
+                      <option value="Hộ nghèo / Hộ cận nghèo">
+                        Hộ nghèo / Hộ cận nghèo
+                      </option>
+                      <option value="Dân tộc thiểu số vùng sâu vùng xa">
+                        Dân tộc thiểu số vùng sâu vùng xa
+                      </option>
+                      <option value="Mồ côi cả cha lẫn mẹ">
+                        Mồ côi cả cha lẫn mẹ
+                      </option>
+                      <option value="Hoàn cảnh khó khăn đột xuất">
+                        Hoàn cảnh khó khăn đột xuất
+                      </option>
                       <option value="Khác">Khác</option>
                     </select>
                   </div>
@@ -559,14 +663,23 @@ export default function RoomRegistrationPage({
                             Phòng đã chọn từ mục Tra cứu:
                           </span>
                           <span className="font-extrabold text-slate-800 text-sm">
-                            Phòng {formData.nguyen_vong_phong} {formData.ma_toa_mong_muon ? `- ${formData.ma_toa_mong_muon}` : ''}
+                            Phòng {formData.nguyen_vong_phong}{" "}
+                            {formData.ma_toa_mong_muon
+                              ? `- ${formData.ma_toa_mong_muon}`
+                              : ""}
                           </span>
                         </div>
                         <button
                           type="button"
                           onClick={() => {
-                            sessionStorage.removeItem('preferred_room_registration');
-                            setFormData((prev) => ({ ...prev, nguyen_vong_phong: '', ma_toa_mong_muon: '' }));
+                            sessionStorage.removeItem(
+                              "preferred_room_registration",
+                            );
+                            setFormData((prev) => ({
+                              ...prev,
+                              nguyen_vong_phong: "",
+                              ma_toa_mong_muon: "",
+                            }));
                           }}
                           className="text-xs text-rose-600 hover:text-rose-800 font-semibold cursor-pointer underline"
                           title="Bỏ chọn phòng này để chọn tự do"
@@ -589,7 +702,9 @@ export default function RoomRegistrationPage({
                           className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition appearance-none cursor-pointer pr-10 font-medium"
                         >
                           <option value="">-- Chọn loại phòng --</option>
-                          <option value="Phòng tiêu chuẩn">Phòng tiêu chuẩn</option>
+                          <option value="Phòng tiêu chuẩn">
+                            Phòng tiêu chuẩn
+                          </option>
                           <option value="Phòng dịch vụ">Phòng dịch vụ</option>
                         </select>
                         <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
@@ -598,68 +713,19 @@ export default function RoomRegistrationPage({
                       </div>
                     </div>
 
-                    {/* Mục 2: Tầng mong muốn */}
+                    {/* Chi tiết nguyện vọng */}
                     <div>
                       <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                        Tầng mong muốn
+                        Chi tiết nguyện vọng
                       </label>
-                      <div className="relative">
-                        <select
-                          name="tang_mong_muon"
-                          value={formData.tang_mong_muon}
-                          onChange={handleChange}
-                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition appearance-none cursor-pointer pr-10 font-medium"
-                        >
-                          <option value="">-- Chọn tầng mong muốn --</option>
-                          <option value="Tầng 1">Tầng 1</option>
-                          <option value="Tầng 2">Tầng 2</option>
-                          <option value="Tầng 3">Tầng 3</option>
-                          <option value="Tầng 4">Tầng 4</option>
-                          <option value="Tầng 5">Tầng 5</option>
-                        </select>
-                        <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
-                          <ChevronDown className="w-4 h-4" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Mục 3: Phòng theo ngân sách */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center justify-between">
-                        <span>Phòng theo ngân sách</span>
-                        {isLoadingPrices ? (
-                          <span className="text-[11px] text-blue-500 font-normal flex items-center gap-1">
-                            <Loader2 className="w-3 h-3 animate-spin" /> Đang tải...
-                          </span>
-                        ) : (
-                          <span className="text-[11px] text-slate-400 font-normal">
-                            Giá phòng / năm
-                          </span>
-                        )}
-                      </label>
-                      <div className="relative">
-                        <select
-                          name="muc_gia_mong_muon"
-                          value={formData.muc_gia_mong_muon}
-                          onChange={handleChange}
-                          disabled={isLoadingPrices}
-                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition appearance-none cursor-pointer pr-10 font-medium disabled:bg-slate-50 disabled:cursor-not-allowed"
-                        >
-                          <option value="">-- Chọn mức ngân sách (giá/năm) --</option>
-                          {priceOptions.map((item, idx) => (
-                            <option key={idx} value={item.label}>
-                              {item.label}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
-                          {isLoadingPrices ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4" />
-                          )}
-                        </div>
-                      </div>
+                      <textarea
+                        name="nguyen_vong"
+                        value={formData.nguyen_vong}
+                        onChange={handleChange}
+                        placeholder="Hãy nhập nội dung nguyện vọng của bạn..."
+                        rows={5}
+                        className="w-full resize-y rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
                     </div>
                   </div>
                 </div>
@@ -696,10 +762,11 @@ export default function RoomRegistrationPage({
                 <button
                   type="submit"
                   disabled={!confirmed || isSubmitting}
-                  className={`px-7 py-2.5 rounded-xl font-semibold text-sm text-white transition-all duration-150 flex items-center justify-center gap-2 shadow-sm ${confirmed && !isSubmitting
-                    ? 'bg-[#0080ff] hover:bg-[#006ee0] active:scale-98 cursor-pointer shadow-blue-500/20'
-                    : 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60'
-                    }`}
+                  className={`px-7 py-2.5 rounded-xl font-semibold text-sm text-white transition-all duration-150 flex items-center justify-center gap-2 shadow-sm ${
+                    confirmed && !isSubmitting
+                      ? "bg-[#0080ff] hover:bg-[#006ee0] active:scale-98 cursor-pointer shadow-blue-500/20"
+                      : "bg-slate-300 text-slate-500 cursor-not-allowed opacity-60"
+                  }`}
                 >
                   {isSubmitting ? (
                     <>
