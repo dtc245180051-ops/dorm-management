@@ -9,9 +9,11 @@ import {
   Building2,
   Bed,
   DoorOpen,
+  Sparkles,
 } from 'lucide-react';
 import AdminLayout from '../../layouts/Admin';
 import occupancyService from '../../services/occupancyService';
+import { matchRoomWithGemini } from '../../services/geminiService';
 
 export default function ProcessRegistrationPage({
   requestId = 'DK-001',
@@ -28,6 +30,8 @@ export default function ProcessRegistrationPage({
   const [selectedBuilding, setSelectedBuilding] = useState('A');
   const [selectedRoom, setSelectedRoom] = useState('A203');
   const [selectedBed, setSelectedBed] = useState('G04');
+  const [aiRecommendation, setAiRecommendation] = useState(null);
+  const [isMatching, setIsMatching] = useState(false);
 
   // Modal từ chối
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -99,6 +103,88 @@ export default function ProcessRegistrationPage({
 
     fetchData();
   }, [requestId]);
+
+  useEffect(() => {
+    if (!requestData || buildingTree.length === 0) return undefined;
+
+    let isCurrent = true;
+    const rooms = buildingTree.flatMap((building) =>
+      (building.rooms || [])
+        .filter((room) => (room.beds || []).length > 0)
+        .map((room) => {
+          const beds = room.beds || [];
+          const occupied = Number(room.thanh_vien_hien_tai || 0);
+          const roomGender = String(room.gioi_tinh || building.gioi_tinh || '');
+          const isCoed =
+            roomGender.toLowerCase().includes('nam') &&
+            roomGender.toLowerCase().includes('nữ');
+          return {
+            ...room,
+            ten_phong: `Phòng ${room.so_phong || room.ma_phong}`,
+            toa: building.ten_toa || `Tòa ${building.ma_toa}`,
+            gioi_tinh: isCoed ? requestData.gioi_tinh : roomGender,
+            thanh_vien_hien_tai: occupied,
+            suc_chua: Number(room.suc_chua || occupied + beds.length),
+            danh_sach_giuong: beds.map((bed) => ({
+              ...bed,
+              da_co_nguoi: false,
+            })),
+          };
+        }),
+    );
+
+    const applyRecommendation = async () => {
+      setIsMatching(true);
+      try {
+        const recommendation = await matchRoomWithGemini(requestData, rooms);
+        if (!isCurrent) return;
+        setAiRecommendation(recommendation);
+        if (!recommendation?.best_room_id) return;
+
+        const matchedBuilding =
+          buildingTree.find(
+            (building) =>
+              recommendation.toa === building.ten_toa ||
+              recommendation.toa?.includes(building.ma_toa),
+          );
+        if (!matchedBuilding) return;
+        const roomToken = String(recommendation.best_room_id || '').replace(
+          /^Phòng\s*/i,
+          '',
+        );
+        const matchedRoom = (matchedBuilding.rooms || []).find(
+          (room) =>
+            room.ma_phong === recommendation.best_room_id ||
+            room.so_phong === roomToken ||
+            room.ma_phong?.includes(roomToken),
+        );
+        const bedToken = String(recommendation.giuong || '').replace(
+          /^Giường\s*/i,
+          '',
+        );
+        const matchedBed = (matchedRoom?.beds || []).find(
+          (bed) =>
+            bed.ma_giuong === recommendation.giuong ||
+            bed.label === recommendation.giuong ||
+            bed.label?.endsWith(bedToken) ||
+            bed.ma_giuong?.endsWith(bedToken),
+        );
+
+        if (matchedBuilding) setSelectedBuilding(matchedBuilding.ma_toa);
+        if (matchedRoom) setSelectedRoom(matchedRoom.ma_phong);
+        if (matchedBed) setSelectedBed(matchedBed.ma_giuong);
+      } catch (err) {
+        console.error('Error matching room with Gemini:', err);
+      } finally {
+        if (isCurrent) setIsMatching(false);
+      }
+    };
+
+    applyRecommendation();
+    return () => {
+      isCurrent = false;
+    };
+  }, [requestData, buildingTree]);
 
   // Tự động kiểm tra và đồng bộ Phòng, Giường khi Tòa hoặc Phòng thay đổi
   useEffect(() => {
@@ -536,6 +622,20 @@ export default function ProcessRegistrationPage({
                   </div>
                 </div>
               </div>
+              {(isMatching || aiRecommendation) && (
+                <div className="mt-3 flex items-start gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3.5 py-3 text-sm text-violet-900">
+                  {isMatching ? (
+                    <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
+                  ) : (
+                    <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
+                  )}
+                  <span>
+                    {isMatching
+                      ? 'Gemini AI đang phân tích phương án xếp chỗ...'
+                      : `Gemini AI (Độ phù hợp: ${aiRecommendation.match_score}%): ${aiRecommendation.ai_reason}`}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* BỘ 2 NÚT HÀNH ĐỘNG DƯỚI CÙNG THEO CHUẨN FIGMA */}

@@ -99,33 +99,35 @@ Trả về kết quả ở định dạng JSON thuần túy (không kèm markdow
   }
 }
 
-/**
- * 2. HÀM TRẢ LỜI CHATBOT TƯ VẤN KTX
- */
+//** 2. HÀM TRẢ LỜI CHATBOT TƯ VẤN KTX */
 export async function askGeminiChatbot(userMessage, conversationHistory = []) {
-  if (!ai) {
+  if (!apiKey) {
     return "Hệ thống AI đang bảo trì hoặc chưa cấu hình API Key. Bạn vui lòng liên hệ Ban Quản lý KTX nhé!";
   }
 
   try {
-    const systemInstruction = `
-Bạn là Trợ lý AI Ký túc xá Đại học CNTT & TT (ICTU).
-Nhiệm vụ: Trả lời thân thiện, lịch sự, chính xác và súc tích bằng tiếng Việt cho sinh viên về:
-- Giờ giấc KTX: Mùa hè mở cổng 5h00, đóng 23h00; Mùa đông mở cổng 5h30, đóng 22h30.
-- Nội quy: Nghiêm cấm nấu ăn trong phòng, không cờ bạc, không gây gổ, không nuôi động vật, tiếp khách đúng giờ.
-- Thanh toán: Tiền phòng, điện, nước nộp qua mã VietQR trước ngày 15 hàng tháng.
-- Thủ tục đăng ký, chuyển phòng, trả phòng thực hiện trực tuyến trên website iDorm.
-    `;
+    const prompt = `
+Bạn là Trợ lý AI Ký túc xá Đại học Công nghệ Thông tin & Truyền thông (ICTU).
+Nhiệm vụ của bạn: Trả lời thân thiện, lịch sự, ngắn gọn và chính xác bằng tiếng Việt dựa trên quy định KTX ICTU:
+- Giờ KTX: Mùa hè mở cổng lúc 5h00, đóng cổng giới nghiêm lúc 23h00; Mùa đông mở lúc 5h30, đóng lúc 22h30.
+- Nội quy: Nghiêm cấm nấu ăn trong phòng, không cờ bạc, không gây mất trật tự, không nuôi động vật, tiếp khách đúng giờ.
+- Tiền phòng, điện nước: Thanh toán qua mã VietQR trước ngày 15 hàng tháng.
+- Mọi thủ tục đăng ký phòng, chuyển phòng đều thực hiện trực tuyến.
 
+Câu hỏi của sinh viên: "${userMessage}"
+Hãy trả lời sinh viên:
+`;
+
+    // Gọi generateContent trực tiếp với prompt tổng hợp
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: userMessage,
-      config: { systemInstruction },
+      model: "gemini-3.8-flash",
+      contents: prompt,
     });
 
     return response.text;
   } catch (error) {
-    console.error("Lỗi Chatbot Gemini:", error);
-    return "Xin lỗi bạn, đường truyền kết nối AI đang bận. Bạn vui lòng thử lại sau giây lát!";
+    console.error("Lỗi Chatbot Gemini chi tiết:", error);
+    // Trả về câu thông báo có kèm thông điệp lỗi để dễ debug nếu muốn
+    return `Đã xảy ra lỗi khi gọi AI: ${error.message || "Vui lòng kiểm tra tab Console (F12)"}`;
   }
 }

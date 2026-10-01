@@ -1464,6 +1464,7 @@ export const occupancyService = {
       {
         ma_toa: 'A1',
         ten_toa: 'Tòa A1',
+        gioi_tinh: 'Nam & Nữ',
         rooms: [
           {
             ma_phong: 'A1_P101',
@@ -1516,6 +1517,7 @@ export const occupancyService = {
       {
         ma_toa: 'A2',
         ten_toa: 'Tòa A2',
+        gioi_tinh: 'Nam & Nữ',
         rooms: [
           {
             ma_phong: 'A2_T1_P101',
@@ -1531,6 +1533,7 @@ export const occupancyService = {
       {
         ma_toa: 'B1',
         ten_toa: 'Tòa B1',
+        gioi_tinh: 'Nam & Nữ',
         rooms: [
           {
             ma_phong: 'B1_T1_P101',

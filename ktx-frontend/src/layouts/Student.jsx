@@ -16,6 +16,7 @@ import {
   Send,
   Menu,
 } from "lucide-react";
+import { askGeminiChatbot } from "../services/geminiService";
 
 const STUDENT_AVATAR_STORAGE_KEY = "ktx_student_avatar";
 
@@ -40,6 +41,7 @@ export default function StudentLayout({
     },
   ]);
   const [inputQuestion, setInputQuestion] = useState("");
+  const [isChatbotResponding, setIsChatbotResponding] = useState(false);
 
   useEffect(() => {
     const syncAvatar = (event) => {
@@ -57,32 +59,24 @@ export default function StudentLayout({
     };
   }, []);
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!inputQuestion.trim()) return;
+    if (!inputQuestion.trim() || isChatbotResponding) return;
 
     const userText = inputQuestion.trim();
+    const conversationHistory = chatMessages.map((message) => ({
+      role: message.sender === "user" ? "user" : "model",
+      text: message.text,
+    }));
     setChatMessages((prev) => [...prev, { sender: "user", text: userText }]);
     setInputQuestion("");
-
-    setTimeout(() => {
-      let reply =
-        "Cảm ơn bạn đã đặt câu hỏi. Đơn đăng ký ở sẽ được ban quản lý xét duyệt trong vòng 1-2 ngày làm việc!";
-      if (
-        userText.toLowerCase().includes("phòng") ||
-        userText.toLowerCase().includes("giường")
-      ) {
-        reply =
-          "Bạn có thể chọn các phòng trống tại mục Nguyện vọng và nêu rõ mong muốn ở cùng bạn bè hoặc tầng thấp/cao nhé.";
-      } else if (
-        userText.toLowerCase().includes("chi phí") ||
-        userText.toLowerCase().includes("tiền")
-      ) {
-        reply =
-          "Chi phí phòng tiêu chuẩn là 350.000đ - 650.000đ/tháng tùy theo loại phòng 4 hoặc 6 người.";
-      }
+    setIsChatbotResponding(true);
+    try {
+      const reply = await askGeminiChatbot(userText, conversationHistory);
       setChatMessages((prev) => [...prev, { sender: "bot", text: reply }]);
-    }, 600);
+    } finally {
+      setIsChatbotResponding(false);
+    }
   };
 
   const navItems = [
@@ -532,10 +526,12 @@ export default function StudentLayout({
                 value={inputQuestion}
                 onChange={(e) => setInputQuestion(e.target.value)}
                 placeholder="Hỏi AI về đăng ký phòng, thủ tục..."
+                disabled={isChatbotResponding}
                 className="flex-1 text-xs px-3 py-2 bg-slate-100 rounded-full border border-transparent focus:border-blue-400 focus:bg-white focus:outline-none"
               />
               <button
                 type="submit"
+                disabled={isChatbotResponding || !inputQuestion.trim()}
                 className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />

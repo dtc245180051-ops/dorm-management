@@ -134,6 +134,7 @@ def get_available_beds_hierarchical(db: Session = Depends(get_db)):
         b_data = {
             "ma_toa": b.ma_toa,
             "ten_toa": b.ten_toa,
+            "gioi_tinh": b.gioi_tinh,
             "rooms": [],
         }
         for floor in b.tangs:
@@ -161,6 +162,7 @@ def get_available_beds_hierarchical(db: Session = Depends(get_db)):
             {
                 "ma_toa": "A",
                 "ten_toa": "Tòa A",
+                "gioi_tinh": "Nam & Nữ",
                 "rooms": [
                     {
                         "ma_phong": "A203",
@@ -186,6 +188,7 @@ def get_available_beds_hierarchical(db: Session = Depends(get_db)):
             {
                 "ma_toa": "B",
                 "ten_toa": "Tòa B",
+                "gioi_tinh": "Nam & Nữ",
                 "rooms": [
                     {
                         "ma_phong": "B101",

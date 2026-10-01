@@ -20,7 +20,7 @@ const isIctuEmail = (email = "") =>
   /^[^\s@]+@ictu\.edu\.vn$/i.test(email.trim());
 
 const getStudentCode = (email, username) => {
-  if (isIctuEmail(email)) return extractStudentCodeFromEmail(email);
+  if (email?.includes("@")) return extractStudentCodeFromEmail(email);
   if (!username) return "";
   if (isIctuEmail(username)) return extractStudentCodeFromEmail(username);
   return username.includes("@") ? "" : username.trim().toUpperCase();
@@ -28,7 +28,7 @@ const getStudentCode = (email, username) => {
 
 const getStoredStudentAccount = () => {
   const storedEmail = localStorage.getItem("ktx_email") || "";
-  const email = isIctuEmail(storedEmail) ? storedEmail.trim() : "";
+  const email = storedEmail.trim();
   const username = localStorage.getItem("ktx_username") || "";
 
   return {
@@ -95,8 +95,9 @@ export default function RoomRegistrationPage({
 
       const userProfile = currentUser.nguoi_dung || currentUser.user || {};
       const accountEmail = userProfile.email || currentUser.email || "";
-      const email = isIctuEmail(accountEmail) ? accountEmail.trim() : "";
+      const email = accountEmail.trim();
       const studentCode =
+        extractStudentCodeFromEmail(email) ||
         currentUser.studentCode ||
         currentUser.student_code ||
         currentUser.msv ||
@@ -109,11 +110,7 @@ export default function RoomRegistrationPage({
         "";
 
       if (accountEmail) {
-        if (email) {
-          localStorage.setItem("ktx_email", email);
-        } else {
-          localStorage.removeItem("ktx_email");
-        }
+        localStorage.setItem("ktx_email", email);
       }
       if (fullName) localStorage.setItem("ktx_fullname", fullName);
 
@@ -348,7 +345,7 @@ export default function RoomRegistrationPage({
                       value={formData.msv}
                       onChange={handleChange}
                       placeholder="Nhập mã sinh viên"
-                      readOnly={Boolean(formData.msv)}
+                      readOnly
                       className={`w-full px-4 py-2.5 border rounded-xl text-sm placeholder-slate-400 focus:outline-none transition ${
                         formData.msv
                           ? "bg-slate-100 text-slate-700 cursor-not-allowed border-slate-200"
@@ -401,7 +398,7 @@ export default function RoomRegistrationPage({
                       value={formData.email}
                       onChange={handleChange}
                       placeholder="Email"
-                      readOnly={Boolean(formData.email)}
+                      readOnly
                       className={`w-full px-4 py-2.5 border rounded-xl text-sm placeholder-slate-400 focus:outline-none transition ${
                         formData.email
                           ? "bg-slate-100 text-slate-700 cursor-not-allowed border-slate-200"
@@ -439,7 +436,8 @@ export default function RoomRegistrationPage({
                       value={formData.ho_ten}
                       onChange={handleChange}
                       placeholder="Họ và tên"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                      readOnly
+                      className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:outline-none cursor-not-allowed"
                       required
                     />
                   </div>
