@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   User,
   Layers,
@@ -14,36 +14,36 @@ import {
   X,
   CheckCircle2,
   Lock,
-} from 'lucide-react';
-import StudentLayout from '../../layouts/Student';
-import occupancyService from '../../services/occupancyService';
+} from "lucide-react";
+import StudentLayout from "../../layouts/Student";
+import occupancyService from "../../services/occupancyService";
 
-const STUDENT_AVATAR_STORAGE_KEY = 'ktx_student_avatar';
+const STUDENT_AVATAR_STORAGE_KEY = "ktx_student_avatar";
 
 export default function StudentProfilePage({ onSelectTab }) {
   // 1. Dữ liệu hồ sơ sinh viên
   const [profile, setProfile] = useState({
-    ho_ten: 'Nguyễn Văn A',
-    vai_tro: 'Sinh viên',
-    msv: 'DTCxxxxxxxxx',
-    lop: 'CNTT K23A',
-    so_dien_thoai: '09xxxxxxxx',
-    email: 'DTCxxxxxxxxx@ictu.edu.vn',
-    ngay_sinh: '12/07/2007',
-    gioi_tinh: 'Nữ',
-    dan_toc: 'Kinh',
-    que_quan: 'Xã A - Tỉnh Bắc Ninh',
-    khoa: 'CNTT',
-    avatar_url: '/avatar.png',
+    ho_ten: "Nguyễn Văn A",
+    vai_tro: "Sinh viên",
+    msv: "DTCxxxxxxxxx",
+    lop: "CNTT K23A",
+    so_dien_thoai: "09xxxxxxxx",
+    email: "DTCxxxxxxxxx@ictu.edu.vn",
+    ngay_sinh: "12/07/2007",
+    gioi_tinh: "Nữ",
+    dan_toc: "Kinh",
+    que_quan: "Xã A - Tỉnh Bắc Ninh",
+    khoa: "CNTT",
+    avatar_url: "/avatar.png",
   });
 
   // 2. Dữ liệu phòng ở (đồng bộ với occupancyService)
   const [roomInfo, setRoomInfo] = useState({
-    toa: 'A2',
-    so_phong: '36',
-    tang: '3',
-    giuong: '4',
-    ngay_nhan_phong: '01/09/2024',
+    toa: "A2",
+    so_phong: "36",
+    tang: "3",
+    giuong: "4",
+    ngay_nhan_phong: "01/09/2024",
   });
 
   // 3. State modal chỉnh sửa & Toast
@@ -68,9 +68,9 @@ export default function StudentProfilePage({ onSelectTab }) {
       loadData();
     };
 
-    window.addEventListener('occupancy-updated', handleOccupancyUpdate);
+    window.addEventListener("occupancy-updated", handleOccupancyUpdate);
     return () => {
-      window.removeEventListener('occupancy-updated', handleOccupancyUpdate);
+      window.removeEventListener("occupancy-updated", handleOccupancyUpdate);
     };
   }, []);
 
@@ -83,14 +83,17 @@ export default function StudentProfilePage({ onSelectTab }) {
           const savedAvatar = localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY);
           const studentProfile = {
             ...student,
-            avatar_url: savedAvatar || student.avatar_url || '/avatar.png',
+            avatar_url: savedAvatar || student.avatar_url || "/avatar.png",
           };
           setProfile(studentProfile);
           setEditFormData(studentProfile);
           if (studentProfile.avatar_url) {
-            localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, studentProfile.avatar_url);
+            localStorage.setItem(
+              STUDENT_AVATAR_STORAGE_KEY,
+              studentProfile.avatar_url,
+            );
             window.dispatchEvent(
-              new CustomEvent('student-avatar-updated', {
+              new CustomEvent("student-avatar-updated", {
                 detail: { avatarUrl: studentProfile.avatar_url },
               }),
             );
@@ -102,24 +105,25 @@ export default function StudentProfilePage({ onSelectTab }) {
       if (occupancyService.getCurrentRoomInfo) {
         const currentRoom = await occupancyService.getCurrentRoomInfo();
         if (currentRoom) {
-          const rawToa = currentRoom.toa || 'A2';
-          const cleanToa = rawToa.replace('Tòa ', '').trim();
-          const rawPhong = currentRoom.so_phong || currentRoom.phong || '36';
-          const cleanPhong = rawPhong.replace(/^P/i, '').trim();
-          const rawGiuong = currentRoom.giuong || '4';
-          const cleanGiuong = rawGiuong.replace(/^G/i, '').replace(/^0+/, '').trim() || '4';
+          const rawToa = currentRoom.toa || "A2";
+          const cleanToa = rawToa.replace("Tòa ", "").trim();
+          const rawPhong = currentRoom.so_phong || currentRoom.phong || "36";
+          const cleanPhong = rawPhong.replace(/^P/i, "").trim();
+          const rawGiuong = currentRoom.giuong || "4";
+          const cleanGiuong =
+            rawGiuong.replace(/^G/i, "").replace(/^0+/, "").trim() || "4";
 
           setRoomInfo({
-            toa: cleanToa || 'A2',
-            so_phong: cleanPhong || '36',
-            tang: currentRoom.tang || '3',
-            giuong: cleanGiuong || '4',
-            ngay_nhan_phong: currentRoom.ngay_nhan_phong || '01/09/2024',
+            toa: cleanToa || "A2",
+            so_phong: cleanPhong || "36",
+            tang: currentRoom.tang || "3",
+            giuong: cleanGiuong || "4",
+            ngay_nhan_phong: currentRoom.ngay_nhan_phong || "01/09/2024",
           });
         }
       }
     } catch (err) {
-      console.error('Lỗi khi tải thông tin cá nhân / phòng ở:', err);
+      console.error("Lỗi khi tải thông tin cá nhân / phòng ở:", err);
     }
   };
 
@@ -137,7 +141,7 @@ export default function StudentProfilePage({ onSelectTab }) {
         setEditFormData((prev) => ({ ...prev, avatar_url: newAvatarUrl }));
         localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, newAvatarUrl);
         window.dispatchEvent(
-          new CustomEvent('student-avatar-updated', {
+          new CustomEvent("student-avatar-updated", {
             detail: { avatarUrl: newAvatarUrl },
           }),
         );
@@ -145,7 +149,7 @@ export default function StudentProfilePage({ onSelectTab }) {
         if (occupancyService.updateStudentProfile) {
           await occupancyService.updateStudentProfile(updated);
         }
-        showToast('Cập nhật ảnh đại diện thành công!');
+        showToast("Cập nhật ảnh đại diện thành công!");
       }
     };
     reader.readAsDataURL(file);
@@ -179,9 +183,12 @@ export default function StudentProfilePage({ onSelectTab }) {
 
       setProfile(updatedProfile);
       if (updatedProfile.avatar_url) {
-        localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, updatedProfile.avatar_url);
+        localStorage.setItem(
+          STUDENT_AVATAR_STORAGE_KEY,
+          updatedProfile.avatar_url,
+        );
         window.dispatchEvent(
-          new CustomEvent('student-avatar-updated', {
+          new CustomEvent("student-avatar-updated", {
             detail: { avatarUrl: updatedProfile.avatar_url },
           }),
         );
@@ -192,9 +199,9 @@ export default function StudentProfilePage({ onSelectTab }) {
       }
 
       setIsEditModalOpen(false);
-      showToast('Cập nhật thông tin cá nhân thành công!');
+      showToast("Cập nhật thông tin cá nhân thành công!");
     } catch (err) {
-      console.error('Lỗi lưu thông tin cá nhân:', err);
+      console.error("Lỗi lưu thông tin cá nhân:", err);
     }
   };
 
@@ -203,7 +210,7 @@ export default function StudentProfilePage({ onSelectTab }) {
       activeTab="profile"
       onSelectTab={onSelectTab}
       userName={profile.ho_ten}
-      userRole={profile.vai_tro || 'Sinh viên'}
+      userRole={profile.vai_tro || "Sinh viên"}
     >
       <div className="space-y-6 pb-12 animate-in fade-in duration-300">
         {/* ========================================================================= */}
@@ -224,11 +231,11 @@ export default function StudentProfilePage({ onSelectTab }) {
           <div className="relative shrink-0 select-none">
             <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full border-4 border-blue-100 overflow-hidden shadow-xs flex items-center justify-center bg-blue-50">
               <img
-                src={profile.avatar_url || '/avatar.png'}
+                src={profile.avatar_url || "/avatar.png"}
                 alt="Avatar Sinh viên"
                 className="w-full h-full object-cover"
                 onError={(e) => {
-                  e.currentTarget.src = '/avatar.png';
+                  e.currentTarget.src = "/avatar.png";
                 }}
               />
             </div>
@@ -258,7 +265,7 @@ export default function StudentProfilePage({ onSelectTab }) {
               </h2>
               {/* Badge bo tròn màu xanh dương nhạt */}
               <span className="bg-blue-100 text-blue-600 rounded-full px-3 py-0.5 text-xs font-semibold select-none">
-                {profile.vai_tro || 'Sinh viên'}
+                {profile.vai_tro || "Sinh viên"}
               </span>
             </div>
 
@@ -266,29 +273,37 @@ export default function StudentProfilePage({ onSelectTab }) {
               <div className="flex items-center justify-center md:justify-start gap-2.5">
                 <User className="w-4 h-4 text-slate-400 shrink-0" />
                 <span>
-                  Mã sinh viên:{' '}
-                  <strong className="text-slate-800 font-semibold">{profile.msv}</strong>
+                  Mã sinh viên:{" "}
+                  <strong className="text-slate-800 font-semibold">
+                    {profile.msv}
+                  </strong>
                 </span>
               </div>
               <div className="flex items-center justify-center md:justify-start gap-2.5">
                 <Layers className="w-4 h-4 text-slate-400 shrink-0" />
                 <span>
-                  Lớp:{' '}
-                  <strong className="text-slate-800 font-semibold">{profile.lop}</strong>
+                  Lớp:{" "}
+                  <strong className="text-slate-800 font-semibold">
+                    {profile.lop}
+                  </strong>
                 </span>
               </div>
               <div className="flex items-center justify-center md:justify-start gap-2.5">
                 <Phone className="w-4 h-4 text-slate-400 shrink-0" />
                 <span>
-                  Số điện thoại:{' '}
-                  <strong className="text-slate-800 font-semibold">{profile.so_dien_thoai}</strong>
+                  Số điện thoại:{" "}
+                  <strong className="text-slate-800 font-semibold">
+                    {profile.so_dien_thoai}
+                  </strong>
                 </span>
               </div>
               <div className="flex items-center justify-center md:justify-start gap-2.5">
                 <Mail className="w-4 h-4 text-slate-400 shrink-0" />
                 <span>
-                  Email:{' '}
-                  <strong className="text-slate-800 font-semibold">{profile.email}</strong>
+                  Email:{" "}
+                  <strong className="text-slate-800 font-semibold">
+                    {profile.email}
+                  </strong>
                 </span>
               </div>
             </div>
@@ -324,7 +339,9 @@ export default function StudentProfilePage({ onSelectTab }) {
                   <User className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>Họ tên</span>
                 </div>
-                <span className="font-semibold text-slate-800">{profile.ho_ten}</span>
+                <span className="font-semibold text-slate-800">
+                  {profile.ho_ten}
+                </span>
               </div>
 
               {/* Ngày sinh */}
@@ -333,7 +350,9 @@ export default function StudentProfilePage({ onSelectTab }) {
                   <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>Ngày sinh</span>
                 </div>
-                <span className="font-semibold text-slate-800">{profile.ngay_sinh}</span>
+                <span className="font-semibold text-slate-800">
+                  {profile.ngay_sinh}
+                </span>
               </div>
 
               {/* Giới tính */}
@@ -342,7 +361,9 @@ export default function StudentProfilePage({ onSelectTab }) {
                   <XCircle className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>Giới tính</span>
                 </div>
-                <span className="font-semibold text-slate-800">{profile.gioi_tinh}</span>
+                <span className="font-semibold text-slate-800">
+                  {profile.gioi_tinh}
+                </span>
               </div>
 
               {/* Dân tộc */}
@@ -351,7 +372,9 @@ export default function StudentProfilePage({ onSelectTab }) {
                   <Users className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>Dân tộc</span>
                 </div>
-                <span className="font-semibold text-slate-800">{profile.dan_toc}</span>
+                <span className="font-semibold text-slate-800">
+                  {profile.dan_toc}
+                </span>
               </div>
 
               {/* Quê quán */}
@@ -360,7 +383,9 @@ export default function StudentProfilePage({ onSelectTab }) {
                   <Home className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>Quê quán</span>
                 </div>
-                <span className="font-semibold text-slate-800">{profile.que_quan}</span>
+                <span className="font-semibold text-slate-800">
+                  {profile.que_quan}
+                </span>
               </div>
             </div>
 
@@ -372,7 +397,9 @@ export default function StudentProfilePage({ onSelectTab }) {
                   <GraduationCap className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>Khoa / Viện</span>
                 </div>
-                <span className="font-semibold text-slate-800">{profile.khoa}</span>
+                <span className="font-semibold text-slate-800">
+                  {profile.khoa}
+                </span>
               </div>
 
               {/* Lớp */}
@@ -381,7 +408,9 @@ export default function StudentProfilePage({ onSelectTab }) {
                   <Layers className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>Lớp</span>
                 </div>
-                <span className="font-semibold text-slate-800">{profile.lop}</span>
+                <span className="font-semibold text-slate-800">
+                  {profile.lop}
+                </span>
               </div>
 
               {/* Mã sinh viên */}
@@ -390,7 +419,9 @@ export default function StudentProfilePage({ onSelectTab }) {
                   <User className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>Mã sinh viên</span>
                 </div>
-                <span className="font-semibold text-slate-800">{profile.msv}</span>
+                <span className="font-semibold text-slate-800">
+                  {profile.msv}
+                </span>
               </div>
 
               {/* Số điện thoại */}
@@ -399,7 +430,9 @@ export default function StudentProfilePage({ onSelectTab }) {
                   <Phone className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>Số điện thoại</span>
                 </div>
-                <span className="font-semibold text-slate-800">{profile.so_dien_thoai}</span>
+                <span className="font-semibold text-slate-800">
+                  {profile.so_dien_thoai}
+                </span>
               </div>
 
               {/* Email */}
@@ -408,7 +441,9 @@ export default function StudentProfilePage({ onSelectTab }) {
                   <Mail className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>Email</span>
                 </div>
-                <span className="font-semibold text-slate-800">{profile.email}</span>
+                <span className="font-semibold text-slate-800">
+                  {profile.email}
+                </span>
               </div>
             </div>
           </div>
@@ -425,7 +460,9 @@ export default function StudentProfilePage({ onSelectTab }) {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 text-left">
             {/* Tòa KTX */}
             <div>
-              <span className="text-xs text-slate-400 block mb-1.5 font-medium">Tòa KTX</span>
+              <span className="text-xs text-slate-400 block mb-1.5 font-medium">
+                Tòa KTX
+              </span>
               <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
                 {roomInfo.toa}
               </span>
@@ -433,7 +470,9 @@ export default function StudentProfilePage({ onSelectTab }) {
 
             {/* Phòng */}
             <div>
-              <span className="text-xs text-slate-400 block mb-1.5 font-medium">Phòng</span>
+              <span className="text-xs text-slate-400 block mb-1.5 font-medium">
+                Phòng
+              </span>
               <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
                 {roomInfo.so_phong}
               </span>
@@ -441,7 +480,9 @@ export default function StudentProfilePage({ onSelectTab }) {
 
             {/* Tầng */}
             <div>
-              <span className="text-xs text-slate-400 block mb-1.5 font-medium">Tầng</span>
+              <span className="text-xs text-slate-400 block mb-1.5 font-medium">
+                Tầng
+              </span>
               <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
                 {roomInfo.tang}
               </span>
@@ -449,7 +490,9 @@ export default function StudentProfilePage({ onSelectTab }) {
 
             {/* Giường */}
             <div>
-              <span className="text-xs text-slate-400 block mb-1.5 font-medium">Giường</span>
+              <span className="text-xs text-slate-400 block mb-1.5 font-medium">
+                Giường
+              </span>
               <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
                 {roomInfo.giuong}
               </span>
@@ -457,7 +500,9 @@ export default function StudentProfilePage({ onSelectTab }) {
 
             {/* Ngày nhận phòng */}
             <div>
-              <span className="text-xs text-slate-400 block mb-1.5 font-medium">Ngày nhận phòng</span>
+              <span className="text-xs text-slate-400 block mb-1.5 font-medium">
+                Ngày nhận phòng
+              </span>
               <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
                 {roomInfo.ngay_nhan_phong}
               </span>
@@ -489,16 +534,19 @@ export default function StudentProfilePage({ onSelectTab }) {
               </button>
             </div>
 
-            <form onSubmit={handleSaveProfile} className="mt-5 space-y-4 text-xs sm:text-sm">
+            <form
+              onSubmit={handleSaveProfile}
+              className="mt-5 space-y-4 text-xs sm:text-sm"
+            >
               {/* Ảnh đại diện preview & chọn ảnh */}
               <div className="flex items-center gap-4 p-3 rounded-2xl bg-slate-50 border border-slate-100">
                 <div className="w-14 h-14 rounded-full border-2 border-blue-200 overflow-hidden bg-white shrink-0">
                   <img
-                    src={editFormData.avatar_url || '/avatar.png'}
+                    src={editFormData.avatar_url || "/avatar.png"}
                     alt="Preview"
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      e.currentTarget.src = '/avatar.png';
+                      e.currentTarget.src = "/avatar.png";
                     }}
                   />
                 </div>
@@ -540,7 +588,8 @@ export default function StudentProfilePage({ onSelectTab }) {
               <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
                 <div>
                   <span className="text-[11px] text-slate-400 block mb-0.5 flex items-center gap-1 font-medium">
-                    <Lock className="w-3 h-3 text-slate-400" /> Mã sinh viên (Cố định)
+                    <Lock className="w-3 h-3 text-slate-400" /> Mã sinh viên (Cố
+                    định)
                   </span>
                   <span className="font-semibold text-slate-700 text-xs sm:text-sm">
                     {profile.msv}
@@ -556,7 +605,8 @@ export default function StudentProfilePage({ onSelectTab }) {
                 </div>
                 <div>
                   <span className="text-[11px] text-slate-400 block mb-0.5 flex items-center gap-1 font-medium">
-                    <Lock className="w-3 h-3 text-slate-400" /> Khoa / Viện (Cố định)
+                    <Lock className="w-3 h-3 text-slate-400" /> Khoa / Viện (Cố
+                    định)
                   </span>
                   <span className="font-semibold text-slate-700 text-xs sm:text-sm">
                     {profile.khoa}
@@ -605,7 +655,8 @@ export default function StudentProfilePage({ onSelectTab }) {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Quê quán / Địa chỉ thường trú <span className="text-red-500">*</span>
+                  Quê quán / Địa chỉ thường trú{" "}
+                  <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
