@@ -19,6 +19,8 @@ export default function FeedbackPage({
   onNavigateDashboard,
   onNavigateRegister,
   onNavigateHistory,
+  onNavigateProfile,
+  onSelectTab,
   onLogout,
 }) {
   const studentMsv = localStorage.getItem('ktx_username') || 'DTC245180051';
@@ -137,19 +139,29 @@ export default function FeedbackPage({
   return (
     <StudentLayout
       activeTab="feedback"
-      onSelectTab={(tabId) => {
+      onSelectTab={onSelectTab || ((tabId) => {
         if (tabId === 'dashboard' && onNavigateDashboard) onNavigateDashboard();
         else if (tabId === 'register' && onNavigateRegister) onNavigateRegister();
         else if (tabId === 'history' && onNavigateHistory) onNavigateHistory();
+        else if (tabId === 'profile' && onNavigateProfile) onNavigateProfile();
         else if (tabId === 'feedback') {
           // đang ở trang này
         } else {
-          if (tabId === 'register') window.history.pushState({}, '', '/student/register');
-          else if (tabId === 'history') window.history.pushState({}, '', '/student/history');
-          else if (tabId === 'dashboard') window.history.pushState({}, '', '/student/dashboard');
-          window.dispatchEvent(new PopStateEvent('popstate'));
+          const pathMap = {
+            dashboard: '/student/dashboard',
+            register: '/student/register',
+            transfer: '/student/transfer-room',
+            history: '/student/history',
+            feedback: '/student/feedback',
+            profile: '/student/profile',
+          };
+          if (pathMap[tabId]) {
+            window.history.pushState({}, '', pathMap[tabId]);
+            window.dispatchEvent(new PopStateEvent('popstate'));
+            window.dispatchEvent(new CustomEvent('student-navigate', { detail: { path: pathMap[tabId] } }));
+          }
         }
-      }}
+      })}
       userName={studentName}
       userRole="Sinh viên"
       onLogout={onLogout}
