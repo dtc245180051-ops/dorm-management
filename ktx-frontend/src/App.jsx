@@ -1,28 +1,29 @@
-import React, { useState, useEffect, useCallback } from "react";
-import Login from "./pages/Login";
-import LandingPage from "./pages/public/LandingPage";
-import AdminLayout from "./layouts/Admin";
-import StudentLayout from "./layouts/Student";
-import AccountantLayout from "./layouts/Accountant";
-import RoomManagement from "./pages/admin/RoomManagement";
-import StudentManagement from "./pages/admin/StudentManagement";
-import IncidentManagement from "./pages/admin/IncidentManagement";
-import ProcessRegistrationPage from "./pages/admin/ProcessRegistrationPage";
-import ProcessTransferPage from "./pages/admin/ProcessTransferPage";
-import ProcessCheckoutPage from "./pages/admin/ProcessCheckoutPage";
-import RoomRegistrationPage from "./pages/student/RoomRegistrationPage";
-import RoomTransferPage from "./pages/student/RoomTransferPage";
-import RequestHistoryPage from "./pages/student/RequestHistoryPage";
-import FeedbackPage from "./pages/student/FeedbackPage";
-import StudentDashboard from "./pages/student/StudentDashboard";
+import React, { useState, useEffect, useCallback } from 'react';
+import Login from './pages/Login';
+import LandingPage from './pages/public/LandingPage';
+import AdminLayout from './layouts/Admin';
+import StudentLayout from './layouts/Student';
+import AccountantLayout from './layouts/Accountant';
+import RoomManagement from './pages/admin/RoomManagement';
+import StudentManagement from './pages/admin/StudentManagement';
+import IncidentManagement from './pages/admin/IncidentManagement';
+import ViolationManagement from './pages/admin/ViolationManagement';
+import ProcessRegistrationPage from './pages/admin/ProcessRegistrationPage';
+import ProcessTransferPage from './pages/admin/ProcessTransferPage';
+import ProcessCheckoutPage from './pages/admin/ProcessCheckoutPage';
+import RoomRegistrationPage from './pages/student/RoomRegistrationPage';
+import RoomTransferPage from './pages/student/RoomTransferPage';
+import RequestHistoryPage from './pages/student/RequestHistoryPage';
+import FeedbackPage from './pages/student/FeedbackPage';
+import StudentDashboard from './pages/student/StudentDashboard';
+import TransactionReconciliation from './pages/accountant/TransactionReconciliation';
+import PeriodicBilling from './pages/accountant/PeriodicBilling';
+import DebtLedger from './pages/accountant/DebtLedger';
+import occupancyService from './services/occupancyService';
 import StudentProfilePage from "./pages/student/StudentProfilePage";
 import RoomSearchPage from "./pages/student/RoomSearchPage";
 import PaymentPage from "./pages/student/PaymentPage";
 import PaymentHistoryPage from "./pages/student/PaymentHistoryPage";
-import TransactionReconciliation from "./pages/accountant/TransactionReconciliation";
-import PeriodicBilling from "./pages/accountant/PeriodicBilling";
-import DebtLedger from "./pages/accountant/DebtLedger";
-import occupancyService from "./services/occupancyService";
 import {
   Clock,
   ArrowRight,
@@ -101,6 +102,12 @@ export default function App() {
       window.removeEventListener("student-navigate", handleCustomNavigate);
     };
   }, []);
+
+  useEffect(() => {
+    if (currentPath === '/admin/violations' || currentPath === '/violations') {
+      setAdminActiveTab('violations');
+    }
+  }, [currentPath]);
 
   useEffect(() => {
     loadRequests();
@@ -879,17 +886,21 @@ export default function App() {
           <IncidentManagement searchTerm={adminSearchTerm} />
         )}
 
-        {adminActiveTab !== "dashboard" &&
-          adminActiveTab !== "rooms" &&
-          adminActiveTab !== "students" &&
-          adminActiveTab !== "incidents" && (
+        {adminActiveTab === 'violations' && (
+          <ViolationManagement searchTerm={adminSearchTerm} />
+        )}
+
+        {adminActiveTab !== 'dashboard' &&
+          adminActiveTab !== 'rooms' &&
+          adminActiveTab !== 'students' &&
+          adminActiveTab !== 'incidents' &&
+          adminActiveTab !== 'violations' && (
             <div className="p-8 text-center text-slate-400 mt-20">
               <h2 className="text-xl font-bold text-slate-600 mb-2">
                 Trang đang được xây dựng
               </h2>
               <p className="text-sm">
-                Vui lòng chọn tab "Dashboard", "Hồ sơ sinh viên", "Quản lý phòng
-                ở" hoặc "Báo hỏng & sự cố".
+                Vui lòng chọn tab trên thanh menu bên trái.
               </p>
             </div>
           )}

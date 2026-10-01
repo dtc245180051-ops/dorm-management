@@ -40,7 +40,7 @@ def register(
                 phone = raw_val
 
     # Tự động gán username nếu người dùng không truyền trực tiếp
-    username = user_in.username
+    username = user_in.username.strip()[:50] if user_in.username else None
     if not username:
         if email:
             username = email.split("@")[0][:50]
@@ -65,7 +65,7 @@ def register(
     # 2. Kiểm tra tên đăng nhập đã tồn tại chưa
     existing_username = (
         db.query(TaiKhoan)
-        .filter(TaiKhoan.ten_dang_nhap == username)
+        .filter(TaiKhoan.ten_dang_nhap.ilike(username))
         .first()
     )
     if existing_username:
@@ -131,18 +131,27 @@ def register(
     db.flush()
 
     # 8. Tự động liên kết vào bảng sinh_vien nếu là vai trò SinhVien
-    if new_account.vai_tro == VaiTro.SINH_VIEN and username.upper().startswith("DTC"):
+    if new_account.vai_tro == VaiTro.SINH_VIEN:
         from app.models.user import SinhVien
-        msv_val = username.upper()
+        msv_val = None
+        if username.upper().startswith("DTC"):
+            msv_val = username.upper()
+        elif email and email.split("@")[0].upper().startswith("DTC"):
+            msv_val = email.split("@")[0].upper()
+        else:
+            msv_val = username.upper()[:20]
+
         existing_sv = db.query(SinhVien).filter(SinhVien.msv == msv_val).first()
         if not existing_sv:
             sv = SinhVien(
                 msv=msv_val,
                 ma_nguoi_dung=new_user.ma_nguoi_dung,
                 lop="DTC-KTX",
-                gioi_tinh=user_in.gender or "Nữ",
+                gioi_tinh=user_in.gender or "Nam",
             )
             db.add(sv)
+        elif not existing_sv.ma_nguoi_dung:
+            existing_sv.ma_nguoi_dung = new_user.ma_nguoi_dung
 
     db.commit()
     db.refresh(new_account)
@@ -200,11 +209,14 @@ def login(
         data={"sub": account.ten_dang_nhap, "role": role_value}
     )
 
+    full_name_val = account.nguoi_dung.ho_ten if account.nguoi_dung else None
+
     return Token(
         access_token=access_token,
         token_type="bearer",
         role=role_value,
         username=account.ten_dang_nhap,
+        full_name=full_name_val,
     )
 
 

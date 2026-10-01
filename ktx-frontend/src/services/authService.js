@@ -31,9 +31,12 @@ export const authService = {
 
       // Lưu trữ token và thông tin phiên đăng nhập
       if (data.access_token) {
-        localStorage.setItem("ktx_token", data.access_token);
-        localStorage.setItem("ktx_user_role", data.role);
-        localStorage.setItem("ktx_username", data.username);
+        localStorage.setItem('ktx_token', data.access_token);
+        localStorage.setItem('ktx_user_role', data.role);
+        localStorage.setItem('ktx_username', data.username);
+        if (data.full_name) {
+          localStorage.setItem('ktx_fullname', data.full_name);
+        }
         const email = identifier.trim();
         if (/^[^\s@]+@ictu\.edu\.vn$/i.test(email)) {
           localStorage.setItem("ktx_email", email);
@@ -56,21 +59,20 @@ export const authService = {
    * Đăng ký tài khoản Sinh viên mới
    * @param {Object} registerData
    */
-  async register({ fullName, gender, email, emailOrPhone, password }) {
+  async register({ fullName, username, email, emailOrPhone, password }) {
     try {
       const emailVal = (email || emailOrPhone || "").trim();
       const isEmail = emailVal.includes("@");
 
-      // Tạo username từ mã sinh viên (phần trước @ của email trường DTCxxxxxxxxx)
-      let username = isEmail ? emailVal.split("@")[0] : emailVal;
+      // Dùng username do người đăng ký chọn; giữ cách suy ra cũ cho các lời gọi không truyền username.
+      const finalUsername = username?.trim() || (isEmail ? emailVal.split("@")[0] : emailVal);
 
       const payload = {
-        username: username,
+        username: finalUsername,
         password: password,
         role: "SinhVien",
         full_name: fullName.trim(),
         email: emailVal,
-        gender: gender || "Nữ",
       };
 
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
