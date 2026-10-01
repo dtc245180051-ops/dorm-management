@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import './StudentDashboard.css';
-import campusBanner from '../../assets/image.png';
-import occupancyService from '../../services/occupancyService';
+import { useState, useEffect } from "react";
+import "./StudentDashboard.css";
+import campusBanner from "../../assets/image.png";
+import occupancyService from "../../services/occupancyService";
 
 /**
  * ============================================================================
@@ -10,16 +10,16 @@ import occupancyService from '../../services/occupancyService';
  */
 const MOCK_STUDENT_DATA = {
   room: {
-    roomNumber: 'P36',
-    building: 'Tòa A2',
-    floor: 'Tầng 3',
+    roomNumber: "P36",
+    building: "Tòa A2",
+    floor: "Tầng 3",
     currentMembers: 6,
     maxCapacity: 8,
   },
   billing: {
-    amount: '1.940.000đ',
-    period: '/năm',
-    status: 'Đã thanh toán',
+    amount: "1.940.000đ",
+    period: "/năm",
+    status: "Đã thanh toán",
   },
   complaints: {
     total: 0,
@@ -27,52 +27,52 @@ const MOCK_STUDENT_DATA = {
     resolved: 0,
   },
   notifications: [
-    { id: 1, title: 'Thông báo đăng ký ở (2026-2027)', date: '01/08/2026' },
-    { id: 2, title: 'Danh sách phòng trống', date: '25/08/2026' },
-    { id: 3, title: 'Kiểm tra phòng định kỳ', date: '15/09/2026' },
+    { id: 1, title: "Thông báo đăng ký ở (2026-2027)", date: "01/08/2026" },
+    { id: 2, title: "Danh sách phòng trống", date: "25/08/2026" },
+    { id: 3, title: "Kiểm tra phòng định kỳ", date: "15/09/2026" },
   ],
   services: [
     {
-      id: 'reg-room',
-      title: 'Đăng ký phòng',
-      desc: 'Đăng ký ở KTX theo kỳ hoặc theo nhu cầu.',
-      cardClass: 'card-blue', // Ô 1: Xanh dương
-      iconType: 'calendar',
+      id: "reg-room",
+      title: "Đăng ký phòng",
+      desc: "Đăng ký ở KTX theo kỳ hoặc theo nhu cầu.",
+      cardClass: "card-blue", // Ô 1: Xanh dương
+      iconType: "calendar",
     },
     {
-      id: 'move-room',
-      title: 'Chuyển / trả phòng',
-      desc: 'Thực hiện chuyển phòng hoặc trả phòng khi cần thiết.',
-      cardClass: 'card-green', // Ô 2: Xanh lá cây
-      iconType: 'exchange',
+      id: "move-room",
+      title: "Chuyển / trả phòng",
+      desc: "Thực hiện chuyển phòng hoặc trả phòng khi cần thiết.",
+      cardClass: "card-green", // Ô 2: Xanh lá cây
+      iconType: "exchange",
     },
     {
-      id: 'search-room',
-      title: 'Tra cứu phòng trống',
-      desc: 'Xem danh sách phòng trống hiện có tại các khu',
-      cardClass: 'card-purple', // Ô 3: Tím hồng
-      iconType: 'search',
+      id: "search-room",
+      title: "Tra cứu phòng trống",
+      desc: "Xem danh sách phòng trống hiện có tại các khu",
+      cardClass: "card-purple", // Ô 3: Tím hồng
+      iconType: "search",
     },
     {
-      id: 'history-room',
-      title: 'Lịch sử phòng',
-      desc: 'Xem lịch sử phòng ở và quá trình lưu trú của bạn.',
-      cardClass: 'card-orange', // Ô 4: Nâu cam
-      iconType: 'clock',
+      id: "history-room",
+      title: "Lịch sử phòng",
+      desc: "Xem lịch sử phòng ở và quá trình lưu trú của bạn.",
+      cardClass: "card-orange", // Ô 4: Nâu cam
+      iconType: "clock",
     },
     {
-      id: 'payment',
-      title: 'Thanh toán phí KTX',
-      desc: 'Tra cứu và thanh toán các khoản phí ký túc xá',
-      cardClass: 'card-teal', // Ô 5: Xanh ngọc mint
-      iconType: 'card',
+      id: "payment",
+      title: "Thanh toán phí KTX",
+      desc: "Tra cứu và thanh toán các khoản phí ký túc xá",
+      cardClass: "card-teal", // Ô 5: Xanh ngọc mint
+      iconType: "card",
     },
     {
-      id: 'feedback',
-      title: 'Gửi phản ánh',
-      desc: 'Gửi yêu cầu hỗ trợ, phản ánh các vấn đề trong KTX',
-      cardClass: 'card-slate', // Ô 6: Xám xanh
-      iconType: 'message',
+      id: "feedback",
+      title: "Gửi phản ánh",
+      desc: "Gửi yêu cầu hỗ trợ, phản ánh các vấn đề trong KTX",
+      cardClass: "card-slate", // Ô 6: Xám xanh
+      iconType: "message",
     },
   ],
 };
@@ -80,12 +80,12 @@ const MOCK_STUDENT_DATA = {
 export default function StudentDashboard({ user, onNavigate }) {
   const [activeModal, setActiveModal] = useState(null);
   const [currentRoomInfo, setCurrentRoomInfo] = useState({
-    phong_hien_tai: 'P36 – Tòa A2 – Tầng 3',
-    thanh_vien: '6/8 người',
-    thoi_gian_luu_tru: '09/2025 – Nay',
-    so_phong: 'P36',
-    toa: 'Tòa A2',
-    tang: 'Tầng 3',
+    phong_hien_tai: "P36 – Tòa A2 – Tầng 3",
+    thanh_vien: "6/8 người",
+    thoi_gian_luu_tru: "09/2025 – Nay",
+    so_phong: "P36",
+    toa: "Tòa A2",
+    tang: "Tầng 3",
     so_thanh_vien: 6,
     suc_chua: 8,
   });
@@ -97,7 +97,7 @@ export default function StudentDashboard({ user, onNavigate }) {
         setCurrentRoomInfo((prev) => ({ ...prev, ...info }));
       }
     } catch (e) {
-      console.error('Error loading room info in StudentDashboard:', e);
+      console.error("Error loading room info in StudentDashboard:", e);
     }
   };
 
@@ -106,9 +106,9 @@ export default function StudentDashboard({ user, onNavigate }) {
     const handleUpdate = () => {
       loadRoomInfo();
     };
-    window.addEventListener('occupancy-updated', handleUpdate);
+    window.addEventListener("occupancy-updated", handleUpdate);
     return () => {
-      window.removeEventListener('occupancy-updated', handleUpdate);
+      window.removeEventListener("occupancy-updated", handleUpdate);
     };
   }, []);
 
@@ -116,35 +116,35 @@ export default function StudentDashboard({ user, onNavigate }) {
   const displayName =
     user?.ho_ten ||
     user?.nguoi_dung?.ho_ten ||
-    localStorage.getItem('ktx_fullname') ||
+    localStorage.getItem("ktx_fullname") ||
     user?.username ||
-    localStorage.getItem('ktx_username') ||
-    'Nguyễn Văn A';
+    localStorage.getItem("ktx_username") ||
+    "Nguyễn Văn A";
 
   const handleCardClick = (service) => {
     if (onNavigate) {
-      if (service.id === 'reg-room') {
-        onNavigate('/student/register');
+      if (service.id === "reg-room") {
+        onNavigate("/student/register");
         return;
       }
-      if (service.id === 'move-room') {
-        onNavigate('/student/transfer-room');
+      if (service.id === "move-room") {
+        onNavigate("/student/transfer-room");
         return;
       }
-      if (service.id === 'history-room') {
-        onNavigate('/student/history');
+      if (service.id === "history-room") {
+        onNavigate("/student/history");
         return;
       }
-      if (service.id === 'search-room' || service.id === 'lookup') {
-        onNavigate('/student/lookup');
+      if (service.id === "search-room" || service.id === "lookup") {
+        onNavigate("/student/lookup");
         return;
       }
-      if (service.id === 'feedback') {
-        onNavigate('/student/feedback');
+      if (service.id === "feedback") {
+        onNavigate("/student/feedback");
         return;
       }
-      if (service.id === 'profile' || service.id === 'thong-tin-ca-nhan') {
-        onNavigate('/student/profile');
+      if (service.id === "profile" || service.id === "thong-tin-ca-nhan") {
+        onNavigate("/student/profile");
         return;
       }
     }
@@ -156,11 +156,11 @@ export default function StudentDashboard({ user, onNavigate }) {
   };
 
   const handleOpenChatbot = (topic) => {
-    setActiveModal({
-      title: 'Chatbot Trợ lý ảo KTX',
-      desc: topic ? `Chủ đề tư vấn: ${topic}` : 'Hỏi đáp nội quy và dịch vụ KTX 24/7',
-      detail: 'Hệ thống Chatbot RAG đang sẵn sàng hỗ trợ giải đáp thắc mắc nội quy, bảng giá dịch vụ và thủ tục đăng ký phòng.',
-    });
+    window.dispatchEvent(
+      new CustomEvent("student-open-chatbot", {
+        detail: { topic: topic === "Tư vấn tự do" ? "" : topic },
+      }),
+    );
   };
 
   const closeModal = () => setActiveModal(null);
@@ -177,9 +177,18 @@ export default function StudentDashboard({ user, onNavigate }) {
         <div className="student-banner-content">
           <h1 className="student-banner-title">Xin chào, {displayName}</h1>
           <p className="student-banner-subtitle">
-            Chào mừng bạn trở lại. Đây là trang quản lý ký túc xá dành riêng cho sinh viên.
+            Chào mừng bạn trở lại. Đây là trang quản lý ký túc xá dành riêng cho
+            sinh viên.
           </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginTop: '10px' }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              flexWrap: "wrap",
+              marginTop: "10px",
+            }}
+          >
             <div className="student-banner-quote" style={{ marginTop: 0 }}>
               Học tập tốt - Sống khỏe - Tuổi trẻ rực rỡ
             </div>
@@ -194,7 +203,7 @@ export default function StudentDashboard({ user, onNavigate }) {
           className="student-stat-card"
           onClick={() =>
             setActiveModal({
-              title: 'Thông tin phòng hiện tại',
+              title: "Thông tin phòng hiện tại",
               desc: `Phòng ${MOCK_STUDENT_DATA.room.roomNumber} - ${MOCK_STUDENT_DATA.room.building}`,
               detail: `Vị trí: ${MOCK_STUDENT_DATA.room.floor}. Trạng thái giường đang lưu trú hiệu lực.`,
             })
@@ -202,16 +211,30 @@ export default function StudentDashboard({ user, onNavigate }) {
         >
           <div className="student-stat-left">
             <div className="student-stat-icon-box blue">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M3 9.5L12 3l9 6.5V20a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 20V9.5z" />
                 <polyline points="9 21 9 12 15 12 15 21" />
               </svg>
             </div>
             <div className="student-stat-info">
               <span className="student-stat-label">Phòng hiện tại</span>
-              <span className="student-stat-value">{currentRoomInfo.so_phong || 'P36'}</span>
+              <span className="student-stat-value">
+                {currentRoomInfo.so_phong || "P36"}
+              </span>
               <span className="student-stat-subtext">
-                {currentRoomInfo.toa || 'Tòa A2'} - {currentRoomInfo.tang ? `Tầng ${currentRoomInfo.tang}` : 'Tầng 3'}
+                {currentRoomInfo.toa || "Tòa A2"} -{" "}
+                {currentRoomInfo.tang
+                  ? `Tầng ${currentRoomInfo.tang}`
+                  : "Tầng 3"}
               </span>
             </div>
           </div>
@@ -223,15 +246,24 @@ export default function StudentDashboard({ user, onNavigate }) {
           className="student-stat-card"
           onClick={() =>
             setActiveModal({
-              title: 'Danh sách thành viên phòng',
-              desc: `Hiện có ${currentRoomInfo.thanh_vien || '6/8 người'} sinh viên`,
-              detail: 'Phòng đang còn chỗ trống cho đợt tiếp nhận kỳ mới.',
+              title: "Danh sách thành viên phòng",
+              desc: `Hiện có ${currentRoomInfo.thanh_vien || "6/8 người"} sinh viên`,
+              detail: "Phòng đang còn chỗ trống cho đợt tiếp nhận kỳ mới.",
             })
           }
         >
           <div className="student-stat-left">
             <div className="student-stat-icon-box cyan">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                 <circle cx="9" cy="7" r="4" />
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -241,7 +273,7 @@ export default function StudentDashboard({ user, onNavigate }) {
             <div className="student-stat-info">
               <span className="student-stat-label">Số thành viên</span>
               <span className="student-stat-value">
-                {currentRoomInfo.thanh_vien || '6/8 người'}
+                {currentRoomInfo.thanh_vien || "6/8 người"}
               </span>
               <span className="student-stat-subtext">Hiện tại / sức chứa</span>
             </div>
@@ -254,15 +286,25 @@ export default function StudentDashboard({ user, onNavigate }) {
           className="student-stat-card"
           onClick={() =>
             setActiveModal({
-              title: 'Tình trạng phí Ký túc xá',
+              title: "Tình trạng phí Ký túc xá",
               desc: `Số tiền: ${MOCK_STUDENT_DATA.billing.amount}`,
-              detail: 'Bạn đã hoàn tất nộp phí lưu trú năm học 2026 - 2027. Không có công nợ tồn đọng.',
+              detail:
+                "Bạn đã hoàn tất nộp phí lưu trú năm học 2026 - 2027. Không có công nợ tồn đọng.",
             })
           }
         >
           <div className="student-stat-left">
             <div className="student-stat-icon-box amber">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 7v10" />
                 <path d="M15 9.5a2.5 2.5 0 0 0-5 0c0 2.5 5 2 5 5a2.5 2.5 0 0 1-5 0" />
@@ -271,12 +313,20 @@ export default function StudentDashboard({ user, onNavigate }) {
             <div className="student-stat-info">
               <span className="student-stat-label">Phí KTX</span>
               <span className="student-stat-value">
-                {MOCK_STUDENT_DATA.billing.amount}{' '}
-                <span style={{ fontSize: '11px', fontWeight: 500, color: '#64748B' }}>
+                {MOCK_STUDENT_DATA.billing.amount}{" "}
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 500,
+                    color: "#64748B",
+                  }}
+                >
                   {MOCK_STUDENT_DATA.billing.period}
                 </span>
               </span>
-              <span className="student-stat-badge">{MOCK_STUDENT_DATA.billing.status}</span>
+              <span className="student-stat-badge">
+                {MOCK_STUDENT_DATA.billing.status}
+              </span>
             </div>
           </div>
           <span className="student-stat-arrow">›</span>
@@ -287,27 +337,40 @@ export default function StudentDashboard({ user, onNavigate }) {
           className="student-stat-card"
           onClick={() => {
             if (onNavigate) {
-              onNavigate('/student/feedback');
+              onNavigate("/student/feedback");
             } else {
               setActiveModal({
-                title: 'Phản ánh sự cố',
-                desc: 'Tình trạng khiếu nại & báo hỏng thiết bị',
-                detail: 'Hiện chưa có khiếu nại hay báo hỏng thiết bị nào đang chờ xử lý.',
+                title: "Phản ánh sự cố",
+                desc: "Tình trạng khiếu nại & báo hỏng thiết bị",
+                detail:
+                  "Hiện chưa có khiếu nại hay báo hỏng thiết bị nào đang chờ xử lý.",
               });
             }
           }}
         >
           <div className="student-stat-left">
             <div className="student-stat-icon-box green">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
             </div>
             <div className="student-stat-info">
               <span className="student-stat-label">Phản ánh</span>
-              <span className="student-stat-value">{MOCK_STUDENT_DATA.complaints.total}</span>
+              <span className="student-stat-value">
+                {MOCK_STUDENT_DATA.complaints.total}
+              </span>
               <span className="student-stat-subtext">
-                Đang xử lý: {MOCK_STUDENT_DATA.complaints.processing} | Đã xử lý: {MOCK_STUDENT_DATA.complaints.resolved}
+                Đang xử lý: {MOCK_STUDENT_DATA.complaints.processing} | Đã xử
+                lý: {MOCK_STUDENT_DATA.complaints.resolved}
               </span>
             </div>
           </div>
@@ -322,7 +385,16 @@ export default function StudentDashboard({ user, onNavigate }) {
           <div className="student-actions-header">
             <div className="student-actions-title">
               <div className="student-actions-title-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <rect x="3" y="3" width="7" height="7" rx="1.5" />
                   <rect x="14" y="3" width="7" height="7" rx="1.5" />
                   <rect x="14" y="14" width="7" height="7" rx="1.5" />
@@ -335,9 +407,10 @@ export default function StudentDashboard({ user, onNavigate }) {
               className="student-actions-subtitle"
               onClick={() =>
                 setActiveModal({
-                  title: 'Dịch vụ sinh viên KTX',
-                  desc: 'Hỗ trợ sinh viên nội trú',
-                  detail: 'Hệ thống cung cấp trọn gói các tiện ích: Đăng ký phòng, chuyển/trả phòng, tra cứu phòng trống và thanh toán trực tuyến.',
+                  title: "Dịch vụ sinh viên KTX",
+                  desc: "Hỗ trợ sinh viên nội trú",
+                  detail:
+                    "Hệ thống cung cấp trọn gói các tiện ích: Đăng ký phòng, chuyển/trả phòng, tra cứu phòng trống và thanh toán trực tuyến.",
                 })
               }
             >
@@ -357,8 +430,17 @@ export default function StudentDashboard({ user, onNavigate }) {
                   <div className="student-action-header-row">
                     <div className="student-action-icon-circle">
                       {/* Calendar Icon */}
-                      {service.iconType === 'calendar' && (
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      {service.iconType === "calendar" && (
+                        <svg
+                          width="22"
+                          height="22"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
                           <rect x="3" y="4" width="18" height="18" rx="2" />
                           <line x1="16" y1="2" x2="16" y2="6" />
                           <line x1="8" y1="2" x2="8" y2="6" />
@@ -366,36 +448,81 @@ export default function StudentDashboard({ user, onNavigate }) {
                         </svg>
                       )}
                       {/* Arrows Icon */}
-                      {service.iconType === 'exchange' && (
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      {service.iconType === "exchange" && (
+                        <svg
+                          width="22"
+                          height="22"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
                           <path d="M7 16V4m0 0L3 8m4-4l4 4" />
                           <path d="M17 8v12m0 0l4-4m-4 4l-4-4" />
                         </svg>
                       )}
                       {/* Search Icon */}
-                      {service.iconType === 'search' && (
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      {service.iconType === "search" && (
+                        <svg
+                          width="22"
+                          height="22"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
                           <circle cx="11" cy="11" r="7" />
                           <line x1="21" y1="21" x2="16" y2="16" />
                         </svg>
                       )}
                       {/* Clock Icon */}
-                      {service.iconType === 'clock' && (
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      {service.iconType === "clock" && (
+                        <svg
+                          width="22"
+                          height="22"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
                           <circle cx="12" cy="12" r="9" />
                           <polyline points="12 7 12 12 15 14" />
                         </svg>
                       )}
                       {/* Credit Card Icon */}
-                      {service.iconType === 'card' && (
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      {service.iconType === "card" && (
+                        <svg
+                          width="22"
+                          height="22"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
                           <rect x="2" y="5" width="20" height="14" rx="2" />
                           <line x1="2" y1="10" x2="22" y2="10" />
                         </svg>
                       )}
                       {/* Message Icon */}
-                      {service.iconType === 'message' && (
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      {service.iconType === "message" && (
+                        <svg
+                          width="22"
+                          height="22"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
                           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                         </svg>
                       )}
@@ -408,7 +535,16 @@ export default function StudentDashboard({ user, onNavigate }) {
 
                 {/* Nút mũi tên: width 36px, height 36px, border-radius 50%, bg #EBF3FE, icon #2563EB size 16px */}
                 <div className="student-action-arrow-btn">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <line x1="5" y1="12" x2="19" y2="12" />
                     <polyline points="12 5 19 12 12 19" />
                   </svg>
@@ -425,7 +561,16 @@ export default function StudentDashboard({ user, onNavigate }) {
             <div className="student-chatbot-header">
               <div className="student-chatbot-identity">
                 <div className="student-robot-avatar">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <rect x="4" y="8" width="16" height="12" rx="2" />
                     <line x1="12" y1="4" x2="12" y2="8" />
                     <circle cx="9" cy="13" r="1" fill="currentColor" />
@@ -435,11 +580,22 @@ export default function StudentDashboard({ user, onNavigate }) {
                 </div>
                 <div>
                   <h3 className="student-chatbot-title">Chatbot KTX</h3>
-                  <span className="student-chatbot-subtitle">Luôn sẵn sàng hỗ trợ bạn</span>
+                  <span className="student-chatbot-subtitle">
+                    Luôn sẵn sàng hỗ trợ bạn
+                  </span>
                 </div>
               </div>
               <div className="student-chatbot-bubble-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
               </div>
@@ -450,20 +606,20 @@ export default function StudentDashboard({ user, onNavigate }) {
               <div className="student-chatbot-chip-row">
                 <button
                   className="student-chatbot-chip"
-                  onClick={() => handleOpenChatbot('Hỏi về nội quy')}
+                  onClick={() => handleOpenChatbot("Hỏi về nội quy")}
                 >
                   Hỏi về nội quy
                 </button>
                 <button
                   className="student-chatbot-chip"
-                  onClick={() => handleOpenChatbot('Tra cứu phòng')}
+                  onClick={() => handleOpenChatbot("Tra cứu phòng")}
                 >
                   Tra cứu phòng
                 </button>
               </div>
               <button
                 className="student-chatbot-chip full-chip"
-                onClick={() => handleOpenChatbot('Hỏi về đăng ký phòng')}
+                onClick={() => handleOpenChatbot("Hỏi về đăng ký phòng")}
               >
                 Hỏi về đăng ký phòng
               </button>
@@ -472,9 +628,18 @@ export default function StudentDashboard({ user, onNavigate }) {
             {/* Nút "Mở chatbot →": background #1D68FE, màu chữ trắng, border-radius 12px, padding 12px */}
             <button
               className="student-chatbot-cta-btn"
-              onClick={() => handleOpenChatbot('Tư vấn tự do')}
+              onClick={() => handleOpenChatbot("Tư vấn tự do")}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <rect x="4" y="8" width="16" height="12" rx="2" />
                 <path d="M12 4v4" />
               </svg>
@@ -486,7 +651,16 @@ export default function StudentDashboard({ user, onNavigate }) {
           <div className="student-notif-card">
             <div className="student-notif-header">
               <div className="student-notif-header-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
@@ -503,7 +677,8 @@ export default function StudentDashboard({ user, onNavigate }) {
                     setActiveModal({
                       title: item.title,
                       desc: `Ngày đăng: ${item.date}`,
-                      detail: 'Chi tiết thông báo từ Ban quản lý Ký túc xá về kế hoạch công tác và thời hạn đăng ký.',
+                      detail:
+                        "Chi tiết thông báo từ Ban quản lý Ký túc xá về kế hoạch công tác và thời hạn đăng ký.",
                     })
                   }
                 >
@@ -522,7 +697,10 @@ export default function StudentDashboard({ user, onNavigate }) {
       {/* ================= MODAL XEM CHI TIẾT TÍNH NĂNG ================= */}
       {activeModal && (
         <div className="student-modal-backdrop" onClick={closeModal}>
-          <div className="student-modal-card" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="student-modal-card"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="student-modal-header">
               <h4 className="student-modal-title">{activeModal.title}</h4>
               <button className="student-modal-close-btn" onClick={closeModal}>
@@ -530,13 +708,16 @@ export default function StudentDashboard({ user, onNavigate }) {
               </button>
             </div>
             <div className="student-modal-body">
-              <p style={{ fontWeight: 600, color: '#1D68FE', marginBottom: 6 }}>
+              <p style={{ fontWeight: 600, color: "#1D68FE", marginBottom: 6 }}>
                 {activeModal.desc}
               </p>
               <p>{activeModal.detail}</p>
             </div>
             <div className="student-modal-footer">
-              <button className="student-modal-primary-btn" onClick={closeModal}>
+              <button
+                className="student-modal-primary-btn"
+                onClick={closeModal}
+              >
                 Đã hiểu
               </button>
             </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from "react";
 import {
   ArrowLeftRight,
   Calendar,
@@ -8,67 +8,67 @@ import {
   AlertCircle,
   Clock,
   Check,
-} from 'lucide-react';
-import StudentLayout from '../../layouts/Student';
-import occupancyService from '../../services/occupancyService';
-import { VIETNAM_PROVINCES } from '../../data/vietnamAddressData';
+} from "lucide-react";
+import StudentLayout from "../../layouts/Student";
+import occupancyService from "../../services/occupancyService";
+import { VIETNAM_PROVINCES } from "../../data/vietnamAddressData";
 
 export default function RoomTransferPage({ onSelectTab }) {
   // 1. Quản lý tab: 'transfer' (Chuyển phòng) hoặc 'checkout' (Trả phòng)
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get('tab') === 'checkout' ? 'checkout' : 'transfer';
+    return params.get("tab") === "checkout" ? "checkout" : "transfer";
   });
 
   useEffect(() => {
     const checkTabParam = () => {
       const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get('tab');
-      if (tabParam === 'checkout' || tabParam === 'transfer') {
+      const tabParam = params.get("tab");
+      if (tabParam === "checkout" || tabParam === "transfer") {
         setActiveTab(tabParam);
       }
     };
     checkTabParam();
-    window.addEventListener('popstate', checkTabParam);
-    return () => window.removeEventListener('popstate', checkTabParam);
+    window.addEventListener("popstate", checkTabParam);
+    return () => window.removeEventListener("popstate", checkTabParam);
   }, []);
 
   // 2. Thông tin phòng hiện tại (Banner trên cùng)
   const [currentRoomInfo, setCurrentRoomInfo] = useState({
-    phong_hien_tai: 'P36 – Tòa A2 – Tầng 3',
-    thanh_vien: '6/8 người',
-    thoi_gian_luu_tru: '09/2025 – Nay',
-    so_phong: 'P36',
+    phong_hien_tai: "P36 – Tòa A2 – Tầng 3",
+    thanh_vien: "6/8 người",
+    thoi_gian_luu_tru: "09/2025 – Nay",
+    so_phong: "P36",
   });
 
   // 3. Danh sách phòng khả dụng cho dropdown chọn phòng đích
   const [roomOptions, setRoomOptions] = useState([
-    { value: 'P36 - Tòa A3 - Tầng 3', label: 'P36 - Tòa A3 - Tầng 3' },
-    { value: 'P101 - Tòa A1 - Tầng 1', label: 'P101 - Tòa A1 - Tầng 1' },
-    { value: 'P102 - Tòa A1 - Tầng 1', label: 'P102 - Tòa A1 - Tầng 1' },
-    { value: 'P103 - Tòa A1 - Tầng 1', label: 'P103 - Tòa A1 - Tầng 1' },
-    { value: 'P201 - Tòa A1 - Tầng 2', label: 'P201 - Tòa A1 - Tầng 2' },
-    { value: 'P205 - Tòa A2 - Tầng 2', label: 'P205 - Tòa A2 - Tầng 2' },
+    { value: "P36 - Tòa A3 - Tầng 3", label: "P36 - Tòa A3 - Tầng 3" },
+    { value: "P101 - Tòa A1 - Tầng 1", label: "P101 - Tòa A1 - Tầng 1" },
+    { value: "P102 - Tòa A1 - Tầng 1", label: "P102 - Tòa A1 - Tầng 1" },
+    { value: "P103 - Tòa A1 - Tầng 1", label: "P103 - Tòa A1 - Tầng 1" },
+    { value: "P201 - Tòa A1 - Tầng 2", label: "P201 - Tòa A1 - Tầng 2" },
+    { value: "P205 - Tòa A2 - Tầng 2", label: "P205 - Tòa A2 - Tầng 2" },
   ]);
 
   // 4. Form state Chuyển phòng (Mặc định TRỐNG HOÀN TOÀN mỗi lần ấn vào)
   const [transferForm, setTransferForm] = useState({
-    ly_do: '',
-    ngay_mong_muon: '',
-    phong_mong_muon: '',
-    mo_ta_chi_tiet: '',
+    ly_do: "",
+    ngay_mong_muon: "",
+    phong_mong_muon: "",
+    mo_ta_chi_tiet: "",
   });
 
   // 5. Form state Trả phòng & địa chỉ chia thành các ô nhỏ (Mặc định TRỐNG HOÀN TOÀN mỗi lần ấn vào)
-  const [checkoutProvince, setCheckoutProvince] = useState('');
-  const [checkoutDistrict, setCheckoutDistrict] = useState('');
-  const [checkoutStreet, setCheckoutStreet] = useState('');
+  const [checkoutProvince, setCheckoutProvince] = useState("");
+  const [checkoutDistrict, setCheckoutDistrict] = useState("");
+  const [checkoutStreet, setCheckoutStreet] = useState("");
 
   const [checkoutForm, setCheckoutForm] = useState({
-    ly_do: '',
-    ngay_mong_muon: '',
-    dia_chi_lien_he: '',
-    mo_ta_chi_tiet: '',
+    ly_do: "",
+    ngay_mong_muon: "",
+    dia_chi_lien_he: "",
+    mo_ta_chi_tiet: "",
   });
 
   // 6. Trạng thái gửi form & phản hồi người dùng
@@ -92,12 +92,12 @@ export default function RoomTransferPage({ onSelectTab }) {
   // Cập nhật lại quận/huyện khi đổi tỉnh/thành
   useEffect(() => {
     if (!checkoutProvince) {
-      setCheckoutDistrict('');
+      setCheckoutDistrict("");
     } else if (
       availableCheckoutDistricts.length > 0 &&
       !availableCheckoutDistricts.includes(checkoutDistrict)
     ) {
-      setCheckoutDistrict('');
+      setCheckoutDistrict("");
     }
   }, [checkoutProvince, availableCheckoutDistricts]);
 
@@ -107,13 +107,12 @@ export default function RoomTransferPage({ onSelectTab }) {
     if (checkoutStreet.trim()) parts.push(checkoutStreet.trim());
     if (checkoutDistrict) parts.push(checkoutDistrict);
     if (checkoutProvince) parts.push(checkoutProvince);
-    const fullAddress = parts.join(', ');
+    const fullAddress = parts.join(", ");
     setCheckoutForm((prev) => ({
       ...prev,
       dia_chi_lien_he: fullAddress,
     }));
   }, [checkoutProvince, checkoutDistrict, checkoutStreet]);
-
 
   // Tải dữ liệu ban đầu và lắng nghe cập nhật realtime
   useEffect(() => {
@@ -122,9 +121,9 @@ export default function RoomTransferPage({ onSelectTab }) {
     const handleOccupancyUpdate = () => {
       loadData();
     };
-    window.addEventListener('occupancy-updated', handleOccupancyUpdate);
+    window.addEventListener("occupancy-updated", handleOccupancyUpdate);
     return () => {
-      window.removeEventListener('occupancy-updated', handleOccupancyUpdate);
+      window.removeEventListener("occupancy-updated", handleOccupancyUpdate);
     };
   }, []);
 
@@ -147,51 +146,57 @@ export default function RoomTransferPage({ onSelectTab }) {
         // Mockup chuẩn theo Figma
         setHistoryList([
           {
-            id: 'YC-0231',
-            ma_yeu_cau: '#YC-0231',
-            loai_yeu_cau: 'Chuyển phòng',
-            ngay_gui: '25/11/2025',
-            phong_lien_quan: 'P12 → P36',
-            trang_thai: 'DA_DUYET',
-            trang_thai_label: 'Đã duyệt',
+            id: "YC-0231",
+            ma_yeu_cau: "#YC-0231",
+            loai_yeu_cau: "Chuyển phòng",
+            ngay_gui: "25/11/2025",
+            phong_lien_quan: "P12 → P36",
+            trang_thai: "DA_DUYET",
+            trang_thai_label: "Đã duyệt",
           },
           {
-            id: 'YC-0232',
-            ma_yeu_cau: '#YC-0232',
-            loai_yeu_cau: 'Trả phòng',
-            ngay_gui: '25/08/2026',
-            phong_lien_quan: 'P36',
-            trang_thai: 'CHO_DUYET',
-            trang_thai_label: 'Chờ duyệt',
+            id: "YC-0232",
+            ma_yeu_cau: "#YC-0232",
+            loai_yeu_cau: "Trả phòng",
+            ngay_gui: "25/08/2026",
+            phong_lien_quan: "P36",
+            trang_thai: "CHO_DUYET",
+            trang_thai_label: "Chờ duyệt",
           },
         ]);
       }
 
-      if (availableOpts && Array.isArray(availableOpts) && availableOpts.length > 0) {
+      if (
+        availableOpts &&
+        Array.isArray(availableOpts) &&
+        availableOpts.length > 0
+      ) {
         const mapped = availableOpts.map((opt) => ({
-          value: opt.label || `P${opt.so_phong} - ${opt.ten_toa || 'Tòa KTX'}`,
-          label: opt.label || `P${opt.so_phong} - ${opt.ten_toa || 'Tòa KTX'}`,
+          value: opt.label || `P${opt.so_phong} - ${opt.ten_toa || "Tòa KTX"}`,
+          label: opt.label || `P${opt.so_phong} - ${opt.ten_toa || "Tòa KTX"}`,
         }));
         // Đảm bảo P36 - Tòa A3 - Tầng 3 luôn ở vị trí đầu tiên chuẩn Figma
-        const filtered = mapped.filter((m) => !m.value.includes('A3_P36') && m.value !== 'P36 - Tòa A3 - Tầng 3');
+        const filtered = mapped.filter(
+          (m) =>
+            !m.value.includes("A3_P36") && m.value !== "P36 - Tòa A3 - Tầng 3",
+        );
         setRoomOptions([
-          { value: 'P36 - Tòa A3 - Tầng 3', label: 'P36 - Tòa A3 - Tầng 3' },
+          { value: "P36 - Tòa A3 - Tầng 3", label: "P36 - Tòa A3 - Tầng 3" },
           ...filtered,
         ]);
       }
     } catch (err) {
-      console.error('Error loading transfer page data:', err);
+      console.error("Error loading transfer page data:", err);
     } finally {
       setIsLoadingHistory(false);
     }
   };
 
-
   // Format ngày dd/mm/yyyy hiển thị
   const formatInputDateToDisplay = (dateStr) => {
-    if (!dateStr) return '';
-    if (dateStr.includes('/')) return dateStr;
-    const [year, month, day] = dateStr.split('-');
+    if (!dateStr) return "";
+    if (dateStr.includes("/")) return dateStr;
+    const [year, month, day] = dateStr.split("-");
     if (year && month && day) {
       return `${day}/${month}/${year}`;
     }
@@ -215,24 +220,24 @@ export default function RoomTransferPage({ onSelectTab }) {
     e.preventDefault();
     if (!transferForm.ly_do) {
       setFeedbackMessage({
-        type: 'error',
-        text: 'Vui lòng chọn lý do chuyển phòng.',
+        type: "error",
+        text: "Vui lòng chọn lý do chuyển phòng.",
       });
       return;
     }
 
     if (!transferForm.ngay_mong_muon) {
       setFeedbackMessage({
-        type: 'error',
-        text: 'Vui lòng chọn ngày mong muốn chuyển phòng.',
+        type: "error",
+        text: "Vui lòng chọn ngày mong muốn chuyển phòng.",
       });
       return;
     }
 
     if (!transferForm.phong_mong_muon) {
       setFeedbackMessage({
-        type: 'error',
-        text: 'Vui lòng chọn phòng mong muốn chuyển tới.',
+        type: "error",
+        text: "Vui lòng chọn phòng mong muốn chuyển tới.",
       });
       return;
     }
@@ -242,24 +247,24 @@ export default function RoomTransferPage({ onSelectTab }) {
 
     try {
       const payload = {
-        phong_hien_tai: currentRoomInfo.so_phong || 'P36',
+        phong_hien_tai: currentRoomInfo.so_phong || "P36",
         ly_do: transferForm.ly_do,
         ngay_mong_muon: formatInputDateToDisplay(transferForm.ngay_mong_muon),
         phong_mong_muon: transferForm.phong_mong_muon,
         mo_ta_chi_tiet: transferForm.mo_ta_chi_tiet,
-        msv: 'B21DCCN001',
-        ho_ten: 'Nguyễn Văn A',
+        msv: "B21DCCN001",
+        ho_ten: "Nguyễn Văn A",
       };
 
       const res = await occupancyService.submitTransferRequest(payload);
       const newReq = res.data || {
         id: `YC-${Date.now().toString().slice(-4)}`,
         ma_yeu_cau: `#YC-${Date.now().toString().slice(-4)}`,
-        loai_yeu_cau: 'Chuyển phòng',
-        ngay_gui: new Date().toLocaleDateString('vi-VN'),
-        phong_lien_quan: `${currentRoomInfo.so_phong || 'P36'} → ${transferForm.phong_mong_muon.split(' - ')[0]}`,
-        trang_thai: 'CHO_DUYET',
-        trang_thai_label: 'Chờ duyệt',
+        loai_yeu_cau: "Chuyển phòng",
+        ngay_gui: new Date().toLocaleDateString("vi-VN"),
+        phong_lien_quan: `${currentRoomInfo.so_phong || "P36"} → ${transferForm.phong_mong_muon.split(" - ")[0]}`,
+        trang_thai: "CHO_DUYET",
+        trang_thai_label: "Chờ duyệt",
       };
 
       // Đưa ngay lên đầu danh sách lịch sử
@@ -267,21 +272,21 @@ export default function RoomTransferPage({ onSelectTab }) {
 
       // Reset form về dạng trống hoàn toàn
       setTransferForm({
-        ly_do: '',
-        ngay_mong_muon: '',
-        phong_mong_muon: '',
-        mo_ta_chi_tiet: '',
+        ly_do: "",
+        ngay_mong_muon: "",
+        phong_mong_muon: "",
+        mo_ta_chi_tiet: "",
       });
 
       setFeedbackMessage({
-        type: 'success',
+        type: "success",
         text: `Gửi yêu cầu chuyển phòng thành công! Mã yêu cầu: ${newReq.ma_yeu_cau || newReq.id}. Ban quản lý sẽ xử lý trong 3–5 ngày làm việc.`,
       });
     } catch (err) {
-      console.error('Submit transfer request failed:', err);
+      console.error("Submit transfer request failed:", err);
       setFeedbackMessage({
-        type: 'error',
-        text: 'Có lỗi xảy ra khi gửi yêu cầu chuyển phòng. Vui lòng thử lại!',
+        type: "error",
+        text: "Có lỗi xảy ra khi gửi yêu cầu chuyển phòng. Vui lòng thử lại!",
       });
     } finally {
       setIsSubmitting(false);
@@ -293,24 +298,24 @@ export default function RoomTransferPage({ onSelectTab }) {
     e.preventDefault();
     if (!checkoutForm.ly_do) {
       setFeedbackMessage({
-        type: 'error',
-        text: 'Vui lòng chọn lý do trả phòng.',
+        type: "error",
+        text: "Vui lòng chọn lý do trả phòng.",
       });
       return;
     }
 
     if (!checkoutForm.ngay_mong_muon) {
       setFeedbackMessage({
-        type: 'error',
-        text: 'Vui lòng chọn ngày mong muốn chuyển / rời KTX.',
+        type: "error",
+        text: "Vui lòng chọn ngày mong muốn chuyển / rời KTX.",
       });
       return;
     }
 
     if (!checkoutForm.dia_chi_lien_he.trim()) {
       setFeedbackMessage({
-        type: 'error',
-        text: 'Vui lòng nhập địa chỉ liên hệ sau khi trả phòng.',
+        type: "error",
+        text: "Vui lòng nhập địa chỉ liên hệ sau khi trả phòng.",
       });
       return;
     }
@@ -320,49 +325,49 @@ export default function RoomTransferPage({ onSelectTab }) {
 
     try {
       const payload = {
-        phong_hien_tai: currentRoomInfo.so_phong || 'P36',
+        phong_hien_tai: currentRoomInfo.so_phong || "P36",
         ly_do: checkoutForm.ly_do,
         ngay_mong_muon: formatInputDateToDisplay(checkoutForm.ngay_mong_muon),
         dia_chi_lien_he: checkoutForm.dia_chi_lien_he,
         mo_ta_chi_tiet: checkoutForm.mo_ta_chi_tiet,
-        msv: 'B21DCCN001',
-        ho_ten: 'Nguyễn Văn A',
+        msv: "B21DCCN001",
+        ho_ten: "Nguyễn Văn A",
       };
 
       const res = await occupancyService.submitCheckoutRequest(payload);
       const newReq = res.data || {
         id: `YC-${Date.now().toString().slice(-4)}`,
         ma_yeu_cau: `#YC-${Date.now().toString().slice(-4)}`,
-        loai_yeu_cau: 'Trả phòng',
-        ngay_gui: new Date().toLocaleDateString('vi-VN'),
-        phong_lien_quan: currentRoomInfo.so_phong || 'P36',
-        trang_thai: 'CHO_DUYET',
-        trang_thai_label: 'Chờ duyệt',
+        loai_yeu_cau: "Trả phòng",
+        ngay_gui: new Date().toLocaleDateString("vi-VN"),
+        phong_lien_quan: currentRoomInfo.so_phong || "P36",
+        trang_thai: "CHO_DUYET",
+        trang_thai_label: "Chờ duyệt",
       };
 
       // Đưa ngay lên đầu danh sách lịch sử
       setHistoryList((prev) => [newReq, ...prev]);
 
       // Reset form về dạng trống hoàn toàn
-      setCheckoutProvince('');
-      setCheckoutDistrict('');
-      setCheckoutStreet('');
+      setCheckoutProvince("");
+      setCheckoutDistrict("");
+      setCheckoutStreet("");
       setCheckoutForm({
-        ly_do: '',
-        ngay_mong_muon: '',
-        dia_chi_lien_he: '',
-        mo_ta_chi_tiet: '',
+        ly_do: "",
+        ngay_mong_muon: "",
+        dia_chi_lien_he: "",
+        mo_ta_chi_tiet: "",
       });
 
       setFeedbackMessage({
-        type: 'success',
+        type: "success",
         text: `Gửi yêu cầu trả phòng thành công! Mã yêu cầu: ${newReq.ma_yeu_cau || newReq.id}. Ban quản lý sẽ liên hệ kiểm tra tài sản trước ngày rời KTX.`,
       });
     } catch (err) {
-      console.error('Submit checkout request failed:', err);
+      console.error("Submit checkout request failed:", err);
       setFeedbackMessage({
-        type: 'error',
-        text: 'Có lỗi xảy ra khi gửi yêu cầu trả phòng. Vui lòng thử lại!',
+        type: "error",
+        text: "Có lỗi xảy ra khi gửi yêu cầu trả phòng. Vui lòng thử lại!",
       });
     } finally {
       setIsSubmitting(false);
@@ -373,7 +378,6 @@ export default function RoomTransferPage({ onSelectTab }) {
     <StudentLayout
       activeTab="transfer"
       onSelectTab={onSelectTab}
-      userName="Nguyễn Văn A"
       userRole="Sinh viên"
     >
       <div className="flex flex-col gap-6 max-w-full">
@@ -433,19 +437,19 @@ export default function RoomTransferPage({ onSelectTab }) {
             <button
               type="button"
               onClick={() => {
-                setActiveTab('transfer');
+                setActiveTab("transfer");
                 setFeedbackMessage(null);
                 setTransferForm({
-                  ly_do: '',
-                  ngay_mong_muon: '',
-                  phong_mong_muon: '',
-                  mo_ta_chi_tiet: '',
+                  ly_do: "",
+                  ngay_mong_muon: "",
+                  phong_mong_muon: "",
+                  mo_ta_chi_tiet: "",
                 });
               }}
               className={`px-5 py-2 rounded-xl text-sm transition-all duration-150 cursor-pointer ${
-                activeTab === 'transfer'
-                  ? 'bg-white text-blue-600 font-bold shadow-xs'
-                  : 'text-slate-600 font-medium hover:text-slate-900'
+                activeTab === "transfer"
+                  ? "bg-white text-blue-600 font-bold shadow-xs"
+                  : "text-slate-600 font-medium hover:text-slate-900"
               }`}
             >
               Chuyển phòng
@@ -453,22 +457,22 @@ export default function RoomTransferPage({ onSelectTab }) {
             <button
               type="button"
               onClick={() => {
-                setActiveTab('checkout');
+                setActiveTab("checkout");
                 setFeedbackMessage(null);
-                setCheckoutProvince('');
-                setCheckoutDistrict('');
-                setCheckoutStreet('');
+                setCheckoutProvince("");
+                setCheckoutDistrict("");
+                setCheckoutStreet("");
                 setCheckoutForm({
-                  ly_do: '',
-                  ngay_mong_muon: '',
-                  dia_chi_lien_he: '',
-                  mo_ta_chi_tiet: '',
+                  ly_do: "",
+                  ngay_mong_muon: "",
+                  dia_chi_lien_he: "",
+                  mo_ta_chi_tiet: "",
                 });
               }}
               className={`px-5 py-2 rounded-xl text-sm transition-all duration-150 cursor-pointer ${
-                activeTab === 'checkout'
-                  ? 'bg-white text-blue-600 font-bold shadow-xs'
-                  : 'text-slate-600 font-medium hover:text-slate-900'
+                activeTab === "checkout"
+                  ? "bg-white text-blue-600 font-bold shadow-xs"
+                  : "text-slate-600 font-medium hover:text-slate-900"
               }`}
             >
               Trả phòng
@@ -479,12 +483,12 @@ export default function RoomTransferPage({ onSelectTab }) {
           {feedbackMessage && (
             <div
               className={`mb-6 p-4 rounded-2xl flex items-start gap-3 text-sm animate-in fade-in duration-200 ${
-                feedbackMessage.type === 'success'
-                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                  : 'bg-rose-50 border border-rose-200 text-rose-800'
+                feedbackMessage.type === "success"
+                  ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                  : "bg-rose-50 border border-rose-200 text-rose-800"
               }`}
             >
-              {feedbackMessage.type === 'success' ? (
+              {feedbackMessage.type === "success" ? (
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
               ) : (
                 <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
@@ -499,7 +503,7 @@ export default function RoomTransferPage({ onSelectTab }) {
             {/* CỘT FORM CHÍNH (2/3)                                                */}
             {/* =================================================================== */}
             <div className="lg:col-span-2">
-              {activeTab === 'transfer' ? (
+              {activeTab === "transfer" ? (
                 /* --------------------------------------------------------------- */
                 /* TAB CHUYỂN PHÒNG (ẢNH 1)                                        */
                 /* --------------------------------------------------------------- */
@@ -518,7 +522,9 @@ export default function RoomTransferPage({ onSelectTab }) {
                           onChange={handleTransferChange}
                           className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 appearance-none pr-10 cursor-pointer shadow-2xs"
                         >
-                          <option value="">-- Chọn lý do chuyển phòng --</option>
+                          <option value="">
+                            -- Chọn lý do chuyển phòng --
+                          </option>
                           <option value="Phòng hiện tại quá tải">
                             Phòng hiện tại quá tải
                           </option>
@@ -574,7 +580,9 @@ export default function RoomTransferPage({ onSelectTab }) {
                         onChange={handleTransferChange}
                         className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 appearance-none pr-10 cursor-pointer shadow-2xs"
                       >
-                        <option value="">-- Chọn phòng mong muốn chuyển tới --</option>
+                        <option value="">
+                          -- Chọn phòng mong muốn chuyển tới --
+                        </option>
                         {roomOptions.map((opt, idx) => (
                           <option key={idx} value={opt.value}>
                             {opt.label}
@@ -607,7 +615,9 @@ export default function RoomTransferPage({ onSelectTab }) {
                       disabled={isSubmitting}
                       className="bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold py-3 px-6 rounded-xl transition cursor-pointer shadow-sm shadow-blue-500/20 text-sm flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                      {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {isSubmitting && (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      )}
                       <span>Gửi yêu cầu chuyển phòng</span>
                     </button>
                   </div>
@@ -685,7 +695,9 @@ export default function RoomTransferPage({ onSelectTab }) {
                         <div className="relative">
                           <select
                             value={checkoutProvince}
-                            onChange={(e) => setCheckoutProvince(e.target.value)}
+                            onChange={(e) =>
+                              setCheckoutProvince(e.target.value)
+                            }
                             className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 appearance-none pr-9 cursor-pointer shadow-2xs"
                           >
                             <option value="">-- Chọn Tỉnh / TP --</option>
@@ -707,7 +719,9 @@ export default function RoomTransferPage({ onSelectTab }) {
                         <div className="relative">
                           <select
                             value={checkoutDistrict}
-                            onChange={(e) => setCheckoutDistrict(e.target.value)}
+                            onChange={(e) =>
+                              setCheckoutDistrict(e.target.value)
+                            }
                             disabled={!checkoutProvince}
                             className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 appearance-none pr-9 cursor-pointer shadow-2xs disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
                           >
@@ -760,7 +774,9 @@ export default function RoomTransferPage({ onSelectTab }) {
                       disabled={isSubmitting}
                       className="bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold py-3 px-6 rounded-xl transition cursor-pointer shadow-sm shadow-blue-500/20 text-sm flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                      {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {isSubmitting && (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      )}
                       <span>Gửi yêu cầu trả phòng</span>
                     </button>
                   </div>
@@ -784,7 +800,8 @@ export default function RoomTransferPage({ onSelectTab }) {
                       1
                     </div>
                     <p className="text-xs text-slate-700 leading-relaxed font-medium">
-                      Yêu cầu chuyển phòng được xử lý trong 3–5 ngày làm việc kể từ khi gửi.
+                      Yêu cầu chuyển phòng được xử lý trong 3–5 ngày làm việc kể
+                      từ khi gửi.
                     </p>
                   </div>
 
@@ -794,7 +811,8 @@ export default function RoomTransferPage({ onSelectTab }) {
                       2
                     </div>
                     <p className="text-xs text-slate-700 leading-relaxed font-medium">
-                      Yêu cầu trả phòng cần gửi trước tối thiểu 7 ngày so với ngày dự kiến rời phòng.
+                      Yêu cầu trả phòng cần gửi trước tối thiểu 7 ngày so với
+                      ngày dự kiến rời phòng.
                     </p>
                   </div>
 
@@ -804,7 +822,8 @@ export default function RoomTransferPage({ onSelectTab }) {
                       3
                     </div>
                     <p className="text-xs text-slate-700 leading-relaxed font-medium">
-                      Sinh viên cần hoàn tất mọi khoản phí KTX trước khi yêu cầu được duyệt.
+                      Sinh viên cần hoàn tất mọi khoản phí KTX trước khi yêu cầu
+                      được duyệt.
                     </p>
                   </div>
 
@@ -814,7 +833,8 @@ export default function RoomTransferPage({ onSelectTab }) {
                       4
                     </div>
                     <p className="text-xs text-slate-700 leading-relaxed font-medium">
-                      Kiểm tra tình trạng phòng và bàn giao tài sản khi trả phòng để tránh phát sinh phí.
+                      Kiểm tra tình trạng phòng và bàn giao tài sản khi trả
+                      phòng để tránh phát sinh phí.
                     </p>
                   </div>
                 </div>
@@ -840,22 +860,32 @@ export default function RoomTransferPage({ onSelectTab }) {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="text-xs font-medium text-slate-500 border-b border-slate-100 pb-3">
-                  <th className="py-3 px-4 font-semibold text-slate-600">Mã yêu cầu</th>
-                  <th className="py-3 px-4 font-semibold text-slate-600">Loại yêu cầu</th>
-                  <th className="py-3 px-4 font-semibold text-slate-600">Ngày gửi</th>
-                  <th className="py-3 px-4 font-semibold text-slate-600">Phòng liên quan</th>
-                  <th className="py-3 px-4 font-semibold text-slate-600">Trạng thái</th>
+                  <th className="py-3 px-4 font-semibold text-slate-600">
+                    Mã yêu cầu
+                  </th>
+                  <th className="py-3 px-4 font-semibold text-slate-600">
+                    Loại yêu cầu
+                  </th>
+                  <th className="py-3 px-4 font-semibold text-slate-600">
+                    Ngày gửi
+                  </th>
+                  <th className="py-3 px-4 font-semibold text-slate-600">
+                    Phòng liên quan
+                  </th>
+                  <th className="py-3 px-4 font-semibold text-slate-600">
+                    Trạng thái
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
                 {historyList.length > 0 ? (
                   historyList.map((item, idx) => {
                     const isApproved =
-                      item.trang_thai === 'DA_DUYET' ||
-                      item.trang_thai_label === 'Đã duyệt';
+                      item.trang_thai === "DA_DUYET" ||
+                      item.trang_thai_label === "Đã duyệt";
                     const isPending =
-                      item.trang_thai === 'CHO_DUYET' ||
-                      item.trang_thai_label === 'Chờ duyệt';
+                      item.trang_thai === "CHO_DUYET" ||
+                      item.trang_thai_label === "Chờ duyệt";
 
                     return (
                       <tr
@@ -897,7 +927,7 @@ export default function RoomTransferPage({ onSelectTab }) {
                           ) : (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-200/60 shadow-2xs">
                               <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                              {item.trang_thai_label || 'Từ chối'}
+                              {item.trang_thai_label || "Từ chối"}
                             </span>
                           )}
                         </td>

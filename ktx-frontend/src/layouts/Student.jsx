@@ -26,9 +26,14 @@ export default function StudentLayout({
   onSelectTab,
   searchTerm = "",
   onSearchChange,
-  userName = "Nguyễn Văn A",
+  userName,
   userRole = "Sinh viên",
 }) {
+  const displayUserName =
+    userName ||
+    localStorage.getItem("ktx_fullname") ||
+    localStorage.getItem("ktx_username") ||
+    "Sinh viên";
   const [showChatbotModal, setShowChatbotModal] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(
@@ -37,7 +42,7 @@ export default function StudentLayout({
   const [chatMessages, setChatMessages] = useState([
     {
       sender: "bot",
-      text: "Xin chào Nguyễn Văn A! Mình là Trợ lý AI KTX. Bạn cần hỗ trợ gì về đăng ký phòng, thủ tục hay nội quy KTX không?",
+      text: `Xin chào ${displayUserName}! Mình là Trợ lý AI KTX. Bạn cần hỗ trợ gì về đăng ký phòng, thủ tục hay nội quy KTX không?`,
     },
   ]);
   const [inputQuestion, setInputQuestion] = useState("");
@@ -57,6 +62,17 @@ export default function StudentLayout({
       window.removeEventListener("student-avatar-updated", syncAvatar);
       window.removeEventListener("storage", syncAvatar);
     };
+  }, []);
+
+  useEffect(() => {
+    const openChatbot = (event) => {
+      setInputQuestion(event.detail?.topic || "");
+      setShowChatbotModal(true);
+    };
+
+    window.addEventListener("student-open-chatbot", openChatbot);
+    return () =>
+      window.removeEventListener("student-open-chatbot", openChatbot);
   }, []);
 
   const handleSendMessage = async (e) => {
@@ -245,7 +261,7 @@ export default function StudentLayout({
             </div>
             <div className="hidden sm:flex flex-col text-left">
               <span className="text-sm font-bold text-slate-800 leading-tight">
-                {userName}
+                {displayUserName}
               </span>
               <span className="text-xs text-slate-500 font-medium">
                 {userRole}

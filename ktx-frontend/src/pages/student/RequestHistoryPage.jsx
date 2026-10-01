@@ -326,7 +326,6 @@ export default function RequestHistoryPage({ onSelectTab }) {
     <StudentLayout
       activeTab="history"
       onSelectTab={onSelectTab}
-      userName="Nguyễn Văn A"
       userRole="Sinh viên"
     >
       {/* Khung nền trắng bo góc lớn đồng bộ toàn hệ thống */}

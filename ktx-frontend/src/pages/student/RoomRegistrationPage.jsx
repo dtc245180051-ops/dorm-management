@@ -38,6 +38,14 @@ const getStoredStudentAccount = () => {
   };
 };
 
+const toDateInputValue = (value = "") => {
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+    const [day, month, year] = value.split("/");
+    return `${year}-${month}-${day}`;
+  }
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+};
+
 export default function RoomRegistrationPage({
   onNavigateHistory,
   onNavigateDashboard,
@@ -88,25 +96,37 @@ export default function RoomRegistrationPage({
     let isMounted = true;
 
     const loadCurrentUser = async () => {
-      if (!localStorage.getItem("ktx_token")) return;
+      let studentProfile = {};
+      try {
+        studentProfile = (await occupancyService.getStudentProfile?.()) || {};
+      } catch (error) {
+        console.warn("Không thể tải hồ sơ sinh viên:", error);
+      }
 
-      const currentUser = await authService.getCurrentUser();
-      if (!isMounted || !currentUser) return;
+      let currentUser = null;
+      if (localStorage.getItem("ktx_token")) {
+        try {
+          currentUser = await authService.getCurrentUser();
+        } catch (error) {
+          console.warn("Không thể tải tài khoản hiện tại:", error);
+        }
+      }
+      if (!isMounted) return;
 
-      const userProfile = currentUser.nguoi_dung || currentUser.user || {};
-      const accountEmail = userProfile.email || currentUser.email || "";
+      const userProfile = currentUser?.nguoi_dung || currentUser?.user || {};
+      const accountEmail = userProfile.email || currentUser?.email || "";
       const email = accountEmail.trim();
       const studentCode =
         extractStudentCodeFromEmail(email) ||
-        currentUser.studentCode ||
-        currentUser.student_code ||
-        currentUser.msv ||
-        getStudentCode(email, currentUser.ten_dang_nhap) ||
+        currentUser?.studentCode ||
+        currentUser?.student_code ||
+        currentUser?.msv ||
+        getStudentCode(email, currentUser?.ten_dang_nhap) ||
         "";
       const fullName =
         userProfile.ho_ten ||
-        currentUser.fullName ||
-        currentUser.full_name ||
+        currentUser?.fullName ||
+        currentUser?.full_name ||
         "";
 
       if (accountEmail) {
@@ -116,16 +136,22 @@ export default function RoomRegistrationPage({
 
       setFormData((prev) => ({
         ...prev,
-        msv: studentCode || prev.msv,
-        ho_ten: fullName || prev.ho_ten,
-        email: accountEmail ? email : prev.email,
+        msv: studentCode || studentProfile.msv || prev.msv,
+        ho_ten: fullName || studentProfile.ho_ten || prev.ho_ten,
+        email: email || studentProfile.email || prev.email,
         gioi_tinh:
-          userProfile.gioi_tinh || currentUser.gender || prev.gioi_tinh,
+          studentProfile.gioi_tinh || userProfile.gioi_tinh || currentUser?.gender || prev.gioi_tinh,
+        ngay_sinh: toDateInputValue(studentProfile.ngay_sinh) || prev.ngay_sinh,
+        cccd: studentProfile.cccd || studentProfile.so_cccd || prev.cccd,
         so_dien_thoai:
-          userProfile.so_dien_thoai || currentUser.phone || prev.so_dien_thoai,
-        khoa: userProfile.khoa || currentUser.department || prev.khoa,
-        lop: userProfile.lop || currentUser.className || prev.lop,
+          studentProfile.so_dien_thoai || userProfile.so_dien_thoai || currentUser?.phone || prev.so_dien_thoai,
+        khoa: studentProfile.khoa || userProfile.khoa || currentUser?.department || prev.khoa,
+        lop: studentProfile.lop || userProfile.lop || currentUser?.className || prev.lop,
+        doi_tuong_uu_tien: studentProfile.doi_tuong_uu_tien || prev.doi_tuong_uu_tien,
+        dia_chi: studentProfile.dia_chi || studentProfile.que_quan || prev.dia_chi,
       }));
+      const savedAddress = studentProfile.dia_chi || studentProfile.que_quan || "";
+      if (savedAddress) setDetailStreet((previous) => previous || savedAddress);
     };
 
     loadCurrentUser();

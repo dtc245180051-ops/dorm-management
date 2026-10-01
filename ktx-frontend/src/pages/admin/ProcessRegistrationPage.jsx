@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   ChevronLeft,
   ChevronDown,
@@ -10,13 +10,13 @@ import {
   Bed,
   DoorOpen,
   Sparkles,
-} from 'lucide-react';
-import AdminLayout from '../../layouts/Admin';
-import occupancyService from '../../services/occupancyService';
-import { matchRoomWithGemini } from '../../services/geminiService';
+} from "lucide-react";
+import AdminLayout from "../../layouts/Admin";
+import occupancyService from "../../services/occupancyService";
+import { matchRoomWithGemini } from "../../services/geminiService";
 
 export default function ProcessRegistrationPage({
-  requestId = 'DK-001',
+  requestId = "DK-001",
   onBack,
   onProcessed,
 }) {
@@ -27,24 +27,28 @@ export default function ProcessRegistrationPage({
 
   // Dữ liệu Tòa - Phòng - Giường trống phục vụ 3 dropdown
   const [buildingTree, setBuildingTree] = useState([]);
-  const [selectedBuilding, setSelectedBuilding] = useState('A');
-  const [selectedRoom, setSelectedRoom] = useState('A203');
-  const [selectedBed, setSelectedBed] = useState('G04');
+  const [selectedBuilding, setSelectedBuilding] = useState("A");
+  const [selectedRoom, setSelectedRoom] = useState("A203");
+  const [selectedBed, setSelectedBed] = useState("G04");
   const [aiRecommendation, setAiRecommendation] = useState(null);
   const [isMatching, setIsMatching] = useState(false);
 
   // Modal từ chối
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
-  const [rejectError, setRejectError] = useState('');
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectError, setRejectError] = useState("");
 
   // Toast thông báo
-  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const [toast, setToast] = useState({
+    show: false,
+    message: "",
+    type: "success",
+  });
 
-  const showToast = (message, type = 'success') => {
+  const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
     setTimeout(() => {
-      setToast({ show: false, message: '', type: 'success' });
+      setToast({ show: false, message: "", type: "success" });
     }, 3500);
   };
 
@@ -68,7 +72,12 @@ export default function ProcessRegistrationPage({
           // 1. Tìm tòa khớp với gợi ý hoặc lấy tòa đầu tiên
           const targetBuilding =
             tree.find((b) => b.ma_toa === detail?.goi_y?.ma_toa) ||
-            tree.find((b) => detail?.goi_y?.ma_toa && (b.ma_toa.startsWith(detail.goi_y.ma_toa) || detail.goi_y.ma_toa.startsWith(b.ma_toa))) ||
+            tree.find(
+              (b) =>
+                detail?.goi_y?.ma_toa &&
+                (b.ma_toa.startsWith(detail.goi_y.ma_toa) ||
+                  detail.goi_y.ma_toa.startsWith(b.ma_toa)),
+            ) ||
             tree[0];
 
           setSelectedBuilding(targetBuilding.ma_toa);
@@ -94,8 +103,8 @@ export default function ProcessRegistrationPage({
           }
         }
       } catch (err) {
-        console.error('Error fetching request detail:', err);
-        showToast('Không thể tải thông tin đơn yêu cầu.', 'error');
+        console.error("Error fetching request detail:", err);
+        showToast("Không thể tải thông tin đơn yêu cầu.", "error");
       } finally {
         setLoading(false);
       }
@@ -114,10 +123,10 @@ export default function ProcessRegistrationPage({
         .map((room) => {
           const beds = room.beds || [];
           const occupied = Number(room.thanh_vien_hien_tai || 0);
-          const roomGender = String(room.gioi_tinh || building.gioi_tinh || '');
+          const roomGender = String(room.gioi_tinh || building.gioi_tinh || "");
           const isCoed =
-            roomGender.toLowerCase().includes('nam') &&
-            roomGender.toLowerCase().includes('nữ');
+            roomGender.toLowerCase().includes("nam") &&
+            roomGender.toLowerCase().includes("nữ");
           return {
             ...room,
             ten_phong: `Phòng ${room.so_phong || room.ma_phong}`,
@@ -141,16 +150,15 @@ export default function ProcessRegistrationPage({
         setAiRecommendation(recommendation);
         if (!recommendation?.best_room_id) return;
 
-        const matchedBuilding =
-          buildingTree.find(
-            (building) =>
-              recommendation.toa === building.ten_toa ||
-              recommendation.toa?.includes(building.ma_toa),
-          );
+        const matchedBuilding = buildingTree.find(
+          (building) =>
+            recommendation.toa === building.ten_toa ||
+            recommendation.toa?.includes(building.ma_toa),
+        );
         if (!matchedBuilding) return;
-        const roomToken = String(recommendation.best_room_id || '').replace(
+        const roomToken = String(recommendation.best_room_id || "").replace(
           /^Phòng\s*/i,
-          '',
+          "",
         );
         const matchedRoom = (matchedBuilding.rooms || []).find(
           (room) =>
@@ -158,9 +166,9 @@ export default function ProcessRegistrationPage({
             room.so_phong === roomToken ||
             room.ma_phong?.includes(roomToken),
         );
-        const bedToken = String(recommendation.giuong || '').replace(
+        const bedToken = String(recommendation.giuong || "").replace(
           /^Giường\s*/i,
-          '',
+          "",
         );
         const matchedBed = (matchedRoom?.beds || []).find(
           (bed) =>
@@ -174,7 +182,7 @@ export default function ProcessRegistrationPage({
         if (matchedRoom) setSelectedRoom(matchedRoom.ma_phong);
         if (matchedBed) setSelectedBed(matchedBed.ma_giuong);
       } catch (err) {
-        console.error('Error matching room with Gemini:', err);
+        console.error("Error matching room with Gemini:", err);
       } finally {
         if (isCurrent) setIsMatching(false);
       }
@@ -199,8 +207,8 @@ export default function ProcessRegistrationPage({
 
     const rooms = currentBld?.rooms || [];
     if (rooms.length === 0) {
-      if (selectedRoom !== '') setSelectedRoom('');
-      if (selectedBed !== '') setSelectedBed('');
+      if (selectedRoom !== "") setSelectedRoom("");
+      if (selectedBed !== "") setSelectedBed("");
       return;
     }
 
@@ -213,7 +221,7 @@ export default function ProcessRegistrationPage({
 
     const beds = currentRoom?.beds || [];
     if (beds.length === 0) {
-      if (selectedBed !== '') setSelectedBed('');
+      if (selectedBed !== "") setSelectedBed("");
       return;
     }
 
@@ -225,11 +233,15 @@ export default function ProcessRegistrationPage({
   }, [buildingTree, selectedBuilding, selectedRoom, selectedBed]);
 
   // Danh sách phòng tương ứng với Tòa đang chọn
-  const currentBuildingObj = buildingTree.find((b) => b.ma_toa === selectedBuilding);
+  const currentBuildingObj = buildingTree.find(
+    (b) => b.ma_toa === selectedBuilding,
+  );
   const availableRooms = currentBuildingObj?.rooms || [];
 
   // Danh sách giường tương ứng với Phòng đang chọn
-  const currentRoomObj = availableRooms.find((r) => r.ma_phong === selectedRoom);
+  const currentRoomObj = availableRooms.find(
+    (r) => r.ma_phong === selectedRoom,
+  );
   const availableBeds = currentRoomObj?.beds || [];
 
   // Khi đổi Tòa -> tự động chọn phòng đầu tiên
@@ -243,11 +255,11 @@ export default function ProcessRegistrationPage({
       if (firstRoom.beds && firstRoom.beds.length > 0) {
         setSelectedBed(firstRoom.beds[0].ma_giuong);
       } else {
-        setSelectedBed('');
+        setSelectedBed("");
       }
     } else {
-      setSelectedRoom('');
-      setSelectedBed('');
+      setSelectedRoom("");
+      setSelectedBed("");
     }
   };
 
@@ -259,14 +271,17 @@ export default function ProcessRegistrationPage({
     if (roomObj && roomObj.beds && roomObj.beds.length > 0) {
       setSelectedBed(roomObj.beds[0].ma_giuong);
     } else {
-      setSelectedBed('');
+      setSelectedBed("");
     }
   };
 
   // Xử lý Phê duyệt & xếp phòng
   const handleApprove = async () => {
     if (!selectedBuilding || !selectedRoom || !selectedBed) {
-      showToast('Vui lòng chọn đầy đủ Tòa, Phòng và Giường trước khi duyệt.', 'error');
+      showToast(
+        "Vui lòng chọn đầy đủ Tòa, Phòng và Giường trước khi duyệt.",
+        "error",
+      );
       return;
     }
 
@@ -279,20 +294,22 @@ export default function ProcessRegistrationPage({
       };
 
       const result = await occupancyService.approveRequest(requestId, payload);
-      const contractCode = result?.data?.ma_hop_dong || `HD26-${selectedBuilding}${selectedRoom}-G${selectedBed}`;
+      const contractCode =
+        result?.data?.ma_hop_dong ||
+        `HD26-${selectedBuilding}${selectedRoom}-G${selectedBed}`;
 
-      showToast(`Duyệt thành công! Đã tạo hợp đồng ${contractCode}`, 'success');
+      showToast(`Duyệt thành công! Đã tạo hợp đồng ${contractCode}`, "success");
 
       setTimeout(() => {
         if (onProcessed) {
-          onProcessed('approved', result);
+          onProcessed("approved", result);
         } else if (onBack) {
           onBack();
         }
       }, 1500);
     } catch (err) {
-      console.error('Error approving request:', err);
-      showToast('Phê duyệt yêu cầu thất bại. Vui lòng thử lại!', 'error');
+      console.error("Error approving request:", err);
+      showToast("Phê duyệt yêu cầu thất bại. Vui lòng thử lại!", "error");
     } finally {
       setSubmitting(false);
     }
@@ -301,7 +318,7 @@ export default function ProcessRegistrationPage({
   // Xử lý Từ chối đơn
   const handleConfirmReject = async () => {
     if (!rejectReason.trim()) {
-      setRejectError('Vui lòng nhập lý do từ chối đơn đăng ký.');
+      setRejectError("Vui lòng nhập lý do từ chối đơn đăng ký.");
       return;
     }
 
@@ -311,38 +328,35 @@ export default function ProcessRegistrationPage({
       await occupancyService.rejectRequest(requestId, payload);
 
       setIsRejectModalOpen(false);
-      showToast('Đã từ chối đơn yêu cầu thành công.', 'success');
+      showToast("Đã từ chối đơn yêu cầu thành công.", "success");
 
       setTimeout(() => {
         if (onProcessed) {
-          onProcessed('rejected');
+          onProcessed("rejected");
         } else if (onBack) {
           onBack();
         }
       }, 1500);
     } catch (err) {
-      console.error('Error rejecting request:', err);
-      setRejectError('Không thể từ chối đơn. Vui lòng thử lại!');
+      console.error("Error rejecting request:", err);
+      setRejectError("Không thể từ chối đơn. Vui lòng thử lại!");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <AdminLayout
-      activeTab="dashboard"
-      userName="QL_Minh"
-    >
+    <AdminLayout activeTab="dashboard" userName="QL_Minh">
       {/* Toast thông báo */}
       {toast.show && (
         <div
           className={`fixed top-5 right-5 z-50 flex items-center gap-2.5 px-5 py-3 rounded-xl shadow-xl text-sm font-semibold transition-all animate-in fade-in slide-in-from-top-4 ${
-            toast.type === 'success'
-              ? 'bg-emerald-600 text-white shadow-emerald-500/20'
-              : 'bg-rose-600 text-white shadow-rose-500/20'
+            toast.type === "success"
+              ? "bg-emerald-600 text-white shadow-emerald-500/20"
+              : "bg-rose-600 text-white shadow-rose-500/20"
           }`}
         >
-          {toast.type === 'success' ? (
+          {toast.type === "success" ? (
             <CheckCircle2 className="w-5 h-5" />
           ) : (
             <AlertTriangle className="w-5 h-5" />
@@ -389,7 +403,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.msv || 'B21DCCN001'}
+                      value={requestData?.msv || "B21DCCN001"}
                       placeholder="Mã sinh viên"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -398,7 +412,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.ho_ten || 'Nguyễn Văn A'}
+                      value={requestData?.ho_ten || "Nguyễn Văn A"}
                       placeholder="Họ và tên"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -407,7 +421,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.gioi_tinh || 'Nam'}
+                      value={requestData?.gioi_tinh || "Nam"}
                       placeholder="Giới tính"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -416,7 +430,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.ngay_sinh || '2003-05-15'}
+                      value={requestData?.ngay_sinh || "2003-05-15"}
                       placeholder="Ngày sinh"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -425,7 +439,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.cccd || '001203004567'}
+                      value={requestData?.cccd || "001203004567"}
                       placeholder="Số CCCD/Định danh"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -438,7 +452,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.so_dien_thoai || '0987654321'}
+                      value={requestData?.so_dien_thoai || "0987654321"}
                       placeholder="Số điện thoại"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -450,8 +464,8 @@ export default function ProcessRegistrationPage({
                       readOnly
                       value={
                         requestData?.email
-                          ? requestData.email.replace('@ictu.edu.vn', '')
-                          : 'nguyenvana'
+                          ? requestData.email.replace("@ictu.edu.vn", "")
+                          : "nguyenvana"
                       }
                       placeholder="Email"
                       className="w-full pl-4 pr-28 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
@@ -464,7 +478,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.khoa || 'Công nghệ thông tin'}
+                      value={requestData?.khoa || "Công nghệ thông tin"}
                       placeholder="Khoa / Viện"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -473,7 +487,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.lop || 'D21CQCN01-B'}
+                      value={requestData?.lop || "D21CQCN01-B"}
                       placeholder="Lớp chuyên ngành"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -482,7 +496,9 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.dia_chi || 'Số 123 Đường Cầu Giấy, Hà Nội'}
+                      value={
+                        requestData?.dia_chi || "Số 123 Đường Cầu Giấy, Hà Nội"
+                      }
                       placeholder="Địa chỉ"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -501,7 +517,7 @@ export default function ProcessRegistrationPage({
                   <input
                     type="text"
                     readOnly
-                    value={requestData?.nguoi_giam_ho || 'Nguyễn Văn B'}
+                    value={requestData?.nguoi_giam_ho || "Nguyễn Văn B"}
                     placeholder="Họ và tên người giám hộ"
                     className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                   />
@@ -510,7 +526,7 @@ export default function ProcessRegistrationPage({
                   <input
                     type="text"
                     readOnly
-                    value={requestData?.moi_quan_he || 'Bố'}
+                    value={requestData?.moi_quan_he || "Bố"}
                     placeholder="Mối quan hệ"
                     className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                   />
@@ -519,7 +535,7 @@ export default function ProcessRegistrationPage({
                   <input
                     type="text"
                     readOnly
-                    value={requestData?.sdt_nguoi_giam_ho || '0912345678'}
+                    value={requestData?.sdt_nguoi_giam_ho || "0912345678"}
                     placeholder="Số điện thoại liên hệ"
                     className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                   />
@@ -533,26 +549,41 @@ export default function ProcessRegistrationPage({
                 Nguyện vọng
               </h2>
               <div className="w-full px-4 py-3 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 shadow-2xs">
-                {requestData?.loai_phong || requestData?.tang_mong_muon || requestData?.muc_gia_mong_muon ? (
+                {requestData?.loai_phong ||
+                requestData?.tang_mong_muon ||
+                requestData?.muc_gia_mong_muon ? (
                   <div className="flex flex-wrap items-center gap-2.5">
                     {requestData?.loai_phong && (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 text-blue-700 font-semibold border border-blue-200 text-xs">
-                        <span className="text-slate-500 font-normal">Loại phòng:</span> {requestData.loai_phong}
+                        <span className="text-slate-500 font-normal">
+                          Loại phòng:
+                        </span>{" "}
+                        {requestData.loai_phong}
                       </span>
                     )}
                     {requestData?.tang_mong_muon && (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200 text-xs">
-                        <span className="text-slate-500 font-normal">Tầng mong muốn:</span> {requestData.tang_mong_muon}
+                        <span className="text-slate-500 font-normal">
+                          Tầng mong muốn:
+                        </span>{" "}
+                        {requestData.tang_mong_muon}
                       </span>
                     )}
                     {requestData?.muc_gia_mong_muon && (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200 text-xs">
-                        <span className="text-slate-500 font-normal">Ngân sách:</span> {requestData.muc_gia_mong_muon}
+                        <span className="text-slate-500 font-normal">
+                          Ngân sách:
+                        </span>{" "}
+                        {requestData.muc_gia_mong_muon}
                       </span>
                     )}
                   </div>
                 ) : (
-                  <div>{requestData?.nguyen_vong || requestData?.nguyen_vong_label || '“Xin hãy xếp cho em 1 phòng nào đó ở tòa A với ạ 🥹”'}</div>
+                  <div>
+                    {requestData?.nguyen_vong ||
+                      requestData?.nguyen_vong_label ||
+                      "“Xin hãy xếp cho em 1 phòng nào đó ở tòa A với ạ 🥹”"}
+                  </div>
                 )}
               </div>
             </div>
@@ -584,7 +615,9 @@ export default function ProcessRegistrationPage({
 
                 {/* Dropdown 2: Phòng */}
                 <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg hover:border-slate-300 transition">
-                  <span className="text-xs font-bold text-slate-700">Phòng</span>
+                  <span className="text-xs font-bold text-slate-700">
+                    Phòng
+                  </span>
                   <div className="relative flex items-center">
                     <select
                       value={selectedRoom}
@@ -604,7 +637,9 @@ export default function ProcessRegistrationPage({
 
                 {/* Dropdown 3: Giường */}
                 <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg hover:border-slate-300 transition">
-                  <span className="text-xs font-bold text-slate-700">Giường</span>
+                  <span className="text-xs font-bold text-slate-700">
+                    Giường
+                  </span>
                   <div className="relative flex items-center">
                     <select
                       value={selectedBed}
@@ -631,7 +666,7 @@ export default function ProcessRegistrationPage({
                   )}
                   <span>
                     {isMatching
-                      ? 'Gemini AI đang phân tích phương án xếp chỗ...'
+                      ? "Gemini AI đang phân tích phương án xếp chỗ..."
                       : `Gemini AI (Độ phù hợp: ${aiRecommendation.match_score}%): ${aiRecommendation.ai_reason}`}
                   </span>
                 </div>
@@ -644,8 +679,8 @@ export default function ProcessRegistrationPage({
               <button
                 type="button"
                 onClick={() => {
-                  setRejectReason('');
-                  setRejectError('');
+                  setRejectReason("");
+                  setRejectError("");
                   setIsRejectModalOpen(true);
                 }}
                 disabled={submitting}
@@ -694,8 +729,11 @@ export default function ProcessRegistrationPage({
             </div>
 
             <p className="text-xs text-slate-600">
-              Vui lòng nhập lý do từ chối đơn đăng ký của sinh viên{' '}
-              <strong className="text-slate-800">{requestData?.ho_ten || 'sinh viên'}</strong>:
+              Vui lòng nhập lý do từ chối đơn đăng ký của sinh viên{" "}
+              <strong className="text-slate-800">
+                {requestData?.ho_ten || "sinh viên"}
+              </strong>
+              :
             </p>
 
             <div>
@@ -704,7 +742,7 @@ export default function ProcessRegistrationPage({
                 value={rejectReason}
                 onChange={(e) => {
                   setRejectReason(e.target.value);
-                  setRejectError('');
+                  setRejectError("");
                 }}
                 placeholder="Ví dụ: Phòng tòa A hiện đã hết giường trống hoặc không đáp ứng tiêu chuẩn ưu tiên..."
                 className="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-rose-500 focus:bg-white transition resize-none"

@@ -579,7 +579,6 @@ export default function App() {
     return (
       <div className="relative">
         <FeedbackPage
-          userName="Nguyễn Văn A"
           onNavigateDashboard={() => navigateTo("/student/dashboard")}
           onNavigateRegister={() => navigateTo("/student/register")}
           onNavigateHistory={() => navigateTo("/student/history")}

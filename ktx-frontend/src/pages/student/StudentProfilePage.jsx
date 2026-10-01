@@ -17,23 +17,40 @@ import {
 } from "lucide-react";
 import StudentLayout from "../../layouts/Student";
 import occupancyService from "../../services/occupancyService";
+import { authService } from "../../services/authService";
 
 const STUDENT_AVATAR_STORAGE_KEY = "ktx_student_avatar";
+
+const toDateInputValue = (value = "") => {
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+    const [day, month, year] = value.split("/");
+    return `${year}-${month}-${day}`;
+  }
+  return value;
+};
+
+const formatDateForDisplay = (value = "") => {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split("-");
+    return `${day}/${month}/${year}`;
+  }
+  return value;
+};
 
 export default function StudentProfilePage({ onSelectTab }) {
   // 1. Dữ liệu hồ sơ sinh viên
   const [profile, setProfile] = useState({
-    ho_ten: "Nguyễn Văn A",
+    ho_ten: "",
     vai_tro: "Sinh viên",
-    msv: "DTCxxxxxxxxx",
-    lop: "CNTT K23A",
-    so_dien_thoai: "09xxxxxxxx",
-    email: "DTCxxxxxxxxx@ictu.edu.vn",
-    ngay_sinh: "12/07/2007",
-    gioi_tinh: "Nữ",
-    dan_toc: "Kinh",
-    que_quan: "Xã A - Tỉnh Bắc Ninh",
-    khoa: "CNTT",
+    msv: "",
+    lop: "",
+    so_dien_thoai: "",
+    email: "",
+    ngay_sinh: "",
+    gioi_tinh: "",
+    dan_toc: "",
+    que_quan: "",
+    khoa: "",
     avatar_url: "/avatar.png",
   });
 
@@ -76,6 +93,30 @@ export default function StudentProfilePage({ onSelectTab }) {
 
   const loadData = async () => {
     try {
+      let accountProfile = {};
+      try {
+        const currentUser = await authService.getCurrentUser();
+        const userProfile = currentUser?.nguoi_dung || currentUser?.user || {};
+        accountProfile = {
+          ho_ten: userProfile.ho_ten || currentUser?.full_name,
+          msv:
+            currentUser?.ten_dang_nhap ||
+            currentUser?.username ||
+            currentUser?.msv,
+          email: userProfile.email || currentUser?.email,
+          so_dien_thoai: userProfile.so_dien_thoai || currentUser?.phone,
+          vai_tro:
+            (userProfile.vai_tro || currentUser?.vai_tro) === "SinhVien"
+              ? "Sinh viên"
+              : userProfile.vai_tro || currentUser?.vai_tro,
+        };
+      } catch (accountError) {
+        console.warn(
+          "Không thể tải thông tin tài khoản hiện tại:",
+          accountError,
+        );
+      }
+
       // 1. Tải hồ sơ sinh viên
       if (occupancyService.getStudentProfile) {
         const student = await occupancyService.getStudentProfile();
@@ -83,10 +124,16 @@ export default function StudentProfilePage({ onSelectTab }) {
           const savedAvatar = localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY);
           const studentProfile = {
             ...student,
+            ...Object.fromEntries(
+              Object.entries(accountProfile).filter(([, value]) => value),
+            ),
             avatar_url: savedAvatar || student.avatar_url || "/avatar.png",
           };
           setProfile(studentProfile);
-          setEditFormData(studentProfile);
+          setEditFormData({
+            ...studentProfile,
+            ngay_sinh: toDateInputValue(studentProfile.ngay_sinh),
+          });
           if (studentProfile.avatar_url) {
             localStorage.setItem(
               STUDENT_AVATAR_STORAGE_KEY,
@@ -157,7 +204,10 @@ export default function StudentProfilePage({ onSelectTab }) {
 
   // Mở modal chỉnh sửa
   const handleOpenEditModal = () => {
-    setEditFormData({ ...profile });
+    setEditFormData({
+      ...profile,
+      ngay_sinh: toDateInputValue(profile.ngay_sinh),
+    });
     setIsEditModalOpen(true);
   };
 
@@ -176,12 +226,23 @@ export default function StudentProfilePage({ onSelectTab }) {
         ...profile,
         so_dien_thoai: editFormData.so_dien_thoai,
         email: editFormData.email,
+        ngay_sinh: editFormData.ngay_sinh,
+        gioi_tinh: editFormData.gioi_tinh,
         que_quan: editFormData.que_quan,
         dan_toc: editFormData.dan_toc || profile.dan_toc,
+        khoa: editFormData.khoa,
+        lop: editFormData.lop,
         avatar_url: editFormData.avatar_url || profile.avatar_url,
       };
 
+      if (occupancyService.updateStudentProfile) {
+        await occupancyService.updateStudentProfile(updatedProfile);
+      }
       setProfile(updatedProfile);
+      setEditFormData({
+        ...updatedProfile,
+        ngay_sinh: toDateInputValue(updatedProfile.ngay_sinh),
+      });
       if (updatedProfile.avatar_url) {
         localStorage.setItem(
           STUDENT_AVATAR_STORAGE_KEY,
@@ -192,10 +253,6 @@ export default function StudentProfilePage({ onSelectTab }) {
             detail: { avatarUrl: updatedProfile.avatar_url },
           }),
         );
-      }
-
-      if (occupancyService.updateStudentProfile) {
-        await occupancyService.updateStudentProfile(updatedProfile);
       }
 
       setIsEditModalOpen(false);
@@ -351,7 +408,7 @@ export default function StudentProfilePage({ onSelectTab }) {
                   <span>Ngày sinh</span>
                 </div>
                 <span className="font-semibold text-slate-800">
-                  {profile.ngay_sinh}
+                  {formatDateForDisplay(profile.ngay_sinh)}
                 </span>
               </div>
 
@@ -516,7 +573,7 @@ export default function StudentProfilePage({ onSelectTab }) {
       {/* ========================================================================= */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200/80 animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 sm:p-7 shadow-2xl border border-slate-200/80 animate-in zoom-in-95 duration-200">
             {/* Header modal */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
@@ -603,26 +660,69 @@ export default function StudentProfilePage({ onSelectTab }) {
                     {profile.ho_ten}
                   </span>
                 </div>
-                <div>
-                  <span className="text-[11px] text-slate-400 block mb-0.5 flex items-center gap-1 font-medium">
-                    <Lock className="w-3 h-3 text-slate-400" /> Khoa / Viện (Cố
-                    định)
-                  </span>
-                  <span className="font-semibold text-slate-700 text-xs sm:text-sm">
-                    {profile.khoa}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[11px] text-slate-400 block mb-0.5 flex items-center gap-1 font-medium">
-                    <Lock className="w-3 h-3 text-slate-400" /> Lớp (Cố định)
-                  </span>
-                  <span className="font-semibold text-slate-700 text-xs sm:text-sm">
-                    {profile.lop}
-                  </span>
-                </div>
               </div>
 
               {/* Các trường cho phép chỉnh sửa */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Khoa / Viện
+                  </label>
+                  <input
+                    type="text"
+                    name="khoa"
+                    value={editFormData.khoa}
+                    onChange={handleInputChange}
+                    placeholder="Nhập khoa / viện"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Lớp
+                  </label>
+                  <input
+                    type="text"
+                    name="lop"
+                    value={editFormData.lop}
+                    onChange={handleInputChange}
+                    placeholder="Nhập lớp"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Ngày sinh
+                  </label>
+                  <input
+                    type="date"
+                    name="ngay_sinh"
+                    value={editFormData.ngay_sinh}
+                    onChange={handleInputChange}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Giới tính
+                  </label>
+                  <select
+                    name="gioi_tinh"
+                    value={editFormData.gioi_tinh}
+                    onChange={handleInputChange}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                  >
+                    <option value="">-- Chọn giới tính --</option>
+                    <option value="Nam">Nam</option>
+                    <option value="Nữ">Nữ</option>
+                    <option value="Khác">Khác</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
                   Số điện thoại <span className="text-red-500">*</span>
