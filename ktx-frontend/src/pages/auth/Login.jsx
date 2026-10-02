@@ -111,10 +111,11 @@ export default function Login({
       if (onLoginSuccess) {
         onLoginSuccess(authenticatedUser.role);
       } else {
+        const roleUpper = String(authenticatedUser.role || "").toUpperCase();
         const targetPath =
-          authenticatedUser.role === "KeToan"
+          (roleUpper.includes("KE_TOAN") || roleUpper.includes("KETOAN"))
             ? "/doi-soat"
-            : authenticatedUser.role === "Admin"
+            : (roleUpper.includes("ADMIN") || roleUpper.includes("QUAN_LY") || roleUpper.includes("QUANLY"))
               ? "/admin"
               : "/student/dashboard";
         window.history.pushState({}, "", targetPath);

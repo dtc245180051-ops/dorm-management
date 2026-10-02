@@ -75,9 +75,6 @@ def get_price_options(db: Session = Depends(get_db)):
     )
     prices = [r[0] for r in results if r[0] is not None]
 
-    if not prices:
-        prices = [4800000.0, 7200000.0, 9600000.0, 12000000.0]
-
     return [
         PriceOptionResponse(
             gia_tien=p,
@@ -225,7 +222,7 @@ def register_room(
             from app.core.security import get_password_hash
             new_tk = TaiKhoan(
                 ten_dang_nhap=clean_msv.lower(),
-                mat_khau=get_password_hash("password123"),
+                mat_khau=get_password_hash(uuid.uuid4().hex),
                 vai_tro=VaiTro.SINH_VIEN,
             )
             db.add(new_tk)
@@ -287,9 +284,9 @@ def get_my_registration_requests(msv: Optional[str] = None):
 
 
 class TransferRoomRequest(BaseModel):
-    msv: Optional[str] = "B21DCCN001"
-    ho_ten: Optional[str] = "Nguyễn Văn A"
-    phong_hien_tai: Optional[str] = "P36"
+    msv: Optional[str] = None
+    ho_ten: Optional[str] = None
+    phong_hien_tai: Optional[str] = None
     ly_do: str
     ngay_mong_muon: str
     phong_mong_muon: str
@@ -297,14 +294,13 @@ class TransferRoomRequest(BaseModel):
 
 
 class CheckoutRoomRequest(BaseModel):
-    msv: Optional[str] = "B21DCCN001"
-    ho_ten: Optional[str] = "Nguyễn Văn A"
-    phong_hien_tai: Optional[str] = "P36"
+    msv: Optional[str] = None
+    ho_ten: Optional[str] = None
+    phong_hien_tai: Optional[str] = None
     ly_do: str
     ngay_mong_muon: str
     dia_chi_lien_he: str
     mo_ta_chi_tiet: Optional[str] = ""
-
 
 @router.post(
     "/transfer",
@@ -426,11 +422,15 @@ def get_current_room(
             "tang": tang_val,
             "thanh_vien": thanh_vien,
             "so_thanh_vien": occupied_count,
-            "suc_chua": suc_chua,
+            "suc_chua": f"{room.suc_chua} người" if room and room.suc_chua else f"{suc_chua} người",
             "ma_giuong": bed.ma_giuong,
+            "giuong": bed.ma_giuong.split("_")[-1] if bed.ma_giuong else "G01",
+            "so_giuong": bed.ma_giuong.split("_")[-1] if bed.ma_giuong else "G01",
             "ma_hop_dong": active_contract.ma_hop_dong,
-            "ngay_bat_dau": str(active_contract.ngay_bat_dau) if active_contract.ngay_bat_dau else None,
-            "ngay_ket_thuc": str(active_contract.ngay_ket_thuc) if active_contract.ngay_ket_thuc else None,
+            "ngay_nhan_phong": active_contract.ngay_bat_dau.strftime("%d/%m/%Y") if active_contract.ngay_bat_dau else "02/10/2026",
+            "ngay_duyet": active_contract.ngay_bat_dau.strftime("%d/%m/%Y") if active_contract.ngay_bat_dau else "02/10/2026",
+            "ngay_bat_dau": active_contract.ngay_bat_dau.strftime("%d/%m/%Y") if active_contract.ngay_bat_dau else "02/10/2026",
+            "ngay_ket_thuc": (active_contract.ngay_ket_thuc or active_contract.ngay_bat_dau.replace(year=active_contract.ngay_bat_dau.year + 1)).strftime("%d/%m/%Y") if active_contract.ngay_bat_dau else "02/10/2027",
             "billing": billing,
         },
         "message": "OK"
@@ -481,16 +481,44 @@ def get_my_stay_contracts(
             else "Đã kết thúc" if status_val == "TERMINATED"
             else "Đã chuyển phòng"
         )
+        # Sức chứa thực tế từ CSDL
+        suc_chua_val = f"{phong.suc_chua} người" if phong and phong.suc_chua else "4 người"
+
+        # Chuẩn hóa ngày nhận phòng và thời hạn hợp đồng 1 năm
+        start_date_str = c.ngay_bat_dau.strftime("%d/%m/%Y") if c.ngay_bat_dau else "02/10/2026"
+        if c.ngay_ket_thuc:
+            end_date_str = c.ngay_ket_thuc.strftime("%d/%m/%Y")
+        elif c.ngay_bat_dau:
+            try:
+                end_date_str = c.ngay_bat_dau.replace(year=c.ngay_bat_dau.year + 1).strftime("%d/%m/%Y")
+            except Exception:
+                end_date_str = "02/10/2027"
+        else:
+            end_date_str = "02/10/2027"
+
+        # Rút gọn mã giường: A1_T3_P301_G02 -> G02
+        full_bed = giuong.ma_giuong if giuong else ""
+        short_bed = full_bed.split("_")[-1] if full_bed else ""
+
         results.append({
             "id": c.ma_hop_dong,
             "ma_hop_dong": c.ma_hop_dong,
             "msv": c.msv,
             "phong": f"P{phong.so_phong}" if phong else "",
             "so_phong": str(phong.so_phong) if phong else "",
+            "ma_phong": phong.ma_phong if phong else "",
             "toa": toa.ten_toa or (f"Tòa {toa.ma_toa}" if toa.ma_toa else "") if toa else "",
             "tang": str(tang.so_tang) if tang else "",
-            "giuong": giuong.ma_giuong if giuong else "",
-            "loai_phong": phong.loai_phong if phong else "",
+            "giuong": short_bed,
+            "so_giuong": short_bed,
+            "ma_giuong": full_bed,
+            "loai_phong": phong.loai_phong if phong else "Phòng tiêu chuẩn",
+            "suc_chua": suc_chua_val,
+            "ngay_nhan_phong": start_date_str,
+            "ngay_bat_dau": start_date_str,
+            "ngay_duyet": start_date_str,
+            "ngay_ket_thuc": end_date_str,
+            "thoi_han_hop_dong": f"{start_date_str} - {end_date_str}",
             "thoi_gian_o": "2026-2027",
             "nam_hoc": "2026-2027",
             "trang_thai": "DANG_O" if status_val == "ACTIVE" else "KET_THUC",

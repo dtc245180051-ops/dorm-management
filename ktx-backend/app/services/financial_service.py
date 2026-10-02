@@ -195,7 +195,7 @@ class FinancialService:
         room_type_stats = [
             RoomTypeStat(
                 roomType="Phòng tiêu chuẩn",
-                monthlyRate=350000.0,
+                monthlyRate=(standard_rec / standard_count) if standard_count else 0,
                 count=standard_count,
                 totalReceivable=standard_rec,
                 totalCollected=standard_col,
@@ -203,7 +203,7 @@ class FinancialService:
             ),
             RoomTypeStat(
                 roomType="Phòng dịch vụ",
-                monthlyRate=650000.0,
+                monthlyRate=(service_rec / service_count) if service_count else 0,
                 count=service_count,
                 totalReceivable=service_rec,
                 totalCollected=service_col,

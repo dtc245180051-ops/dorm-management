@@ -1,58 +1,36 @@
 import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 # In-memory store lưu trữ danh sách các phản ánh sự cố từ sinh viên
 # Đảm bảo Ban quản lý KTX tiếp nhận và xử lý tức thì, đồng bộ với CSDL
-INCIDENTS: List[Dict] = [
-    {
-        "id": "PA-001",
-        "ma_phan_anh": "PA-001",
-        "msv": "DTC245180051",
-        "ho_ten": "Nguyễn Văn A",
-        "phong": "P36",
-        "loai_phan_anh": "Cơ sở vật chất",
-        "tieu_de": "Bóng đèn hành lang tầng 2 bị hỏng",
-        "mo_ta": "Bóng đèn trước cửa phòng 204 bị chớp tắt liên tục và đã cháy tối qua, mong ban quản lý cử kỹ thuật thay thế sớm.",
-        "hinh_anh": None,
-        "ngay_gui": "2026-09-26T14:30:00",
-        "trang_thai": "DANG_XU_LY",
-        "ghi_chu_xu_ly": "Đã giao tổ kỹ thuật điện kiểm tra và chuẩn bị bóng thay thế.",
-    },
-    {
-        "id": "PA-002",
-        "ma_phan_anh": "PA-002",
-        "msv": "DTC2151001",
-        "ho_ten": "Trần Thị Mai",
-        "phong": "P102",
-        "loai_phan_anh": "Điện nước",
-        "tieu_de": "Vòi nước bồn rửa mặt bị rỉ nước",
-        "mo_ta": "Vòi rửa mặt trong nhà vệ sinh phòng 102 bị rỉ nước liên tục gây lãng phí nước và ẩm ướt sàn.",
-        "hinh_anh": None,
-        "ngay_gui": "2026-09-25T09:15:00",
-        "trang_thai": "DA_XU_LY",
-        "ghi_chu_xu_ly": "Đã thay gioăng cao su và van khóa mới sáng 26/09.",
-    },
-]
+INCIDENTS: List[Dict] = []
 
 
 def add_incident(data: dict) -> dict:
     """Thêm một phản ánh mới từ sinh viên và đẩy lên đầu danh sách."""
     incident_id = data.get("id") or data.get("ma_phan_anh") or f"PA-{len(INCIDENTS) + 1:03d}"
+    phan_loai = data.get("phan_loai") or data.get("loai_phan_anh") or "Cơ sở vật chất"
+    now_iso = datetime.datetime.now().isoformat()
+
     new_incident = {
         "id": incident_id,
         "ma_phan_anh": incident_id,
-        "msv": data.get("msv", "DTC245180051"),
+        "msv": data.get("msv", ""),
         "ho_ten": data.get("ho_ten", "Sinh viên"),
-        "phong": data.get("phong", "P36"),
-        "loai_phan_anh": data.get("loai_phan_anh", "Cơ sở vật chất"),
+        "phong": data.get("phong", ""),
+        "loai_phan_anh": phan_loai,
+        "phan_loai": phan_loai,
         "tieu_de": data.get("tieu_de", ""),
         "mo_ta": data.get("mo_ta", ""),
         "hinh_anh": data.get("hinh_anh"),
-        "ngay_gui": datetime.datetime.now().isoformat(),
+        "muc_do_uu_tien": data.get("muc_do_uu_tien", "Thường"),
+        "ngay_gui": data.get("ngay_gui") or now_iso,
+        "ngay_tao": data.get("ngay_tao") or now_iso,
         "trang_thai": data.get("trang_thai", "CHO_XU_LY"),
         "ghi_chu_xu_ly": data.get("ghi_chu_xu_ly", ""),
     }
 
+    # Đưa lên đầu danh sách
     INCIDENTS.insert(0, new_incident)
     return new_incident
 
@@ -60,6 +38,15 @@ def add_incident(data: dict) -> dict:
 def get_all_incidents() -> List[Dict]:
     """Lấy danh sách toàn bộ phản ánh cho Ban Quản lý KTX."""
     return INCIDENTS
+
+
+def get_today_incidents() -> List[Dict]:
+    """Lấy danh sách các phản ánh gửi trong ngày hôm nay."""
+    today_str = datetime.date.today().isoformat()
+    return [
+        pa for pa in INCIDENTS
+        if str(pa.get("ngay_gui") or pa.get("ngay_tao") or "").startswith(today_str)
+    ]
 
 
 def get_incidents_by_student(msv: str) -> List[Dict]:

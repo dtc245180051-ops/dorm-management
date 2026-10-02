@@ -263,7 +263,7 @@ def approve_request(
             from app.core.security import get_password_hash
             new_tk = TaiKhoan(
                 ten_dang_nhap=clean_msv.lower(),
-                mat_khau=get_password_hash("password123"),
+                mat_khau=get_password_hash(uuid.uuid4().hex),
                 vai_tro=VaiTro.SINH_VIEN,
             )
             db.add(new_tk)

@@ -2,114 +2,6 @@ const API_BASE_URL = 'http://localhost:8000/api/v1';
 
 const CACHE_KEY = 'reconciliation_cache_data';
 
-function generateFallbackStatement(fileName, bankName, periodName) {
-  const items = [
-    {
-      id: 'TX-001',
-      bankTransactionCode: 'FT260927001',
-      transactionDate: '26/09/2026 09:15',
-      amount: 1940000,
-      transferContent: 'DTC245180051 Nguyen Van A nop tien phong KTX ky 1',
-      invoiceCode: 'HD-2026-001',
-      matched_invoice: 'HD-2026-001',
-      studentCode: 'DTC245180051',
-      studentName: 'Nguyễn Văn A',
-      room: 'P36',
-      status: 'AUTO_MATCHED',
-      action: 'VIEW',
-      bankName: bankName || 'TP Bank - TK 20020813520',
-    },
-    {
-      id: 'TX-002',
-      bankTransactionCode: 'FT260927002',
-      transactionDate: '26/09/2026 10:42',
-      amount: 1940000,
-      transferContent: 'DTC2151001 Tran Thi Mai thanh toan ky tuc xa',
-      invoiceCode: 'HD-2026-002',
-      matched_invoice: 'HD-2026-002',
-      studentCode: 'DTC2151001',
-      studentName: 'Trần Thị Mai',
-      room: 'P102',
-      status: 'AUTO_MATCHED',
-      action: 'VIEW',
-      bankName: bankName || 'TP Bank - TK 20020813520',
-    },
-    {
-      id: 'TX-003',
-      bankTransactionCode: 'FT260927003',
-      transactionDate: '26/09/2026 11:20',
-      amount: 1940000,
-      transferContent: 'SV001 Le Van Cuong chuyen khoan tien phong',
-      invoiceCode: 'HD-2026-003',
-      matched_invoice: 'HD-2026-003',
-      studentCode: 'SV001',
-      studentName: 'Lê Văn Cường',
-      room: 'P205',
-      status: 'AUTO_MATCHED',
-      action: 'VIEW',
-      bankName: bankName || 'TP Bank - TK 20020813520',
-    },
-    {
-      id: 'TX-004',
-      bankTransactionCode: 'FT260927004',
-      transactionDate: '26/09/2026 14:05',
-      amount: 1940000,
-      transferContent: 'Phu huynh chuyen tien phong ktx cho con',
-      invoiceCode: null,
-      matched_invoice: 'Thiếu mã sinh viên',
-      studentCode: null,
-      studentName: null,
-      room: null,
-      status: 'INVALID_SYNTAX',
-      action: 'MANUAL_MATCH',
-      bankName: bankName || 'TP Bank - TK 20020813520',
-    },
-    {
-      id: 'TX-005',
-      bankTransactionCode: 'FT260927005',
-      transactionDate: '26/09/2026 15:30',
-      amount: 1940000,
-      transferContent: 'DTC245040017 Hoang Duc Nam nop phi ktx',
-      invoiceCode: 'HD-2026-005',
-      matched_invoice: 'HD-2026-005',
-      studentCode: 'DTC245040017',
-      studentName: 'Hoàng Đức Nam',
-      room: 'P301',
-      status: 'AUTO_MATCHED',
-      action: 'VIEW',
-      bankName: bankName || 'TP Bank - TK 20020813520',
-    },
-    {
-      id: 'TX-006',
-      bankTransactionCode: 'FT260927006',
-      transactionDate: '26/09/2026 16:15',
-      amount: 1940000,
-      transferContent: 'Chuyen tien ky tuc xa thang 9',
-      invoiceCode: null,
-      matched_invoice: 'Thiếu mã sinh viên',
-      studentCode: null,
-      studentName: null,
-      room: null,
-      status: 'INVALID_SYNTAX',
-      action: 'MANUAL_MATCH',
-      bankName: bankName || 'TP Bank - TK 20020813520',
-    },
-  ];
-
-  return {
-    fileName: fileName || 'sao_ke_ngan_hang.xlsx',
-    bankName: bankName || 'TP Bank - TK 20020813520',
-    period: periodName || 'Tháng 09/2026',
-    totalTransactions: items.length,
-    statistics: {
-      totalTransactions: items.length,
-      autoMatched: 4,
-      manualRequired: 2,
-    },
-    items,
-  };
-}
-
 function getCachedData() {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
@@ -135,25 +27,7 @@ export const reconciliationService = {
    * Helper đảm bảo có token xác thực cho Kế toán
    */
   async ensureToken() {
-    let token = localStorage.getItem('ktx_token');
-    if (!token) {
-      try {
-        const resp = await fetch(`${API_BASE_URL}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ username: 'KT_Hoa', password: 'password123' }),
-        });
-        const d = await resp.json();
-        if (d.access_token) {
-          token = d.access_token;
-          localStorage.setItem('ktx_token', token);
-          localStorage.setItem('ktx_user', JSON.stringify({ username: 'KT_Hoa', role: 'KeToan' }));
-        }
-      } catch (e) {
-        console.error('Lỗi tự động xác thực KT_Hoa:', e);
-      }
-    }
-    return token;
+    return localStorage.getItem('access_token') || localStorage.getItem('ktx_token');
   },
 
   /**
@@ -209,48 +83,7 @@ export const reconciliationService = {
       console.warn('Lỗi getReconciliations API, sử dụng bộ đệm:', error);
     }
 
-    // Fallback: Sử dụng dữ liệu đã cache
-    const cache = getCachedData();
-    if (!cache) {
-      return {
-        success: true,
-        data: {
-          items: [],
-          total: 0,
-          statistics: { totalTransactions: 0, autoMatched: 0, manualRequired: 0 },
-        },
-      };
-    }
-
-    let filtered = cache.items || [];
-    if (status && status !== 'ALL') {
-      if (status === 'MATCHED' || status === 'AUTO_MATCHED') {
-        filtered = filtered.filter((i) => i.status === 'AUTO_MATCHED' || i.status === 'MATCHED');
-      } else {
-        filtered = filtered.filter((i) => i.status === 'INVALID_SYNTAX' || i.status === 'MANUAL_REQUIRED');
-      }
-    }
-    if (keyword && keyword.trim()) {
-      const kw = keyword.trim().toLowerCase();
-      filtered = filtered.filter(
-        (i) =>
-          (i.bankTransactionCode && i.bankTransactionCode.toLowerCase().includes(kw)) ||
-          (i.transferContent && i.transferContent.toLowerCase().includes(kw)) ||
-          (i.studentCode && i.studentCode.toLowerCase().includes(kw))
-      );
-    }
-
-    const start = (page - 1) * pageSize;
-    const paged = filtered.slice(start, start + pageSize);
-
-    return {
-      success: true,
-      data: {
-        items: paged,
-        total: filtered.length,
-        statistics: cache.statistics,
-      },
-    };
+    return { success: false, data: { items: [], total: 0, statistics: { totalTransactions: 0, autoMatched: 0, manualRequired: 0 } } };
   },
 
   /**
@@ -276,25 +109,6 @@ export const reconciliationService = {
       console.warn('Lỗi getTransactionDetail API, sử dụng bộ đệm:', error);
     }
 
-    const cache = getCachedData();
-    const item = (cache?.items || []).find((i) => i.id === id || i.bankTransactionCode === id);
-    if (item) {
-      return {
-        success: true,
-        data: {
-          transaction: item,
-          student: {
-            studentCode: item.studentCode || 'Chưa xác định',
-            studentName: item.studentName || 'Chưa xác định',
-            room: item.room || 'Chưa xếp phòng',
-          },
-          invoice: {
-            invoiceCode: item.invoiceCode || 'Chưa liên kết',
-            amount: item.amount || 0,
-          },
-        },
-      };
-    }
 
     return {
       success: false,
@@ -333,45 +147,7 @@ export const reconciliationService = {
       console.warn('Lỗi searchStudents API, sử dụng dữ liệu mặc định:', error);
     }
 
-    const fallbackStudents = [
-      {
-        studentId: 'DTC245180051',
-        studentCode: 'DTC245180051',
-        studentName: 'Nguyễn Văn A',
-        room: 'P36',
-        class: 'D21CQCN01',
-        debt: 1940000,
-      },
-      {
-        studentId: 'DTC2151001',
-        studentCode: 'DTC2151001',
-        studentName: 'Trần Thị Mai',
-        room: 'P102',
-        class: 'D20QTKD02',
-        debt: 1940000,
-      },
-      {
-        studentId: 'SV001',
-        studentCode: 'SV001',
-        studentName: 'Lê Văn Cường',
-        room: 'P205',
-        class: 'D22CNTT03',
-        debt: 1940000,
-      },
-    ];
-
-    const kw = (keyword || '').trim().toLowerCase();
-    const results = kw
-      ? fallbackStudents.filter(
-          (s) =>
-            s.studentCode.toLowerCase().includes(kw) || s.studentName.toLowerCase().includes(kw)
-        )
-      : fallbackStudents;
-
-    return {
-      success: true,
-      data: results,
-    };
+    return { success: true, data: [] };
   },
 
   /**
@@ -400,24 +176,7 @@ export const reconciliationService = {
       console.warn('Lỗi getStudentInvoices API, sử dụng dữ liệu mặc định:', error);
     }
 
-    const cleanId = studentId || 'SV';
-    return {
-      success: true,
-      data: [
-        {
-          id: `HDTP-2026-${cleanId}`,
-          invoiceCode: `HDTP-2026-${cleanId}`,
-          description: 'Hóa đơn tiền phòng Năm học 2026 – 2027',
-          amount: 6600000,
-          paidAmount: 0,
-          remainingAmount: 6600000,
-          dueDate: '15/09/2026',
-          status: 'CHUA_THANH_TOAN',
-          invoiceType: 'TIEN_PHONG',
-          period: 'Năm học 2026 – 2027',
-        },
-      ],
-    };
+    return { success: true, data: [] };
   },
 
   /**
@@ -511,7 +270,7 @@ export const reconciliationService = {
    * @param {string} [period] - Kỳ sao kê
    */
   async uploadStatement(file, bank = '', period = '') {
-    const bankName = bank || 'TP Bank - TK 20020813520';
+    const bankName = bank || '';
     const periodName = period || 'Tháng 09/2026';
 
     try {
@@ -546,13 +305,6 @@ export const reconciliationService = {
     }
 
     // Fallback xử lý file trực tiếp không để bị chặn bởi lỗi Not Found
-    const fallbackData = generateFallbackStatement(file?.name, bankName, periodName);
-    saveCacheData(fallbackData);
-
-    return {
-      success: true,
-      data: fallbackData,
-      message: `Đã tải lên và đối soát thành công file ${file?.name || 'sao kê'}`,
-    };
+    return { success: false, data: { items: [], totalTransactions: 0, statistics: { totalTransactions: 0, autoMatched: 0, manualRequired: 0 } }, message: 'Kh?ng th? t?i sao k? l?n m?y ch?.' };
   },
 };

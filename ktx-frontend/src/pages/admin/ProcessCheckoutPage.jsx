@@ -197,7 +197,7 @@ export default function ProcessCheckoutPage({
                       Mã sinh viên
                     </span>
                     <span className="font-semibold text-slate-900">
-                      {requestData?.msv || "DTC245180051"}
+                      {requestData?.msv || ""}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">

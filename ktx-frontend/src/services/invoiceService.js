@@ -8,25 +8,7 @@ export const invoiceService = {
    * Helper đảm bảo có token xác thực cho Kế toán
    */
   async ensureToken() {
-    let token = localStorage.getItem('ktx_token');
-    if (!token) {
-      try {
-        const resp = await fetch(`${API_BASE_URL}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ username: 'KT_Hoa', password: 'password123' }),
-        });
-        const d = await resp.json();
-        if (d.access_token) {
-          token = d.access_token;
-          localStorage.setItem('ktx_token', token);
-          localStorage.setItem('ktx_user', JSON.stringify({ username: 'KT_Hoa', role: 'KeToan' }));
-        }
-      } catch (e) {
-        console.error('Lỗi tự động xác thực KT_Hoa trong invoiceService:', e);
-      }
-    }
-    return token;
+    return localStorage.getItem('access_token') || localStorage.getItem('ktx_token');
   },
 
   /**
@@ -43,13 +25,13 @@ export const invoiceService = {
   /**
    * Lấy danh sách đối tượng cần lập hóa đơn tiền phòng theo tháng
    */
-  async getRoomCandidates(month = 'Tháng 09/2026', stayDuration = 1, unitPrice = 350000, appliedTarget = 'Tất cả phòng (Tiêu chuẩn & Dịch vụ)') {
+  async getRoomCandidates(month = '', stayDuration = 1, unitPrice = undefined, appliedTarget = '') {
     try {
       const params = new URLSearchParams({
         ky_thanh_toan: month,
         thoi_gian_o_thang: stayDuration,
-        don_gia_thang: unitPrice,
-        ap_dung: appliedTarget,
+        ...(unitPrice !== undefined ? { don_gia_thang: unitPrice } : {}),
+        ...(appliedTarget ? { ap_dung: appliedTarget } : {}),
       });
 
       const headers = await this.getAuthHeaders();

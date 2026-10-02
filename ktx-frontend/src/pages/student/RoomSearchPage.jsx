@@ -118,7 +118,7 @@ export default function RoomSearchPage({
   }, [rooms, appliedFilters]);
 
   // Tính toán phân trang
-  const totalPages = Math.max(1, Math.ceil(filteredRooms.length / itemsPerPage));
+  const totalPages = Math.max(1, Math.ceil((filteredRooms || []).length / itemsPerPage));
   const paginatedRooms = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredRooms.slice(startIndex, startIndex + itemsPerPage);
@@ -161,7 +161,11 @@ export default function RoomSearchPage({
   const studentName =
     localStorage.getItem('ktx_fullname') ||
     localStorage.getItem('ktx_username') ||
-    'Nguyễn Văn A';
+    '';
+  const buildingOptions = [...new Set((rooms || []).map((room) => room.toa || room.ma_toa).filter(Boolean))];
+  const floorOptions = [...new Set((rooms || []).map((room) => Number(room.so_tang)).filter((floor) => floor > 0))].sort((a, b) => a - b);
+  const typeOptions = [...new Set((rooms || []).map((room) => room.loai_phong).filter(Boolean))];
+  const capacityOptions = [...new Set((rooms || []).map((room) => Number(room.suc_chua)).filter((capacity) => capacity > 0))].sort((a, b) => a - b);
 
   return (
     <StudentLayout
@@ -348,7 +352,7 @@ export default function RoomSearchPage({
             ) : (
               /* Lưới 4 cột trên Desktop */
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {paginatedRooms.map((room) => {
+                {paginatedRooms?.map((room) => {
                   const isFull = room.trang_thai === 'DA_DAY';
                   return (
                     <div

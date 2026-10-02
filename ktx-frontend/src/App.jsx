@@ -108,6 +108,63 @@ export default function App() {
     }
   }, [currentPath]);
 
+  // Phân quyền bảo vệ đường dẫn (Role-Based Access Control - RBAC)
+  useEffect(() => {
+    const token = localStorage.getItem("ktx_token");
+    const roleStr = (localStorage.getItem("ktx_user_role") || "").toUpperCase();
+
+    if (token) {
+      // 1. Quản lý KTX: Chỉ được phép xem và thao tác trên phân hệ /admin
+      if (
+        roleStr.includes("QUAN_LY") ||
+        roleStr.includes("QUANLY") ||
+        roleStr.includes("ADMIN")
+      ) {
+        if (!currentPath.startsWith("/admin")) {
+          navigateTo("/admin");
+        }
+      }
+      // 2. Kế toán: Chỉ được xem và thao tác trên phân hệ kế toán
+      else if (roleStr.includes("KE_TOAN") || roleStr.includes("KETOAN")) {
+        const isAccRoute =
+          currentPath === "/doi-soat" ||
+          currentPath === "/lap-hoa-don" ||
+          currentPath === "/so-cong-no" ||
+          currentPath.startsWith("/accountant") ||
+          currentPath === "/reconciliation" ||
+          currentPath === "/billing" ||
+          currentPath === "/debt";
+        if (!isAccRoute) {
+          navigateTo("/doi-soat");
+        }
+      }
+      // 3. Sinh viên: Chỉ được truy cập các trang sinh viên
+      else if (roleStr.includes("SINH_VIEN") || roleStr.includes("SINHVIEN")) {
+        const isForbidden =
+          currentPath.startsWith("/admin") ||
+          currentPath === "/doi-soat" ||
+          currentPath === "/lap-hoa-don" ||
+          currentPath === "/so-cong-no" ||
+          currentPath.startsWith("/accountant");
+        if (isForbidden) {
+          navigateTo("/student/dashboard");
+        }
+      }
+    } else {
+      // Chưa đăng nhập: Không cho truy cập trực tiếp các trang nội bộ
+      const isInternal =
+        currentPath.startsWith("/admin") ||
+        currentPath.startsWith("/student") ||
+        currentPath === "/doi-soat" ||
+        currentPath === "/lap-hoa-don" ||
+        currentPath === "/so-cong-no" ||
+        currentPath.startsWith("/accountant");
+      if (isInternal) {
+        navigateTo("/");
+      }
+    }
+  }, [currentPath]);
+
   // Tự động dọn dẹp dữ liệu mẫu / test cũ nếu còn lưu trong LocalStorage
   useEffect(() => {
     try {
@@ -235,9 +292,14 @@ export default function App() {
             );
           }}
           onLoginSuccess={(role) => {
-            if (role === "KeToan") {
+            const r = String(role || "").toUpperCase();
+            if (r.includes("KE_TOAN") || r.includes("KETOAN")) {
               navigateTo("/doi-soat");
-            } else if (role === "Admin") {
+            } else if (
+              r.includes("ADMIN") ||
+              r.includes("QUAN_LY") ||
+              r.includes("QUANLY")
+            ) {
               navigateTo("/admin");
             } else {
               navigateTo("/student/dashboard");
@@ -278,8 +340,14 @@ export default function App() {
     return (
       <div className="relative">
         <AccountantLayout
-          user={{ username: "KT_Hoa", role: "KeToan" }}
-          onLogout={() => navigateTo("/login")}
+          user={{
+            username: localStorage.getItem('ktx_fullname') || localStorage.getItem('ktx_username') || 'Phòng Kế Toán',
+            role: 'KeToan'
+          }}
+          onLogout={() => {
+            localStorage.clear();
+            navigateTo("/");
+          }}
           activeMenu="reconciliation"
           onMenuChange={handleAccountantMenuChange}
           searchTerm={accountantSearchTerm}
@@ -300,8 +368,14 @@ export default function App() {
     return (
       <div className="relative">
         <AccountantLayout
-          user={{ username: "KT_Hoa", role: "KeToan" }}
-          onLogout={() => navigateTo("/login")}
+          user={{
+            username: localStorage.getItem('ktx_fullname') || localStorage.getItem('ktx_username') || 'Phòng Kế Toán',
+            role: 'KeToan'
+          }}
+          onLogout={() => {
+            localStorage.clear();
+            navigateTo("/");
+          }}
           activeMenu="billing"
           onMenuChange={handleAccountantMenuChange}
           searchTerm={accountantSearchTerm}
@@ -322,8 +396,14 @@ export default function App() {
     return (
       <div className="relative">
         <AccountantLayout
-          user={{ username: "KT_Hoa", role: "KeToan" }}
-          onLogout={() => navigateTo("/login")}
+          user={{
+            username: localStorage.getItem('ktx_fullname') || localStorage.getItem('ktx_username') || 'Phòng Kế Toán',
+            role: 'KeToan'
+          }}
+          onLogout={() => {
+            localStorage.clear();
+            navigateTo("/");
+          }}
           activeMenu="debt-book"
           onMenuChange={handleAccountantMenuChange}
           searchTerm={accountantSearchTerm}
@@ -627,7 +707,10 @@ export default function App() {
           onNavigateProfile={() => navigateTo("/student/profile")}
           onSelectTab={handleStudentTabSelect}
           onNavigate={navigateTo}
-          onLogout={() => navigateTo("/login")}
+          onLogout={() => {
+            localStorage.clear();
+            navigateTo("/");
+          }}
         />
         <RoleSwitcher
           currentRole="student"
@@ -725,7 +808,7 @@ export default function App() {
         onSelectTab={setAdminActiveTab}
         searchTerm={adminSearchTerm}
         onSearchChange={setAdminSearchTerm}
-        userName="QL_Minh"
+        userName={localStorage.getItem("ktx_fullname") || localStorage.getItem("ktx_username") || "Ban Quản Lý KTX"}
       >
         {adminActiveTab === "dashboard" && (
           <Dashboard
@@ -806,71 +889,8 @@ export default function App() {
   );
 }
 
-function RoleSwitcher({ currentRole, onSwitchRole }) {
-  const handleRoleClick = (r) => {
-    if (r === "home") {
-      window.history.pushState({}, "", "/");
-      window.dispatchEvent(new PopStateEvent("popstate"));
-      return;
-    }
-    if (onSwitchRole) {
-      if (r === "admin") onSwitchRole("/admin");
-      else if (r === "student") onSwitchRole("/student/dashboard");
-      else if (r === "accountant") onSwitchRole("/doi-soat");
-      else onSwitchRole(r);
-    }
-  };
-
-  return (
-    <div className="fixed top-3 right-64 z-50 flex items-center bg-white/90 backdrop-blur-md border border-slate-200 p-1 rounded-full shadow-lg text-xs font-semibold gap-1">
-      <button
-        type="button"
-        onClick={() => handleRoleClick("home")}
-        className="px-3 py-1.5 rounded-full transition flex items-center gap-1.5 cursor-pointer text-slate-600 hover:text-blue-600 hover:bg-slate-100"
-        title="Về Trang chủ công khai"
-      >
-        <Home className="w-3.5 h-3.5" />
-        <span>Trang chủ</span>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => handleRoleClick("admin")}
-        className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 cursor-pointer ${
-          currentRole === "admin"
-            ? "bg-slate-900 text-white shadow-xs"
-            : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-        }`}
-      >
-        <ShieldCheck className="w-3.5 h-3.5" />
-        <span>Admin</span>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => handleRoleClick("student")}
-        className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 cursor-pointer ${
-          currentRole === "student"
-            ? "bg-blue-600 text-white shadow-xs"
-            : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-        }`}
-      >
-        <UserCheck className="w-3.5 h-3.5" />
-        <span>Sinh viên</span>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => handleRoleClick("accountant")}
-        className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 cursor-pointer ${
-          currentRole === "accountant"
-            ? "bg-emerald-600 text-white shadow-xs"
-            : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-        }`}
-      >
-        <Calculator className="w-3.5 h-3.5" />
-        <span>Kế toán</span>
-      </button>
-    </div>
-  );
+function RoleSwitcher() {
+  // Ẩn thanh chuyển vai trò để đảm bảo phân quyền nghiêm ngặt theo đúng tài khoản đăng nhập
+  return null;
 }
+

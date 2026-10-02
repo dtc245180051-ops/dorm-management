@@ -1,14 +1,25 @@
 from __future__ import annotations
 
+import calendar
+import csv
 import datetime
+import io
+import re
+import unicodedata
 import uuid
 from typing import List, Optional
 
 from fastapi import HTTPException, status
+try:
+    from openpyxl import Workbook, load_workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    HAS_OPENPYXL = True
+except ImportError:
+    HAS_OPENPYXL = False
 from sqlalchemy.orm import Session
 
-from app.models.debt import SoCongNo
 from app.models.contract import HopDong, Phi
+from app.models.debt import SoCongNo
 from app.models.dorm import Giuong, Phong, Tang, ToaNha
 from app.models.invoice import HoaDon, LoaiHoaDon, TrangThaiHoaDon
 from app.models.user import NguoiDung, SinhVien
@@ -23,25 +34,98 @@ from app.schemas.invoice import (
 )
 
 
+def strip_accents(text: str) -> str:
+    """Loại bỏ dấu tiếng Việt và chuẩn hóa chữ thường để nhận diện tiêu đề/cột"""
+    if not text:
+        return ""
+    norm = unicodedata.normalize("NFD", text)
+    unaccented = "".join(c for c in norm if unicodedata.category(c) != "Mn")
+    return unaccented.replace("đ", "d").replace("Đ", "D").lower().strip()
+
+
+def parse_meter_number(val: any) -> int:
+    """Phân tích số chỉ số điện/nước an toàn, tránh làm sai lệch số thập phân hoặc hàng nghìn"""
+    if val is None:
+        return 0
+    if isinstance(val, (int, float)):
+        return max(0, int(round(val)))
+    s = str(val).strip()
+    if not s:
+        return 0
+    try:
+        return max(0, int(round(float(s))))
+    except ValueError:
+        pass
+    cleaned = s.replace(" ", "")
+    if "." in cleaned and "," in cleaned:
+        if cleaned.rfind(",") > cleaned.rfind("."):
+            cleaned = cleaned.replace(".", "").replace(",", ".")
+        else:
+            cleaned = cleaned.replace(",", "")
+    elif "," in cleaned:
+        parts = cleaned.split(",")
+        if len(parts) == 2 and len(parts[1]) != 3:
+            cleaned = cleaned.replace(",", ".")
+        else:
+            cleaned = cleaned.replace(",", "")
+    elif "." in cleaned:
+        parts = cleaned.split(".")
+        if len(parts) == 2 and len(parts[1]) != 3:
+            cleaned = cleaned
+        else:
+            cleaned = cleaned.replace(".", "")
+    try:
+        return max(0, int(round(float(cleaned))))
+    except Exception:
+        m = re.findall(r"\d+", cleaned)
+        return int(m[0]) if m else 0
+
 
 class InvoiceService:
     @staticmethod
     def get_room_billing_candidates(
         db: Session,
         ky_thanh_toan: str = "Tháng 09/2026",
-        don_gia_thang: float = 350000.0,
+        don_gia_thang: Optional[float] = None,
         thoi_gian_o_thang: int = 1,
         ap_dung: Optional[str] = None,
     ) -> List[RoomBillingCandidate]:
         """
         Lấy danh sách sinh viên nội trú cần lập hóa đơn tiền phòng theo tháng:
-        - Đơn giá niêm yết: Phòng tiêu chuẩn là 350.000 VNĐ/tháng, Phòng dịch vụ là 650.000 VNĐ/tháng.
+
         - Phạm vi áp dụng: Tất cả phòng, Chỉ phòng tiêu chuẩn, Chỉ phòng dịch vụ (hoặc theo tòa).
         - Chỉ lấy từ các hợp đồng ACTIVE thực sự tồn tại trong CSDL.
         """
         # 1. Truy vấn các hợp đồng đang hiệu lực từ CSDL
         query = db.query(HopDong).filter(HopDong.trang_thai == "ACTIVE")
         active_contracts = query.all()
+
+        # Lọc theo kỳ thanh toán nếu có
+        if ky_thanh_toan:
+            m_month = re.search(r"(\d{1,2})/(\d{4})", ky_thanh_toan)
+            if m_month:
+                month_num = int(m_month.group(1))
+                year_num = int(m_month.group(2))
+                _, last_day = calendar.monthrange(year_num, month_num)
+                period_start = datetime.date(year_num, month_num, 1)
+                period_end = datetime.date(year_num, month_num, last_day)
+                active_contracts = [
+                    hd for hd in active_contracts
+                    if (hd.ngay_bat_dau or datetime.date(2000, 1, 1)) <= period_end
+                    and (hd.ngay_ket_thuc or datetime.date(2099, 12, 31)) >= period_start
+                ]
+            else:
+                years = [int(y) for y in re.findall(r"\b(20\d\d)\b", ky_thanh_toan)]
+                if years:
+                    start_year = min(years)
+                    end_year = max(years)
+                    period_start = datetime.date(start_year, 8, 1)
+                    period_end = datetime.date(end_year, 7, 31) if end_year > start_year else datetime.date(start_year, 12, 31)
+                    active_contracts = [
+                        hd for hd in active_contracts
+                        if (hd.ngay_bat_dau or datetime.date(2000, 1, 1)) <= period_end
+                        and (hd.ngay_ket_thuc or datetime.date(2099, 12, 31)) >= period_start
+                    ]
 
         candidates: List[RoomBillingCandidate] = []
 
@@ -54,22 +138,27 @@ class InvoiceService:
             phong_str = "Chưa xếp phòng"
             ma_phong_val = None
             loai_phong_label = "Phòng tiêu chuẩn"
-            unit_price = 350000.0
+            unit_price = 0.0
 
             if hd.giuong and hd.giuong.phong:
                 p = hd.giuong.phong
                 ma_phong_val = p.ma_phong
                 t = p.tang.toa_nha.ten_toa if p.tang and p.tang.toa_nha else ""
-                phong_str = f"P{p.so_phong} - {t}".strip(" -")
+                so_phong_clean = p.so_phong if p.so_phong.upper().startswith("P") else f"P{p.so_phong}"
+                phong_str = f"{so_phong_clean} - {t}".strip(" -")
                 raw_loai = (p.loai_phong or "").lower()
                 if "dịch vụ" in raw_loai or "dich vu" in raw_loai or "service" in raw_loai:
                     loai_phong_label = "Phòng dịch vụ"
-                    unit_price = 650000.0
+                    unit_price = float(p.gia_tien_nam or 0) / 12
                 else:
                     loai_phong_label = "Phòng tiêu chuẩn"
-                    unit_price = 350000.0
+                    unit_price = float(p.gia_tien_nam or 0) / 12
 
-            # Lọc theo phạm vi áp dụng (Chỉ phòng tiêu chuẩn / Chỉ phòng dịch vụ)
+            # Nếu đơn giá tháng được truyền vào khác mặc định thì áp dụng
+            if don_gia_thang is not None and don_gia_thang > 0:
+                unit_price = don_gia_thang
+
+            # Lọc theo phạm vi áp dụng (Chỉ phòng tiêu chuẩn / Chỉ phòng dịch vụ / theo tòa)
             if ap_dung:
                 ap_norm = ap_dung.lower()
                 if "tiêu chuẩn" in ap_norm and "dịch vụ" not in ap_norm:
@@ -79,7 +168,6 @@ class InvoiceService:
                     if loai_phong_label != "Phòng dịch vụ":
                         continue
                 elif "tòa" in ap_norm or "toa" in ap_norm:
-                    import re
                     m = re.search(r"A\d+", ap_dung, re.IGNORECASE)
                     if m and m.group(0).upper() not in phong_str.upper():
                         continue
@@ -151,12 +239,10 @@ class InvoiceService:
 
         # Lọc theo kỳ thanh toán nếu không truyền danh sách MSV cụ thể
         if not request.danh_sach_msv:
-            import re
             m_month = re.search(r"(\d{1,2})/(\d{4})", request.ky_thanh_toan)
             if m_month:
                 month_num = int(m_month.group(1))
                 year_num = int(m_month.group(2))
-                import calendar
                 _, last_day = calendar.monthrange(year_num, month_num)
                 period_start = datetime.date(year_num, month_num, 1)
                 period_end = datetime.date(year_num, month_num, last_day)
@@ -180,7 +266,6 @@ class InvoiceService:
 
         # Lọc theo tòa nhà áp dụng nếu không truyền danh sách MSV cụ thể
         if not request.danh_sach_msv and request.ap_dung and "tòa" in request.ap_dung.lower():
-            import re
             m = re.search(r"A\d+", request.ap_dung, re.IGNORECASE)
             if m:
                 target_building = m.group(0).upper()
@@ -211,7 +296,6 @@ class InvoiceService:
 
         try:
             for hd in valid_contracts:
-                # Trích xuất thông tin người dùng và phòng từ quan hệ hợp đồng
                 sv = hd.sinh_vien
                 nd = sv.nguoi_dung if sv else None
                 ho_ten = nd.ho_ten if nd else (sv.msv if sv else hd.msv)
@@ -219,23 +303,28 @@ class InvoiceService:
                 phong_str = "Chưa xếp phòng"
                 ma_phong_val = None
                 loai_phong_label = "Phòng tiêu chuẩn"
-                unit_price = 350000.0
+                unit_price = 0.0
 
                 if hd.giuong and hd.giuong.phong:
                     p = hd.giuong.phong
                     ma_phong_val = p.ma_phong
                     t = p.tang.toa_nha.ten_toa if p.tang and p.tang.toa_nha else ""
-                    phong_str = f"P{p.so_phong} - {t}".strip(" -")
+                    so_phong_clean = p.so_phong if p.so_phong.upper().startswith("P") else f"P{p.so_phong}"
+                    phong_str = f"{so_phong_clean} - {t}".strip(" -")
                     raw_loai = (p.loai_phong or "").lower()
                     if "dịch vụ" in raw_loai or "dich vu" in raw_loai or "service" in raw_loai:
                         loai_phong_label = "Phòng dịch vụ"
-                        unit_price = 650000.0
+                        unit_price = float(p.gia_tien_nam or 0) / 12
                     else:
                         loai_phong_label = "Phòng tiêu chuẩn"
-                        unit_price = 350000.0
+                        unit_price = float(p.gia_tien_nam or 0) / 12
 
-                # Lọc theo phạm vi áp dụng (Chỉ phòng tiêu chuẩn / Chỉ phòng dịch vụ)
-                if request.ap_dung:
+                # Áp dụng đơn giá tháng nếu có truyền vào khác mặc định
+                if request.don_gia_thang is not None and request.don_gia_thang > 0:
+                    unit_price = request.don_gia_thang
+
+                # Lọc theo phạm vi áp dụng (Chỉ phòng tiêu chuẩn / Chỉ phòng dịch vụ) nếu không chỉ định danh sách msv
+                if not request.danh_sach_msv and request.ap_dung:
                     ap_norm = request.ap_dung.lower()
                     if "tiêu chuẩn" in ap_norm and "dịch vụ" not in ap_norm and loai_phong_label != "Phòng tiêu chuẩn":
                         continue
@@ -313,11 +402,17 @@ class InvoiceService:
 
                 created_invoices.append(new_invoice)
 
-            if not created_invoices and already_issued_info:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Tất cả hợp đồng được chọn đã được phát hành hóa đơn cho {request.ky_thanh_toan} trước đó ({', '.join(already_issued_info)}). Không thể phát hành trùng!",
-                )
+            if not created_invoices:
+                if already_issued_info:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Tất cả hợp đồng được chọn đã được phát hành hóa đơn cho {request.ky_thanh_toan} trước đó ({', '.join(already_issued_info)}). Không thể phát hành trùng!",
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Không tìm thấy hợp đồng nào phù hợp với phạm vi áp dụng đã chọn để phát hành hóa đơn.",
+                    )
 
             db.commit()
 
@@ -364,6 +459,7 @@ class InvoiceService:
             tong_hoa_don=len(created_invoices),
             tong_so_tien=total_sum,
             invoices=invoices_response,
+            danh_sach_hoa_don=invoices_response,
         )
 
     @staticmethod
@@ -375,71 +471,50 @@ class InvoiceService:
         Lấy danh sách các phòng phục vụ lập hóa đơn tiền điện nước theo tháng.
         Kiểm tra hóa đơn điện nước đã phát hành cho phòng trong tháng tương ứng.
         """
-        # Truy vấn phòng từ CSDL
         rooms = db.query(Phong).all()
         candidates: List[UtilityBillingCandidate] = []
 
-        if rooms:
-            for r in rooms:
-                toa_ten = r.tang.toa_nha.ten_toa if r.tang and r.tang.toa_nha else "KTX"
-                # Đếm số sinh viên đang ở trong phòng
-                student_count = (
-                    db.query(HopDong)
-                    .join(Giuong, HopDong.ma_giuong == Giuong.ma_giuong)
-                    .filter(Giuong.ma_phong == r.ma_phong, HopDong.trang_thai == "ACTIVE")
-                    .count()
-                )
+        for r in rooms:
+            toa_ten = r.tang.toa_nha.ten_toa if r.tang and r.tang.toa_nha else "KTX"
+            student_count = (
+                db.query(HopDong)
+                .join(Giuong, HopDong.ma_giuong == Giuong.ma_giuong)
+                .filter(Giuong.ma_phong == r.ma_phong, HopDong.trang_thai == "ACTIVE")
+                .count()
+            )
 
-                existing = (
-                    db.query(HoaDon)
-                    .filter(
-                        HoaDon.ma_phong == r.ma_phong,
-                        HoaDon.loai_hoa_don == LoaiHoaDon.DIEN_NUOC.value,
-                        HoaDon.ky_thanh_toan == thang,
-                    )
-                    .first()
+            existing = (
+                db.query(HoaDon)
+                .filter(
+                    HoaDon.ma_phong == r.ma_phong,
+                    HoaDon.loai_hoa_don == LoaiHoaDon.DIEN_NUOC.value,
+                    HoaDon.ky_thanh_toan == thang,
                 )
+                .first()
+            )
 
-                candidates.append(
-                    UtilityBillingCandidate(
-                        ma_phong=r.ma_phong,
-                        so_phong=r.so_phong,
-                        toa_nha=toa_ten,
-                        so_sinh_vien=student_count,
-                        chi_so_dien_cu_moi="1000 - 1100",
-                        so_dien_kwh=100,
-                        chi_so_nuoc_cu_moi="400 - 410",
-                        so_nuoc_m3=10,
-                        tong_tien=450000.0,
-                        da_lap_hoa_don=existing is not None,
-                    )
+            so_p = r.so_phong if r.so_phong.upper().startswith("P") else f"P{r.so_phong}"
+
+            candidates.append(
+                UtilityBillingCandidate(
+                    ma_phong=r.ma_phong,
+                    so_phong=so_p,
+                    toa_nha=toa_ten,
+                    so_sinh_vien=student_count if student_count > 0 else (r.suc_chua or 4),
+                    chi_so_dien_cu_moi="1000 - 1100",
+                    so_dien_kwh=100,
+                    chi_so_nuoc_cu_moi="400 - 410",
+                    so_nuoc_m3=10,
+                    tong_tien=450000.0,
+                    so_dien_cu=1000,
+                    so_dien_moi=1100,
+                    so_nuoc_cu=400,
+                    so_nuoc_moi=410,
+                    tien_dien=300000.0,
+                    tien_nuoc=150000.0,
+                    da_lap_hoa_don=existing is not None,
                 )
-        else:
-            # Fallback danh sách phòng mẫu chuẩn Figma
-            for item in DEFAULT_DEMO_UTILITY_ROOMS:
-                existing = (
-                    db.query(HoaDon)
-                    .filter(
-                        HoaDon.ma_phong == item["ma_phong"],
-                        HoaDon.loai_hoa_don == LoaiHoaDon.DIEN_NUOC.value,
-                        HoaDon.ky_thanh_toan == thang,
-                    )
-                    .first()
-                )
-                candidates.append(
-                    UtilityBillingCandidate(
-                        ma_phong=item["ma_phong"],
-                        so_phong=item["so_phong"],
-                        toa_nha=item["toa_nha"],
-                        so_sinh_vien=item["so_sinh_vien"],
-                        chi_so_dien_cu_moi=item["chi_so_dien_cu_moi"],
-                        so_dien_kwh=item["so_dien_kwh"],
-                        chi_so_nuoc_cu_moi=item["chi_so_nuoc_cu_moi"],
-                        so_nuoc_m3=item["so_nuoc_m3"],
-                        tong_tien=item["tong_tien"],
-                        da_lap_hoa_don=existing is not None,
-                    )
-                )
+            )
 
         return candidates
 
@@ -470,10 +545,19 @@ class InvoiceService:
             thang=request.thang,
         )
 
+        if not all_candidates:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Không tìm thấy phòng nào trong hệ thống để phát hành hóa đơn điện nước.",
+            )
+
         targets = all_candidates
         if request.danh_sach_phong:
-            selected_set = set(request.danh_sach_phong)
-            targets = [c for c in all_candidates if c.ma_phong in selected_set]
+            selected_set = {p.strip().upper() for p in request.danh_sach_phong}
+            targets = [
+                c for c in all_candidates
+                if c.ma_phong.upper() in selected_set or c.so_phong.upper() in selected_set
+            ]
             if not targets:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -487,9 +571,15 @@ class InvoiceService:
         room_detail_map = {}
         if request.chi_tiet_phong:
             for item in request.chi_tiet_phong:
-                room_detail_map[item.ma_phong.upper()] = item
+                clean_mp = item.ma_phong.strip().upper()
+                room_detail_map[clean_mp] = item
                 if item.so_phong:
-                    room_detail_map[item.so_phong.upper()] = item
+                    clean_sp = item.so_phong.strip().upper()
+                    room_detail_map[clean_sp] = item
+                    clean_digits = re.sub(r"[^0-9]", "", clean_sp)
+                    if clean_digits:
+                        room_detail_map[clean_digits] = item
+                        room_detail_map[f"P{clean_digits}"] = item
 
         for c in targets:
             existing = (
@@ -511,7 +601,13 @@ class InvoiceService:
             ma_hd = f"HDDN-{today_str}-{unique_suffix}"
 
             # Tính toán tiền điện nước:
-            meter_info = room_detail_map.get(c.ma_phong.upper()) or room_detail_map.get(c.so_phong.upper())
+            digits_so_phong = re.sub(r"[^0-9]", "", c.so_phong)
+            meter_info = (
+                room_detail_map.get(c.ma_phong.upper())
+                or room_detail_map.get(c.so_phong.upper())
+                or room_detail_map.get(digits_so_phong)
+                or room_detail_map.get(f"P{digits_so_phong}")
+            )
             if meter_info:
                 calculated_amount = float(meter_info.tong_tien)
                 so_dien_str = f"Điện: {meter_info.chi_so_dien_cu_moi} ({meter_info.so_dien_kwh} kWh)"
@@ -561,11 +657,17 @@ class InvoiceService:
 
             created_invoices.append(new_invoice)
 
-        if not created_invoices and already_issued_rooms:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Tất cả các phòng được chọn đã được phát hành hóa đơn điện nước cho {request.thang} trước đó ({', '.join(already_issued_rooms)}). Không thể phát hành trùng!",
-            )
+        if not created_invoices:
+            if already_issued_rooms:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Tất cả các phòng được chọn đã được phát hành hóa đơn điện nước cho {request.thang} trước đó ({', '.join(already_issued_rooms)}). Không thể phát hành trùng!",
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Không có phòng nào hợp lệ để phát hành hóa đơn điện nước.",
+                )
 
         db.commit()
 
@@ -603,6 +705,7 @@ class InvoiceService:
             tong_hoa_don=len(created_invoices),
             tong_so_tien=total_sum,
             invoices=invoices_response,
+            danh_sach_hoa_don=invoices_response,
         )
 
     @staticmethod
@@ -623,18 +726,20 @@ class InvoiceService:
         - Tổng tiền = Tiền điện + Tiền nước
         Trả về danh sách phòng kèm kết quả tính toán chi tiết.
         """
-        import io, csv, re
-        from openpyxl import load_workbook
-
         raw_rows = []
         is_excel = filename.lower().endswith((".xlsx", ".xls"))
         if is_excel:
+            if not HAS_OPENPYXL:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Thư viện openpyxl chưa được cài đặt trên máy chủ để đọc file Excel.",
+                )
             try:
                 wb = load_workbook(io.BytesIO(file_bytes), data_only=True)
                 ws = wb.active
                 for row in ws.iter_rows(values_only=True):
                     if row and any(c is not None and str(c).strip() != "" for c in row):
-                        raw_rows.append([str(c).strip() if c is not None else "" for c in row])
+                        raw_rows.append([c if c is not None else "" for c in row])
             except Exception as e:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -670,8 +775,8 @@ class InvoiceService:
         col_water_new = -1
 
         for idx, r in enumerate(raw_rows[:10]):
-            r_lower = [str(c).lower().replace(" ", "").replace("_", "") for c in r]
-            for c_idx, cell in enumerate(r_lower):
+            r_normalized = [strip_accents(str(c)).replace(" ", "").replace("_", "") for c in r]
+            for c_idx, cell in enumerate(r_normalized):
                 if any(k in cell for k in ["phong", "maphong", "sophong", "room"]):
                     col_room = c_idx
                 elif any(k in cell for k in ["diencu", "chisodiencu", "oldelec", "dien_cu"]):
@@ -707,30 +812,32 @@ class InvoiceService:
         room_map = {}
         for r in db_rooms:
             toa = r.tang.toa_nha.ten_toa if r.tang and r.tang.toa_nha else "Tòa A1"
+            clean_so = r.so_phong.lstrip("Pp")
             room_map[r.ma_phong.upper()] = (r.ma_phong, r.so_phong, toa)
             room_map[r.so_phong.upper()] = (r.ma_phong, r.so_phong, toa)
-            room_map[f"P{r.so_phong}".upper()] = (r.ma_phong, r.so_phong, toa)
+            room_map[clean_so.upper()] = (r.ma_phong, r.so_phong, toa)
+            room_map[f"P{clean_so}".upper()] = (r.ma_phong, r.so_phong, toa)
+            room_map[f"P{clean_so} - {toa}".upper()] = (r.ma_phong, r.so_phong, toa)
+            room_map[f"{clean_so} - {toa}".upper()] = (r.ma_phong, r.so_phong, toa)
 
         items: List[UtilityBillingCandidate] = []
         total_amount = 0.0
 
         for r_idx in range(header_idx + 1, len(raw_rows)):
             row = raw_rows[r_idx]
-            if not row or col_room >= len(row) or not row[col_room].strip():
+            if not row or col_room >= len(row) or not str(row[col_room]).strip():
                 continue
 
-            raw_room = row[col_room].strip()
-            if any(k in raw_room.lower() for k in ["phòng", "phong", "tổng", "stt"]):
-                continue
+            raw_room = str(row[col_room]).strip()
+            norm_raw_room = strip_accents(raw_room)
+            if any(k in norm_raw_room for k in ["phong", "tong", "stt"]):
+                if not any(c.isdigit() for c in norm_raw_room):
+                    continue
 
-            def parse_num(val_str: str) -> int:
-                m = re.findall(r"\d+", val_str.replace(",", "").replace(".", ""))
-                return int(m[0]) if m else 0
-
-            elec_old = parse_num(row[col_elec_old]) if col_elec_old < len(row) and col_elec_old != -1 else 1000
-            elec_new = parse_num(row[col_elec_new]) if col_elec_new < len(row) and col_elec_new != -1 else elec_old + 100
-            water_old = parse_num(row[col_water_old]) if col_water_old < len(row) and col_water_old != -1 else 400
-            water_new = parse_num(row[col_water_new]) if col_water_new < len(row) and col_water_new != -1 else water_old + 10
+            elec_old = parse_meter_number(row[col_elec_old]) if 0 <= col_elec_old < len(row) else 1000
+            elec_new = parse_meter_number(row[col_elec_new]) if 0 <= col_elec_new < len(row) else elec_old + 100
+            water_old = parse_meter_number(row[col_water_old]) if 0 <= col_water_old < len(row) else 400
+            water_new = parse_meter_number(row[col_water_new]) if 0 <= col_water_new < len(row) else water_old + 10
 
             elec_usage = max(0, elec_new - elec_old)
             water_usage = max(0, water_new - water_old)
@@ -755,6 +862,14 @@ class InvoiceService:
                 so_p = digits[0] if digits else raw_room
                 toa_p = "Tòa A1"
 
+            # Đếm số sinh viên thực tế trong phòng
+            student_count = (
+                db.query(HopDong)
+                .join(Giuong, HopDong.ma_giuong == Giuong.ma_giuong)
+                .filter(Giuong.ma_phong == ma_p, HopDong.trang_thai == "ACTIVE")
+                .count()
+            )
+
             existing = (
                 db.query(HoaDon)
                 .filter(
@@ -770,7 +885,7 @@ class InvoiceService:
                     ma_phong=ma_p,
                     so_phong=so_p,
                     toa_nha=toa_p,
-                    so_sinh_vien=4,
+                    so_sinh_vien=student_count if student_count > 0 else 4,
                     chi_so_dien_cu_moi=f"{elec_old} - {elec_new}",
                     so_dien_kwh=elec_usage,
                     chi_so_nuoc_cu_moi=f"{water_old} - {water_new}",
@@ -800,10 +915,12 @@ class InvoiceService:
         """
         Tạo file Excel mẫu nhập chỉ số điện nước KTX
         """
-        import openpyxl, io
-        from openpyxl.styles import Font, Alignment, PatternFill
-
-        wb = openpyxl.Workbook()
+        if not HAS_OPENPYXL:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Thư viện openpyxl chưa được cài đặt trên máy chủ để xuất file Excel mẫu.",
+            )
+        wb = Workbook()
         ws = wb.active
         ws.title = "Chỉ số điện nước"
 
@@ -818,12 +935,7 @@ class InvoiceService:
         ]
         ws.append(headers)
 
-        sample_data = [
-            [1, "P101 - Tòa A1", 1000, 1100, 400, 410, "Tháng 09/2026"],
-            [2, "P102 - Tòa A1", 1000, 1100, 400, 410, "Tháng 09/2026"],
-            [3, "P203 - Tòa A1", 1000, 1100, 400, 410, "Tháng 09/2026"],
-            [4, "P205 - Tòa A2", 1540, 1670, 540, 554, "Tháng 09/2026"],
-        ]
+        sample_data = []
         for row in sample_data:
             ws.append(row)
 
@@ -862,15 +974,15 @@ class InvoiceService:
         query = db.query(HoaDon)
 
         if loai_hoa_don:
-            query = query.filter(HoaDon.loai_hoa_don == loai_hoa_don)
+            query = query.filter(HoaDon.loai_hoa_don == loai_hoa_don.strip().upper())
         if ky_thanh_toan:
-            query = query.filter(HoaDon.ky_thanh_toan == ky_thanh_toan)
+            query = query.filter(HoaDon.ky_thanh_toan == ky_thanh_toan.strip())
         if trang_thai:
-            query = query.filter(HoaDon.trang_thai == trang_thai)
+            query = query.filter(HoaDon.trang_thai == trang_thai.strip().upper())
         if msv:
-            query = query.filter(HoaDon.msv == msv)
+            query = query.filter(HoaDon.msv == msv.strip())
         if ma_phong:
-            query = query.filter(HoaDon.ma_phong == ma_phong)
+            query = query.filter(HoaDon.ma_phong == ma_phong.strip())
 
         invoices = query.order_by(HoaDon.ngay_tao.desc()).all()
 
@@ -905,7 +1017,9 @@ class InvoiceService:
         """
         Lấy thông tin chi tiết một hóa đơn theo mã.
         """
-        inv = db.query(HoaDon).filter(HoaDon.ma_hoa_don == ma_hoa_don).first()
+        if not ma_hoa_don:
+            return None
+        inv = db.query(HoaDon).filter(HoaDon.ma_hoa_don == ma_hoa_don.strip()).first()
         if not inv:
             return None
 
@@ -925,4 +1039,3 @@ class InvoiceService:
             ghi_chu=inv.ghi_chu,
             nguoi_tao=inv.nguoi_tao,
         )
-

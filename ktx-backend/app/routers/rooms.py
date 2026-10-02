@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import RoleChecker, get_current_user
+from app.core.deps import RoleChecker, get_current_admin, get_current_user
 from app.models.user import TaiKhoan
 from app.schemas.dorm import (
     GiuongResponse,
@@ -72,8 +72,8 @@ async def upload_room_image(file: UploadFile = File(...)):
     "/buildings",
     response_model=ToaNhaResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Tạo tòa nhà mới (Chỉ Quản Lý)",
-    dependencies=[Depends(RoleChecker(["QuanLy"]))],
+    summary="Tạo tòa nhà mới (Chỉ Quản Lý/Admin)",
+    dependencies=[Depends(get_current_admin)],
 )
 def create_building(
     building_in: ToaNhaCreate,
@@ -110,8 +110,8 @@ def get_building_by_id(
 @router.put(
     "/buildings/{ma_toa}",
     response_model=ToaNhaResponse,
-    summary="Cập nhật tòa nhà (Chỉ Quản Lý)",
-    dependencies=[Depends(RoleChecker(["QuanLy"]))],
+    summary="Cập nhật tòa nhà (Chỉ Quản Lý/Admin)",
+    dependencies=[Depends(get_current_admin)],
 )
 def update_building(
     ma_toa: str,
@@ -124,8 +124,8 @@ def update_building(
 @router.delete(
     "/buildings/{ma_toa}",
     status_code=status.HTTP_200_OK,
-    summary="Xóa tòa nhà (Chỉ Quản Lý)",
-    dependencies=[Depends(RoleChecker(["QuanLy"]))],
+    summary="Xóa tòa nhà (Chỉ Quản Lý/Admin)",
+    dependencies=[Depends(get_current_admin)],
 )
 def delete_building(
     ma_toa: str,

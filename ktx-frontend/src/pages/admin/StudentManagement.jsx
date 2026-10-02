@@ -135,15 +135,7 @@ export default function StudentManagement({ searchTerm = '', openAddRequest = 0 
 
   // Tòa nhà hiển thị
   const displayedBuildings = useMemo(() => {
-    if (buildings.length > 0) return buildings;
-    return [
-      { ma_toa: 'A1', ten_toa: 'Tòa A1' },
-      { ma_toa: 'A2', ten_toa: 'Tòa A2' },
-      { ma_toa: 'A3', ten_toa: 'Tòa A3' },
-      { ma_toa: 'A4', ten_toa: 'Tòa A4' },
-      { ma_toa: 'A5', ten_toa: 'Tòa A5' },
-      { ma_toa: 'A6', ten_toa: 'Tòa A6' },
-    ];
+    return Array.isArray(buildings) ? buildings : [];
   }, [buildings]);
 
   // Nếu đang xem chi tiết sinh viên (Figma Image 2)
@@ -398,13 +390,12 @@ export default function StudentManagement({ searchTerm = '', openAddRequest = 0 
               const isTerminated = sv.trang_thai_o === 'DA_TRA_PHONG';
               const roomInfo = sv.thong_tin_phong_hien_tai;
 
-              // Định dạng hiển thị phòng: e.g. "P102 - A1"
               let roomDisplay = 'Chưa xếp';
               if (isAssigned && roomInfo) {
                 const bld = roomInfo.ten_toa
                   ? roomInfo.ten_toa.replace(/tòa/gi, '').trim()
-                  : 'A1';
-                roomDisplay = `P${roomInfo.so_phong || '102'} – ${bld}`;
+                  : (roomInfo.ma_toa || '');
+                roomDisplay = roomInfo.so_phong ? `P${roomInfo.so_phong}${bld ? ` – ${bld}` : ''}` : 'Chưa xếp';
               }
 
               return (

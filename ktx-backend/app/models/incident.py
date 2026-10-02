@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Date, ForeignKey, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -46,6 +46,27 @@ class PhanAnh(Base):
     )
     tom_tat: Mapped[Optional[str]] = mapped_column(
         Text,
+        nullable=True,
+    )
+    tieu_de: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    muc_do_uu_tien: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        default="Thường",
+        nullable=True,
+    )
+    phong: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+    mo_ta: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    ngay_tao: Mapped[Optional[datetime.datetime]] = mapped_column(
+        DateTime,
         nullable=True,
     )
 

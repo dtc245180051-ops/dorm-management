@@ -12,7 +12,10 @@ const api = axios.create({
 // Tự động đính kèm token nếu có trong localStorage
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    const token =
+      localStorage.getItem('token') ||
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('ktx_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -21,36 +24,9 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Interceptor xử lý lỗi chung và tự động lấy token cho Quản lý nếu chưa đăng nhập
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      try {
-        // Tự động đăng nhập mặc định với tài khoản QL_Minh
-        const formData = new URLSearchParams();
-        formData.append('username', 'QL_Minh');
-        formData.append('password', 'password123');
-
-        const loginRes = await axios.post(`${API_BASE_URL}/auth/login`, formData, {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        });
-
-        if (loginRes.data?.access_token) {
-          localStorage.setItem('access_token', loginRes.data.access_token);
-          localStorage.setItem('user_role', loginRes.data.role);
-          localStorage.setItem('user_name', loginRes.data.username);
-          originalRequest.headers.Authorization = `Bearer ${loginRes.data.access_token}`;
-          return api(originalRequest);
-        }
-      } catch (loginErr) {
-        console.warn('Auto login failed:', loginErr);
-      }
-    }
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 // ----------------- AUTH SERVICES -----------------
@@ -63,9 +39,16 @@ export const authService = {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
     if (res.data?.access_token) {
+      localStorage.setItem('token', res.data.access_token);
       localStorage.setItem('access_token', res.data.access_token);
+      localStorage.setItem('ktx_token', res.data.access_token);
       localStorage.setItem('user_role', res.data.role);
+      localStorage.setItem('ktx_user_role', res.data.role);
       localStorage.setItem('user_name', res.data.username);
+      localStorage.setItem('ktx_username', res.data.username);
+      if (res.data.full_name) {
+        localStorage.setItem('ktx_fullname', res.data.full_name);
+      }
     }
     return res.data;
   },
@@ -76,9 +59,14 @@ export const authService = {
   },
 
   logout: () => {
+    localStorage.removeItem('token');
     localStorage.removeItem('access_token');
+    localStorage.removeItem('ktx_token');
     localStorage.removeItem('user_role');
+    localStorage.removeItem('ktx_user_role');
     localStorage.removeItem('user_name');
+    localStorage.removeItem('ktx_username');
+    localStorage.removeItem('ktx_fullname');
   },
 };
 
@@ -106,7 +94,12 @@ export const dormService = {
   },
 
   deleteBuilding: async (ma_toa) => {
-    const res = await api.delete(`/rooms/buildings/${ma_toa}`);
+    const token =
+      localStorage.getItem('token') ||
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('ktx_token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await api.delete(`/rooms/buildings/${ma_toa}`, { headers });
     return res.data;
   },
 

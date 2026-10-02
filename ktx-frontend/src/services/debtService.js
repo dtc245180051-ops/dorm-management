@@ -9,25 +9,7 @@ export const debtService = {
    * Helper đảm bảo có token xác thực cho Kế toán
    */
   async ensureToken() {
-    let token = localStorage.getItem('ktx_token');
-    if (!token) {
-      try {
-        const resp = await fetch(`${API_BASE_URL}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ username: 'KT_Hoa', password: 'password123' }),
-        });
-        const d = await resp.json();
-        if (d.access_token) {
-          token = d.access_token;
-          localStorage.setItem('ktx_token', token);
-          localStorage.setItem('ktx_user', JSON.stringify({ username: 'KT_Hoa', role: 'KeToan' }));
-        }
-      } catch (e) {
-        console.error('Lỗi tự động xác thực KT_Hoa:', e);
-      }
-    }
-    return token;
+    return localStorage.getItem('access_token') || localStorage.getItem('ktx_token');
   },
 
   /**

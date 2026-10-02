@@ -30,7 +30,7 @@ export default function BuildingDetailPage({
   onBuildingDeleted,
   onSelectRoom,
 }) {
-  const targetBuildingId = initialBuilding?.ma_toa || buildingId || 'A1';
+  const targetBuildingId = initialBuilding?.ma_toa || buildingId || '';
 
   // State dữ liệu tòa nhà
   const [building, setBuilding] = useState(initialBuilding || null);

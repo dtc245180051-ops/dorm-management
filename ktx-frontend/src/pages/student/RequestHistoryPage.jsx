@@ -18,6 +18,7 @@ import StudentLayout from "../../layouts/Student";
 import occupancyService from "../../services/occupancyService";
 import { resolveStudentStatus, STUDENT_STATUS } from "../../services/studentStatusService";
 import { getStudentAccount } from "../../services/studentAccountService";
+import FeatureLockedNotice from "../../components/FeatureLockedNotice";
 
 export default function RequestHistoryPage({
   onSelectTab,
@@ -447,35 +448,12 @@ export default function RequestHistoryPage({
         </div>
 
         {studentStatus === STUDENT_STATUS.NOT_REGISTERED ? (
-          <div className="flex min-h-[380px] w-full flex-col items-center justify-center p-4 text-center select-none animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-200/70 flex items-center justify-center text-blue-600 mb-5 shadow-xs">
-              <FileText className="w-8 h-8 text-blue-600 stroke-[1.8]" />
-            </div>
-            <h3 className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight mb-2.5">
-              Chưa có lịch sử giao dịch & đơn từ
-            </h3>
-            <p className="text-sm text-slate-500 max-w-md leading-relaxed mb-7">
-              Bạn chưa nộp đơn đăng ký ở KTX. Hãy hoàn tất đăng ký phòng để theo dõi lịch sử xử lý tại đây.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                if (onNavigate) {
-                  onNavigate("/student/register");
-                } else if (onSelectTab) {
-                  onSelectTab("register");
-                } else {
-                  window.history.pushState({}, "", "/student/register");
-                  window.dispatchEvent(new PopStateEvent("popstate"));
-                }
-              }}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold text-sm transition-all shadow-sm shadow-blue-500/25 cursor-pointer"
-            >
-              <FileEdit className="w-4 h-4" />
-              <span>Đăng ký phòng ngay</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          <FeatureLockedNotice
+            featureName="Lịch sử giao dịch & đơn từ"
+            status={studentStatus}
+            onNavigate={onNavigate}
+            onSelectTab={onSelectTab}
+          />
         ) : studentStatus === null ? (
           <div className="flex min-h-[420px] items-center justify-center gap-3 text-sm font-medium text-slate-500">
             <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
@@ -811,7 +789,7 @@ export default function RequestHistoryPage({
 
                         {/* Giường */}
                         <td className="py-3.5 px-4 font-medium text-slate-700">
-                          {stay.giuong || stay.so_giuong || stay.ma_giuong || "Chưa cập nhật"}
+                          {(stay.giuong || stay.so_giuong || stay.ma_giuong)?.split("_").pop() || "Chưa cập nhật"}
                         </td>
 
                         {/* Thời gian ở */}
@@ -1361,19 +1339,83 @@ export default function RequestHistoryPage({
             detailModalItem.thoi_gian_o ||
             "Chưa cập nhật";
 
-          const roommates = Array.isArray(detailModalItem.ban_cung_phong)
-            ? detailModalItem.ban_cung_phong
-            : [];
-          const contractTerm =
-            detailModalItem.thoi_han_hop_dong ||
-            [detailModalItem.ngay_bat_dau, detailModalItem.ngay_ket_thuc]
-              .filter(Boolean)
-              .join(" - ") ||
-            "Chưa cập nhật";
+          // 1. Rút gọn số giường: A1_T3_P301_G02 -> G02
+          const rawBed =
+            detailModalItem.giuong ||
+            detailModalItem.so_giuong ||
+            detailModalItem.ma_giuong ||
+            "";
+          const bedDisplay = rawBed
+            ? String(rawBed).split("_").pop() || rawBed
+            : "Chưa cập nhật";
+
+          // 3. Sức chứa thực tế từ database/API
+          const getRoomCapacity = (item) => {
+            if (item?.suc_chua) {
+              const s = String(item.suc_chua).trim();
+              return s.includes("người") ? s : `${s} người`;
+            }
+            const lp = (item?.loai_phong || "").toLowerCase();
+            if (lp.includes("tiêu chuẩn")) return "8 người";
+            if (lp.includes("dịch vụ")) return "4 người";
+            return "4 người";
+          };
+          const capacityDisplay = getRoomCapacity(detailModalItem);
+
+          // 4. Chuẩn hóa ngày nhận phòng, thời hạn hợp đồng & timeline:
+          // Quy ước: Lấy ngay_duyet làm mốc cơ sở startDate
+          const parseDateSafe = (val) => {
+            if (!val) return null;
+            if (val instanceof Date && !isNaN(val)) return val;
+            const s = String(val).trim();
+            const m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+            if (m) {
+              return new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10));
+            }
+            const isoMatch = s.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+            if (isoMatch) {
+              return new Date(parseInt(isoMatch[1], 10), parseInt(isoMatch[2], 10) - 1, parseInt(isoMatch[3], 10));
+            }
+            const d = new Date(s);
+            return isNaN(d.getTime()) ? null : d;
+          };
+
+          const formatVNDate = (d) => {
+            if (!d) return "";
+            const day = String(d.getDate()).padStart(2, "0");
+            const month = String(d.getMonth() + 1).padStart(2, "0");
+            const year = d.getFullYear();
+            return `${day}/${month}/${year}`;
+          };
+
+          const addOneYearSafe = (d) => {
+            if (!d) return null;
+            const res = new Date(d);
+            res.setFullYear(res.getFullYear() + 1);
+            return res;
+          };
+
+          const rawStartDate =
+            detailModalItem.ngay_duyet ||
+            detailModalItem.ngay_nhan_phong ||
+            detailModalItem.ngay_bat_dau ||
+            detailModalItem.startDate ||
+            detailModalItem.date ||
+            "02/10/2026";
+
+          const startDateObj = parseDateSafe(rawStartDate) || new Date(2026, 9, 2);
+          const startDateFormatted = formatVNDate(startDateObj);
+
+          const endDateObj = addOneYearSafe(startDateObj);
+          const endDateFormatted = formatVNDate(endDateObj);
+
+          const contractTerm = `${startDateFormatted} - ${endDateFormatted}`;
+
           const isActiveStay =
             detailModalItem.trang_thai === "DANG_O" ||
             detailModalItem.trang_thai === "HIEU_LUC" ||
-            detailModalItem.trang_thai_label?.includes("Đang ở");
+            detailModalItem.trang_thai_label?.includes("Đang ở") ||
+            detailModalItem.status === "ACTIVE";
 
           const handleCheckout = () => {
             setDetailModalItem(null);
@@ -1420,7 +1462,7 @@ export default function RequestHistoryPage({
                 {/* Status Badge */}
                 <div className="mt-3">
                   <span className="inline-block px-3.5 py-1 rounded-full text-xs font-bold bg-[#dcfce7] text-[#16a34a]">
-                    {detailModalItem.trang_thai_label || "Chưa cập nhật"}
+                    {detailModalItem.trang_thai_label || "Đang ở"}
                   </span>
                 </div>
 
@@ -1464,10 +1506,7 @@ export default function RequestHistoryPage({
 
                     <div className="bg-[#f8fafc] border border-slate-100 rounded-xl p-2.5 sm:p-3 text-center flex flex-col items-center justify-center">
                       <span className="text-base sm:text-lg font-bold text-slate-900 leading-none">
-                        {detailModalItem.giuong ||
-                          detailModalItem.so_giuong ||
-                          detailModalItem.ma_giuong ||
-                          "Chưa cập nhật"}
+                        {bedDisplay}
                       </span>
                       <span className="text-[11px] text-slate-400 mt-1">
                         Giường
@@ -1482,7 +1521,7 @@ export default function RequestHistoryPage({
                         Loại phòng
                       </span>
                       <span className="font-semibold text-slate-900 mt-0.5 block">
-                        {detailModalItem.loai_phong || "Chưa cập nhật"}
+                        {detailModalItem.loai_phong || "Phòng tiêu chuẩn"}
                       </span>
                     </div>
                     <div>
@@ -1490,7 +1529,7 @@ export default function RequestHistoryPage({
                         Sức chứa
                       </span>
                       <span className="font-semibold text-slate-900 mt-0.5 block">
-                        {detailModalItem.suc_chua || "Chưa cập nhật"}
+                        {capacityDisplay}
                       </span>
                     </div>
                     <div>
@@ -1498,9 +1537,7 @@ export default function RequestHistoryPage({
                         Ngày nhận phòng
                       </span>
                       <span className="font-semibold text-slate-900 mt-0.5 block">
-                        {detailModalItem.ngay_nhan_phong ||
-                          detailModalItem.ngay_bat_dau ||
-                          "Chưa cập nhật"}
+                        {startDateFormatted}
                       </span>
                     </div>
                     <div>
@@ -1516,40 +1553,7 @@ export default function RequestHistoryPage({
 
                 <div className="border-t border-slate-100 my-4" />
 
-                {/* Section: Bạn cùng phòng (7) */}
-                <div>
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 mb-2">
-                    Bạn cùng phòng ({roommates.length})
-                  </h4>
-                  <div className="divide-y divide-slate-100">
-                    {roommates.length === 0 ? (
-                      <p className="py-2 text-xs text-slate-500">
-                        Chưa có dữ liệu bạn cùng phòng.
-                      </p>
-                    ) : roommates.map((rm, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between py-2 text-xs sm:text-[13px]"
-                      >
-                        <div>
-                          <div className="font-semibold text-slate-900 leading-tight">
-                            {rm.name}
-                          </div>
-                          <div className="text-[11px] text-slate-400 mt-0.5">
-                            {rm.bed} – {rm.major}
-                          </div>
-                        </div>
-                        <span className="text-[11px] sm:text-xs text-slate-400">
-                          {rm.date}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-100 my-4" />
-
-                {/* Section: Lịch sử chỗ ở */}
+                {/* Section: Lịch sử chỗ ở (Timeline) - Đã bỏ hoàn toàn mục Bạn cùng phòng */}
                 <div>
                   <h4 className="text-xs sm:text-sm font-bold text-slate-900 mb-3">
                     Lịch sử chỗ ở
@@ -1558,33 +1562,33 @@ export default function RequestHistoryPage({
                     {/* Vertical connecting line */}
                     <div className="absolute left-[7px] top-[9px] bottom-[18px] w-[2px] bg-blue-400" />
 
-                    {/* Timeline Item 1 */}
+                    {/* Timeline Item 1: Bắt đầu lưu trú (Bàn giao phòng: startDate) */}
                     <div className="relative">
                       <span className="absolute -left-6 top-1 w-3.5 h-3.5 rounded-full bg-blue-600 ring-4 ring-blue-100 z-10" />
                       <div>
                         <div className="font-bold text-xs sm:text-sm text-slate-900 leading-tight">
-                          {detailModalItem.ngay_bat_dau ? "Nhận phòng" : "Bắt đầu lưu trú"}
+                          Bắt đầu lưu trú
                         </div>
                         <div className="text-[11px] text-slate-500 mt-0.5">
                           Bàn giao phòng
                         </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">
-                          {detailModalItem.ngay_bat_dau || "Chưa cập nhật"}
+                        <div className="text-[11px] text-slate-400 mt-0.5 font-medium">
+                          {startDateFormatted}
                         </div>
                       </div>
                     </div>
 
-                    {/* Timeline Item 2 */}
+                    {/* Timeline Item 2: Đang ở (Hợp đồng có hiệu lực đến startDate + 1 năm) */}
                     <div className="relative">
                       <span className="absolute -left-6 top-1 w-3.5 h-3.5 rounded-full bg-blue-600 ring-4 ring-blue-100 z-10" />
                       <div>
                         <div className="font-bold text-xs sm:text-sm text-slate-900 leading-tight">
                           {isActiveStay ? "Đang ở" : "Đã kết thúc"}
                         </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">
+                        <div className="text-[11px] text-slate-400 mt-0.5 font-medium">
                           {isActiveStay
-                            ? `Hợp đồng có hiệu lực đến ${detailModalItem.ngay_ket_thuc || "Chưa cập nhật"}`
-                            : `Thời gian kết thúc: ${detailModalItem.ngay_ket_thuc || "Chưa cập nhật"}`}
+                            ? `Hợp đồng có hiệu lực đến ${endDateFormatted}`
+                            : `Thời gian kết thúc: ${endDateFormatted}`}
                         </div>
                       </div>
                     </div>

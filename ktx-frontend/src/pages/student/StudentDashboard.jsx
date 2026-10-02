@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import "./StudentDashboard.css";
 import campusBanner from "../../assets/image.png";
 import occupancyService from "../../services/occupancyService";
-import { getStudentAccount } from "../../services/studentAccountService";
+import feedbackService from "../../services/feedbackService";
 
 // Dữ liệu tĩnh cho danh sách chức năng (không phải dữ liệu người dùng)
 const SERVICE_LIST = [
@@ -66,45 +66,6 @@ export default function StudentDashboard({ user, onNavigate }) {
 
   const loadRoomInfo = async () => {
     try {
-      const acc = getStudentAccount();
-      if (acc?.currentResidence?.isActive && acc.currentResidence.contractStatus === "ACTIVE") {
-        const cr = acc.currentResidence;
-        const roomNum = String(cr.roomNumber || "").replace(/^P/i, "");
-        const bld = cr.building || "";
-        const floor = cr.floor || (roomNum.startsWith("5") ? "5" : (roomNum[0] || ""));
-        const firstBill = acc.bills?.[0];
-        if (roomNum) {
-          setCurrentRoomInfo({
-            phong_hien_tai: `P${roomNum}${bld ? ` – ${bld}` : ""}${floor ? ` – Tầng ${floor}` : ""}`,
-            so_phong: `P${roomNum}`,
-            toa: bld,
-            tang: floor,
-            thanh_vien: cr.members || "--",
-            thoi_gian_luu_tru: cr.startDate ? `${cr.startDate} – Nay` : "Đang lưu trú",
-            so_thanh_vien: cr.memberCount || 0,
-            suc_chua: cr.capacity || 8,
-          });
-          setBilling(
-            firstBill
-              ? {
-                  amount: `${(firstBill.amount || 0).toLocaleString("vi-VN")}đ`,
-                  period: "/tháng",
-                  status: firstBill.isPaid ? "Đã thanh toán" : "Chờ thanh toán",
-                }
-              : null
-          );
-          return;
-        }
-      }
-
-      // Nếu hợp đồng đã kết thúc hoặc không active
-      if (acc?.currentResidence?.contractStatus === "EXPIRED" || acc?.currentResidence?.isActive === false) {
-        setCurrentRoomInfo(null);
-        setBilling(null);
-        return;
-      }
-
-      // Thử đọc từ backend thông qua occupancyService
       const info = await occupancyService.getCurrentRoomInfo();
       if (info && info.so_phong) {
         setCurrentRoomInfo(info);
@@ -124,23 +85,17 @@ export default function StudentDashboard({ user, onNavigate }) {
     }
   };
 
-  const loadComplaints = () => {
+  const loadComplaints = async () => {
     try {
-      const raw = localStorage.getItem("dorm_feedbacks");
-      if (raw) {
-        const list = JSON.parse(raw);
-        if (Array.isArray(list)) {
-          const total = list.length;
-          const processing = list.filter(
-            (f) => f.status === "Chờ tiếp nhận" || f.status === "Đang xử lý"
-          ).length;
-          const resolved = list.filter((f) => f.status === "Đã giải quyết").length;
-          setComplaints({ total, processing, resolved });
-          return;
-        }
-      }
-    } catch (_) {}
-    setComplaints({ total: 0, processing: 0, resolved: 0 });
+      const msv = user?.msv || user?.nguoi_dung?.sinh_vien?.msv || localStorage.getItem("ktx_username") || "";
+      const list = await feedbackService.getStudentIncidents(msv);
+      const processing = list.filter((f) => ["Chờ tiếp nhận", "Đang xử lý", "CHO_TIEP_NHAN", "CHO_XU_LY", "DANG_XU_LY"].includes(f.trang_thai || f.status)).length;
+      const resolved = list.filter((f) => ["Đã giải quyết", "DA_GIAI_QUYET", "DA_XU_LY"].includes(f.trang_thai || f.status)).length;
+      setComplaints({ total: list.length, processing, resolved });
+    } catch (error) {
+      console.warn("Không thể tải phản ánh của sinh viên:", error);
+      setComplaints({ total: 0, processing: 0, resolved: 0 });
+    }
   };
 
   const loadRegistrationStatus = () => {
@@ -199,7 +154,6 @@ export default function StudentDashboard({ user, onNavigate }) {
     };
   }, []);
 
-  // Lấy tên hiển thị của sinh viên: ưu tiên dữ liệu đăng nhập / localStorage, fallback 'Nguyễn Văn A' chuẩn theo ảnh
   const displayName =
     user?.ho_ten ||
     user?.nguoi_dung?.ho_ten ||
@@ -323,12 +277,10 @@ export default function StudentDashboard({ user, onNavigate }) {
             <div className="student-stat-info">
               <span className="student-stat-label">Phòng hiện tại</span>
               <span className="student-stat-value">
-                {currentRoomInfo?.so_phong || "Chưa có"}
+                {currentRoomInfo?.so_phong ? `${currentRoomInfo.so_phong} - Tòa ${(currentRoomInfo.toa || "").replace(/^Tòa\s*/i, "")}` : "Chưa có"}
               </span>
               <span className="student-stat-subtext">
-                {currentRoomInfo
-                  ? `${currentRoomInfo.toa || ""} - Tầng ${currentRoomInfo.tang || "--"}`
-                  : "Chưa được xếp phòng"}
+                {currentRoomInfo ? "Đang lưu trú" : "Chưa được xếp phòng"}
               </span>
             </div>
           </div>
@@ -371,7 +323,7 @@ export default function StudentDashboard({ user, onNavigate }) {
             <div className="student-stat-info">
               <span className="student-stat-label">Số thành viên</span>
               <span className="student-stat-value">
-                {currentRoomInfo?.thanh_vien || "--"}
+                {currentRoomInfo ? `${currentRoomInfo.so_thanh_vien ?? "--"}/${String(currentRoomInfo.suc_chua ?? "").match(/\d+/)?.[0] || "--"}` : "--"}
               </span>
               <span className="student-stat-subtext">Hiện tại / sức chứa</span>
             </div>
@@ -433,6 +385,8 @@ export default function StudentDashboard({ user, onNavigate }) {
               </span>
               {billing ? (
                 <span className="student-stat-badge">{billing.status}</span>
+              ) : currentRoomInfo ? (
+                <span className="student-stat-subtext">Chưa phát sinh nợ</span>
               ) : (
                 <span className="student-stat-subtext">Chưa có thông tin</span>
               )}

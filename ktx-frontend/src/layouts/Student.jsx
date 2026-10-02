@@ -15,9 +15,11 @@ import {
   X,
   Send,
   Menu,
+  Lock,
 } from "lucide-react";
 import { askGeminiChatbot } from "../services/geminiService";
 import AppFooter from "../components/AppFooter";
+import { useStudentStatus } from "../hooks/useStudentStatus";
 
 const STUDENT_AVATAR_STORAGE_KEY = "ktx_student_avatar";
 const STUDENT_ANNOUNCEMENTS_KEY = "ktx_announcements";
@@ -47,6 +49,7 @@ export default function StudentLayout({
     localStorage.getItem("ktx_fullname") ||
     localStorage.getItem("ktx_username") ||
     "Sinh viên";
+  const { canAccess } = useStudentStatus();
   const [showChatbotModal, setShowChatbotModal] = useState(false);
   const chatEndRef = useRef(null);
   const [showMobileNav, setShowMobileNav] = useState(false);
@@ -411,21 +414,30 @@ export default function StudentLayout({
                   .map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.id;
+                    const isLocked = !canAccess(item.id);
                     return (
                       <button
                         key={item.id}
                         type="button"
                         onClick={() => handleTabClick(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
                           ? "bg-[#e0f2fe] text-[#0284c7] font-bold shadow-sm"
+                          : isLocked
+                          ? "text-slate-500 hover:bg-slate-100 font-medium"
                           : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
                           }`}
+                        title={isLocked ? "Tính năng yêu cầu được xếp phòng KTX" : item.label}
                       >
-                        <Icon
-                          className={`w-4 h-4 shrink-0 ${isActive ? "text-[#0284c7]" : "text-slate-400"
-                            }`}
-                        />
-                        <span>{item.label}</span>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Icon
+                            className={`w-4 h-4 shrink-0 ${isActive ? "text-[#0284c7]" : isLocked ? "text-slate-400 opacity-60" : "text-slate-400"
+                              }`}
+                          />
+                          <span className="truncate">{item.label}</span>
+                        </div>
+                        {isLocked && (
+                          <Lock className="w-3.5 h-3.5 shrink-0 text-slate-400/80" />
+                        )}
                       </button>
                     );
                   })}
@@ -443,18 +455,27 @@ export default function StudentLayout({
                   .map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.id;
+                    const isLocked = !canAccess(item.id);
                     return (
                       <button
                         key={item.id}
                         type="button"
                         onClick={() => handleTabClick(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
                           ? "bg-[#e0f2fe] text-[#0284c7] font-bold"
+                          : isLocked
+                          ? "text-slate-500 hover:bg-slate-100 font-medium"
                           : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
                           }`}
+                        title={isLocked ? "Tính năng yêu cầu được xếp phòng KTX" : item.label}
                       >
-                        <Icon className="w-4 h-4 shrink-0 text-slate-400" />
-                        <span>{item.label}</span>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Icon className={`w-4 h-4 shrink-0 ${isLocked ? "text-slate-400 opacity-60" : "text-slate-400"}`} />
+                          <span className="truncate">{item.label}</span>
+                        </div>
+                        {isLocked && (
+                          <Lock className="w-3.5 h-3.5 shrink-0 text-slate-400/80" />
+                        )}
                       </button>
                     );
                   })}

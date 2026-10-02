@@ -193,16 +193,6 @@ export function approveStudentRoom(studentId, roomData = {}) {
   }
 
   // 4. Đảm bảo có khoản tiền phòng phát sinh
-  if (!account.bills.some((b) => b.id === "BILL-10-2026")) {
-    account.bills.unshift({
-      id: "BILL-10-2026",
-      title: "Tiền phòng & Dịch vụ KTX Tháng 10/2026",
-      amount: 400000,
-      status: "UNPAID",
-      dueDate: "15/10/2026",
-    });
-  }
-
   return saveStudentAccount(account);
 }
 

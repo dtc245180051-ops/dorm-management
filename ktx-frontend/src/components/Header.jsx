@@ -34,7 +34,7 @@ export default function Header({
         </button>
 
         {/* User profile pill */}
-        <div className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-sm font-semibold transition-colors shadow-xs cursor-pointer select-none">
+        <div className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-sm font-semibold transition-colors shadow-xs select-none">
           <User className="w-4 h-4 fill-white/20" />
           <span>{userName}</span>
         </div>

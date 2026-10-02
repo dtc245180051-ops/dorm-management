@@ -170,16 +170,17 @@ export default function StudentProfilePage({ onSelectTab }) {
           const cleanToa = rawToa.replace("Tòa ", "").trim();
           const rawPhong = currentRoom.so_phong || currentRoom.phong || "";
           const cleanPhong = rawPhong.replace(/^P/i, "").trim();
-          const rawGiuong = currentRoom.giuong || "";
-          const cleanGiuong =
-            rawGiuong.replace(/^G/i, "").replace(/^0+/, "").trim() || "";
+          const rawGiuong = currentRoom.giuong || currentRoom.so_giuong || currentRoom.ma_giuong?.split("_")?.pop() || "";
+          const cleanGiuong = rawGiuong.match(/G?\d+/i)?.[0]
+            ? `G${rawGiuong.match(/\d+/)?.[0]?.padStart(2, "0")}`
+            : "";
 
           setRoomInfo({
-            toa: cleanToa || "---",
+            toa: cleanToa || currentRoom.ten_toa?.replace(/^Tòa\s*/i, "") || "---",
             so_phong: cleanPhong || "Chưa xếp",
-            tang: currentRoom.tang || "---",
+            tang: currentRoom.tang || currentRoom.so_tang || "---",
             giuong: cleanGiuong || "---",
-            ngay_nhan_phong: currentRoom.ngay_nhan_phong || currentRoom.thoi_gian_luu_tru || "---",
+            ngay_nhan_phong: formatDateForDisplay(currentRoom.ngay_duyet || currentRoom.ngay_nhan_phong || currentRoom.ngay_bat_dau || currentRoom.thoi_gian_luu_tru || "---"),
           });
         } else {
           setRoomInfo({

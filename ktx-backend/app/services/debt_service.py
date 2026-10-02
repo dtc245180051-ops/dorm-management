@@ -22,14 +22,6 @@ from app.schemas.debt import (
 
 class DebtService:
     @classmethod
-    def ensure_seed_data(cls, db: Session):
-        """
-        Dữ liệu hệ thống bắt đầu chuẩn xác từ Tháng 09/2026.
-        Không tự động tạo thêm các hóa đơn cũ ngoài Tháng 09/2026.
-        """
-        pass
-
-    @classmethod
     def _format_room_name(cls, db: Session, sv_msv: str) -> str:
         """
         Định dạng phòng hiển thị chuẩn: P203, P101, P102 theo yêu cầu người dùng
@@ -47,7 +39,7 @@ class DebtService:
             if m:
                 return f"P{m.group(1)}"
             return recent_inv.so_phong
-        return "P101"
+        return "--"
 
     @classmethod
     def get_debt_summary(cls, db: Session, keyword: Optional[str] = None) -> DebtSummaryResponse:
@@ -55,7 +47,6 @@ class DebtService:
         Lấy thống kê tổng quan và danh sách chi tiết công nợ sinh viên (Sổ công nợ - Screenshot 1).
         Khi sinh viên chuyển thiếu tiền, công nợ còn lại được ghi nhận tự động.
         """
-        cls.ensure_seed_data(db)
         today = datetime.date.today()
 
         # Lấy tất cả sinh viên
@@ -209,19 +200,15 @@ class DebtService:
         - Thông tin sinh viên (Mã SV, Họ tên, Phòng ở, Số điện thoại, Tổng dư nợ)
         - Danh mục các khoản thu (Khoản thu, Kỳ/Tháng, Số tiền, Đã nộp, Còn lại, Trạng thái)
         """
-        cls.ensure_seed_data(db)
         today = datetime.date.today()
 
         sv = db.query(SinhVien).filter(SinhVien.msv == student_id).first()
         if not sv:
-            # Fallback nếu mã sinh viên demo
-            sv_name = "Nguyễn Hoàng Long"
-            phone = "0987 654 321"
-            room = "P102"
-        else:
-            sv_name = sv.nguoi_dung.ho_ten if sv.nguoi_dung else sv.msv
-            phone = sv.nguoi_dung.so_dien_thoai if (sv.nguoi_dung and sv.nguoi_dung.so_dien_thoai) else "0987 654 321"
-            room = cls._format_room_name(db, sv.msv)
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Kh?ng t?m th?y sinh vi?n")
+        sv_name = sv.nguoi_dung.ho_ten if sv.nguoi_dung else sv.msv
+        phone = sv.nguoi_dung.so_dien_thoai if (sv.nguoi_dung and sv.nguoi_dung.so_dien_thoai) else "--"
+        room = cls._format_room_name(db, sv.msv)
 
         # Lấy danh sách hóa đơn trực tiếp của SV
         direct_invoices = db.query(HoaDon).filter(HoaDon.msv == student_id).order_by(HoaDon.ngay_lap.asc()).all()

@@ -238,6 +238,40 @@ export default function RoomRegistrationPage({
     };
   }, []);
 
+  // Lắng nghe sự kiện realtime khi Admin duyệt đơn để cập nhật tức thì sang Giai đoạn 3
+  useEffect(() => {
+    const handleStatusSync = async () => {
+      const code =
+        formData.msv ||
+        storedStudentAccount.msv ||
+        localStorage.getItem("ktx_username") ||
+        "";
+      if (code) {
+        try {
+          const statusRes = await resolveStudentStatus(code);
+          setStudentStatusInfo({
+            status: statusRes.status,
+            studentInfo: statusRes.studentInfo,
+            activeRoom: statusRes.activeRoom,
+            latestRequest: statusRes.latestRequest,
+            loading: false,
+          });
+        } catch (e) {
+          console.warn("Lỗi sync status trong RoomRegistrationPage:", e);
+        }
+      }
+    };
+
+    window.addEventListener("occupancy-updated", handleStatusSync);
+    window.addEventListener("student-account-updated", handleStatusSync);
+    window.addEventListener("storage", handleStatusSync);
+    return () => {
+      window.removeEventListener("occupancy-updated", handleStatusSync);
+      window.removeEventListener("student-account-updated", handleStatusSync);
+      window.removeEventListener("storage", handleStatusSync);
+    };
+  }, [formData.msv, storedStudentAccount.msv]);
+
   // Tự động điền thông tin phòng nếu sinh viên bấm "Đăng ký phòng này" từ Tra cứu phòng
   useEffect(() => {
     try {
@@ -503,6 +537,9 @@ export default function RoomRegistrationPage({
                       {studentStatusInfo.activeRoom?.so_phong ||
                         studentStatusInfo.activeRoom?.ma_phong ||
                         "---"}
+                      {studentStatusInfo.activeRoom?.so_giuong || studentStatusInfo.activeRoom?.giuong
+                        ? ` / ${String(studentStatusInfo.activeRoom.so_giuong || studentStatusInfo.activeRoom.giuong).split('_').pop()}`
+                        : ""}
                     </div>
                   </div>
                   <div className="bg-white/90 rounded-xl p-3.5 border border-emerald-100/80 shadow-2xs">
@@ -591,7 +628,7 @@ export default function RoomRegistrationPage({
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-slate-800 leading-tight">
-                    Đơn đăng ký đang chờ xét duyệt
+                    Đơn đăng ký của bạn đang chờ Ban Quản lý xét duyệt
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-500 font-medium">
                     Đơn đăng ký lưu trú của bạn đã được gửi thành công và đang

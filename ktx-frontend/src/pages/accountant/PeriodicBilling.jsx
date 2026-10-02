@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import './PeriodicBilling.css';
 import { invoiceService } from '../../services/invoiceService';
+import { getStudentAccount } from '../../services/studentAccountService';
 
 /**
  * Danh sách tháng thanh toán
@@ -29,33 +30,14 @@ const APPLIED_TARGET_OPTIONS = [
 
 /**
  * Đơn giá niêm yết theo tháng theo quy định:
- * - Phòng tiêu chuẩn: 350.000 VNĐ/tháng
- * - Phòng dịch vụ: 650.000 VNĐ/tháng
  */
-const LISTED_PRICES = {
-  tieu_chuan: {
-    key: 'tieu_chuan',
-    name: 'Phòng tiêu chuẩn',
-    price: 350000,
-    label: 'Phòng tiêu chuẩn : 350.000 VNĐ/tháng',
-  },
-  dich_vu: {
-    key: 'dich_vu',
-    name: 'Phòng dịch vụ',
-    price: 650000,
-    label: 'Phòng dịch vụ : 650.000 VNĐ/tháng',
-  },
-};
-
 /**
  * Danh sách sinh viên mẫu theo tháng (kèm loại phòng và đơn giá niêm yết)
  */
-const MOCK_ROOM_BILLING_STUDENTS = [];
 
 /**
  * Dữ liệu mẫu hóa đơn điện nước theo tháng
  */
-const MOCK_UTILITY_BILLING_ROOMS = [];
 
 /**
  * Trang "LẬP HÓA ĐƠN ĐỊNH KỲ" (Dành riêng cho Kế Toán)
@@ -111,37 +93,63 @@ export default function PeriodicBilling({ searchTerm = '' }) {
 
   // 1. Tải danh sách ứng viên tiền phòng từ Backend API khi thay đổi tham số (tháng, phạm vi loại phòng)
   const loadRoomCandidates = useCallback(async () => {
-    const data = await invoiceService.getRoomCandidates(billingMonth, 1, 350000, appliedTarget);
+    let list = [];
+    const data = await invoiceService.getRoomCandidates(billingMonth, 1, undefined, appliedTarget);
     if (data !== null && Array.isArray(data)) {
-      setRoomStudents(
-        data.map((c) => {
-          const isService = c.loai_phong === 'Phòng dịch vụ' || (c.phong && c.phong.includes('203')) || c.so_tien === 650000;
-          const roomTypeLabel = c.loai_phong || (isService ? 'Phòng dịch vụ' : 'Phòng tiêu chuẩn');
-          const unitPrice = isService ? 650000 : 350000;
-          const finalAmount = c.so_tien || unitPrice;
-          return {
-            id: c.msv,
-            name: c.ho_ten,
-            room: c.phong,
-            roomType: roomTypeLabel,
-            monthlyPrice: c.don_gia_thang || unitPrice,
-            rawAmount: finalAmount,
-            contractTerm: c.thoi_han_hop_dong || '01/09/2026 - 31/01/2027',
-            termAmount: `${finalAmount.toLocaleString('vi-VN')} VND`,
-            daLapHoaDon: c.da_lap_hoa_don,
-          };
-        })
-      );
-    } else {
-      // Fallback dữ liệu mẫu khi mất kết nối mạng hoặc lỗi server
-      setRoomStudents(
-        MOCK_ROOM_BILLING_STUDENTS.map((s) => ({
-          ...s,
-          rawAmount: s.monthlyPrice,
-          termAmount: `${s.monthlyPrice.toLocaleString('vi-VN')} VND`,
-        }))
-      );
+      list = data.map((c) => {
+        const isService =
+          String(c.loai_phong || '').toLowerCase().includes('dịch vụ') ||
+          String(c.loai_phong || '').toLowerCase().includes('dich vu');
+        const roomTypeLabel = c.loai_phong || (isService ? 'Phòng dịch vụ' : 'Phòng tiêu chuẩn');
+        const unitPrice = Number(c.don_gia_thang || 0);
+        const finalAmount = Number(c.so_tien ?? unitPrice);
+        return {
+          id: c.msv,
+          name: c.ho_ten,
+          room: c.phong,
+          roomType: roomTypeLabel,
+          monthlyPrice: Number(c.don_gia_thang || 0),
+          rawAmount: finalAmount,
+          contractTerm: c.thoi_han_hop_dong || '',
+          termAmount: `${finalAmount.toLocaleString('vi-VN')} VND`,
+          daLapHoaDon: c.da_lap_hoa_don,
+        };
+      });
     }
+
+    // Tự động đồng bộ sinh viên vừa được duyệt phòng từ tài khoản lưu trú hợp lệ
+    try {
+      const acc = getStudentAccount();
+      if (
+        acc?.currentResidence?.isActive &&
+        acc.currentResidence.contractStatus === 'ACTIVE' &&
+        acc.currentResidence.roomNumber
+      ) {
+        const studentId = acc.studentId || localStorage.getItem('ktx_username') || '';
+        const alreadyExists = list.some(
+          (s) => s.id?.toLowerCase() === studentId.toLowerCase()
+        );
+        if (!alreadyExists && studentId) {
+          const roomTypeLabel = acc.currentResidence.roomType || 'Phòng tiêu chuẩn';
+          const monthlyPrice = roomTypeLabel.includes('dịch vụ') ? 800000 : 400000;
+          list.unshift({
+            id: studentId.toUpperCase(),
+            name: acc.fullName || localStorage.getItem('ktx_fullname') || 'Sinh viên KTX',
+            room: `P${acc.currentResidence.roomNumber}`,
+            roomType: roomTypeLabel,
+            monthlyPrice,
+            rawAmount: monthlyPrice,
+            contractTerm: `${acc.currentResidence.startDate || '01/10/2026'} – ${acc.currentResidence.endDate || '30/06/2027'}`,
+            termAmount: `${monthlyPrice.toLocaleString('vi-VN')} VND`,
+            daLapHoaDon: false,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Lỗi đồng bộ sinh viên hợp lệ vào PeriodicBilling:', e);
+    }
+
+    setRoomStudents(list);
   }, [billingMonth, appliedTarget]);
 
   // 2. Khi đổi tháng điện nước, khôi phục cache nếu tháng đó đã nạp file, ngược lại reset rỗng
@@ -160,6 +168,19 @@ export default function PeriodicBilling({ searchTerm = '' }) {
 
   useEffect(() => {
     loadRoomCandidates();
+
+    const handleUpdate = () => {
+      loadRoomCandidates();
+    };
+
+    window.addEventListener('occupancy-updated', handleUpdate);
+    window.addEventListener('student-account-updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('occupancy-updated', handleUpdate);
+      window.removeEventListener('student-account-updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
   }, [loadRoomCandidates]);
 
   // 3. Lọc dữ liệu sinh viên theo loại phòng áp dụng và từ khóa tìm kiếm
@@ -195,7 +216,7 @@ export default function PeriodicBilling({ searchTerm = '' }) {
   // Tổng giá trị đợt phát hành = Tổng tiền của tất cả sinh viên trong đợt phát hành này
   const totalBatchAmount = useMemo(() => {
     return targetRoomStudents.reduce((sum, s) => {
-      const amt = s.rawAmount || (s.roomType === 'Phòng dịch vụ' ? 650000 : 350000);
+      const amt = Number(s.rawAmount || 0);
       return sum + amt;
     }, 0);
   }, [targetRoomStudents]);
@@ -282,7 +303,7 @@ export default function PeriodicBilling({ searchTerm = '' }) {
         ky_thanh_toan: billingMonth,
         ap_dung: appliedTarget,
         thoi_gian_o_thang: 1,
-        don_gia_thang: 350000.0,
+
         han_thanh_toan: deadline,
         ghi_chu: `Phát hành hóa đơn tiền phòng ${billingMonth} (${appliedTarget})`,
       };
@@ -454,11 +475,9 @@ export default function PeriodicBilling({ searchTerm = '' }) {
           {/* Cột phải: Đơn giá niêm yết cố định & Tổng giá trị đợt phát hành */}
           <div className="billing-form-col">
             <div className="billing-control-box readonly-box">
-              <span className="billing-static-text">Phòng tiêu chuẩn : 350.000 VNĐ/tháng</span>
             </div>
 
             <div className="billing-control-box readonly-box">
-              <span className="billing-static-text">Phòng dịch vụ : 650.000 VNĐ/tháng</span>
             </div>
 
             {/* Đổi ô tổng phải nộp thành tổng giá trị đợt phát hành */}
@@ -800,7 +819,6 @@ export default function PeriodicBilling({ searchTerm = '' }) {
                     </div>
                     <div className="billing-summary-row">
                       <span className="label">Đơn giá niêm yết:</span>
-                      <span className="value">Tiêu chuẩn: 350.000đ | Dịch vụ: 650.000đ</span>
                     </div>
                     <div className="billing-summary-row">
                       <span className="label">Số sinh viên áp dụng:</span>

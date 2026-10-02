@@ -46,14 +46,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
   });
 
   // 3. Danh sách phòng khả dụng cho dropdown chọn phòng đích
-  const [roomOptions, setRoomOptions] = useState([
-    { value: "P36 - Tòa A3 - Tầng 3", label: "P36 - Tòa A3 - Tầng 3" },
-    { value: "P101 - Tòa A1 - Tầng 1", label: "P101 - Tòa A1 - Tầng 1" },
-    { value: "P102 - Tòa A1 - Tầng 1", label: "P102 - Tòa A1 - Tầng 1" },
-    { value: "P103 - Tòa A1 - Tầng 1", label: "P103 - Tòa A1 - Tầng 1" },
-    { value: "P201 - Tòa A1 - Tầng 2", label: "P201 - Tòa A1 - Tầng 2" },
-    { value: "P205 - Tòa A2 - Tầng 2", label: "P205 - Tòa A2 - Tầng 2" },
-  ]);
+  const [roomOptions, setRoomOptions] = useState([]);
 
   // 4. Form state Chuyển phòng (Mặc định TRỐNG HOÀN TOÀN mỗi lần ấn vào)
   const [transferForm, setTransferForm] = useState({
@@ -656,7 +649,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
                         <option value="">
                           -- Chọn phòng mong muốn chuyển tới --
                         </option>
-                        {roomOptions.map((opt, idx) => (
+                        {roomOptions?.map((opt, idx) => (
                           <option key={idx} value={opt.value}>
                             {opt.label}
                           </option>

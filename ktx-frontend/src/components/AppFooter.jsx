@@ -27,7 +27,6 @@ export default function AppFooter({ onAction }) {
               <span className="text-slate-800">DORM</span>
             </span>
           </div>
-
           <p className="text-sm leading-6 text-slate-600">
             Đại học Công nghệ Thông tin và Truyền thông. Cổng dịch vụ nội trú
             dành cho sinh viên.

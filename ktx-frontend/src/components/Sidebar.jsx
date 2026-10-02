@@ -89,7 +89,7 @@ export default function Sidebar({ activeTab = "rooms", onSelectTab }) {
           onClick={() => {
             if (window.confirm("Bạn có chắc chắn muốn đăng xuất không?")) {
               localStorage.clear();
-              window.location.reload();
+              window.location.href = "/";
             }
           }}
           className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-[8px] text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors text-left cursor-pointer"

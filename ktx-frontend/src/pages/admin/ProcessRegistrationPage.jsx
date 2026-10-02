@@ -337,7 +337,7 @@ export default function ProcessRegistrationPage({
       // Cập nhật Schema tài khoản sinh viên dùng chung (Global State / localStorage)
       const bldName = selectedBuilding.startsWith("Tòa") ? selectedBuilding : `Tòa ${selectedBuilding}`;
       const rNum = String(selectedRoom).replace(/^P/i, "");
-      approveStudentRoom(requestData?.msv || "dtc245180051", {
+      approveStudentRoom(requestData?.msv, {
         requestId,
         building: bldName,
         roomNumber: rNum,
@@ -455,7 +455,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.msv || "B21DCCN001"}
+                      value={requestData?.msv || ""}
                       placeholder="Mã sinh viên"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -464,7 +464,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.ho_ten || "Nguyễn Văn A"}
+                      value={requestData?.ho_ten || ""}
                       placeholder="Họ và tên"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -473,7 +473,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.gioi_tinh || "Nam"}
+                      value={requestData?.gioi_tinh || ""}
                       placeholder="Giới tính"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -482,7 +482,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.ngay_sinh || "2003-05-15"}
+                      value={requestData?.ngay_sinh || ""}
                       placeholder="Ngày sinh"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -491,7 +491,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.cccd || "001203004567"}
+                      value={requestData?.cccd || ""}
                       placeholder="Số CCCD/Định danh"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -504,7 +504,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.so_dien_thoai || "0987654321"}
+                      value={requestData?.so_dien_thoai || ""}
                       placeholder="Số điện thoại"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -530,7 +530,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.khoa || "Công nghệ thông tin"}
+                      value={requestData?.khoa || ""}
                       placeholder="Khoa / Viện"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -539,7 +539,7 @@ export default function ProcessRegistrationPage({
                     <input
                       type="text"
                       readOnly
-                      value={requestData?.lop || "D21CQCN01-B"}
+                      value={requestData?.lop || ""}
                       placeholder="Lớp chuyên ngành"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                     />
@@ -569,7 +569,7 @@ export default function ProcessRegistrationPage({
                   <input
                     type="text"
                     readOnly
-                    value={requestData?.nguoi_giam_ho || "Nguyễn Văn B"}
+                    value={requestData?.ho_ten_nguoi_giam_ho || ""}
                     placeholder="Họ và tên người giám hộ"
                     className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                   />
@@ -578,7 +578,7 @@ export default function ProcessRegistrationPage({
                   <input
                     type="text"
                     readOnly
-                    value={requestData?.moi_quan_he || "Bố"}
+                    value={requestData?.moi_quan_he || ""}
                     placeholder="Mối quan hệ"
                     className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                   />
@@ -587,7 +587,7 @@ export default function ProcessRegistrationPage({
                   <input
                     type="text"
                     readOnly
-                    value={requestData?.sdt_nguoi_giam_ho || "0912345678"}
+                    value={requestData?.sdt_nguoi_giam_ho || ""}
                     placeholder="Số điện thoại liên hệ"
                     className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                   />

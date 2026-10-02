@@ -13,7 +13,6 @@ import json
 import urllib.request
 import urllib.error
 import urllib.parse
-from datetime import date, timedelta
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -53,116 +52,23 @@ def http_request(method, endpoint, data=None, token=None, headers=None, params=N
     except Exception as e:
         return 500, {"error": str(e)}
 
-def ensure_sample_contract_exists():
-    """
-    Tạo dữ liệu hợp đồng mẫu hợp lệ trực tiếp vào DB nếu DB chưa có hợp đồng nào.
-    Tuân thủ đúng 100% quan hệ FK của DB hiện có:
-    ToaNha -> Tang -> Phong -> Giuong
-    NguoiDung -> SinhVien
-    HopDong (ma_hop_dong, msv, ma_giuong, trang_thai='ACTIVE')
-    """
+def get_existing_active_contract():
+    """Read an existing active contract; never create database rows."""
     try:
         from app.core.database import SessionLocal
-        from app.models.dorm import ToaNha, Tang, Phong, Giuong
-        from app.models.user import NguoiDung, SinhVien
         from app.models.contract import HopDong
 
         db = SessionLocal()
         try:
-            existing_contract = db.query(HopDong).filter(HopDong.trang_thai == "ACTIVE").first()
-            if existing_contract:
-                print(f"[INIT] Đã có hợp đồng ACTIVE trong CSDL: ma_hop_dong={existing_contract.ma_hop_dong}, msv={existing_contract.msv}")
-                return existing_contract.ma_hop_dong, existing_contract.msv
-
-            print("[INIT] CSDL chưa có hợp đồng. Tiến hành khởi tạo 1 hợp đồng mẫu hợp lệ...")
-            # 1. ToaNha
-            toa = db.query(ToaNha).filter(ToaNha.ma_toa == "TOA_A1").first()
-            if not toa:
-                toa = ToaNha(ma_toa="TOA_A1", ten_toa="Tòa A1")
-                db.add(toa)
-                db.flush()
-
-            # 2. Tang
-            tang = db.query(Tang).filter(Tang.ma_tang == "TANG_1_A1").first()
-            if not tang:
-                tang = Tang(ma_tang="TANG_1_A1", so_tang=1, ma_toa=toa.ma_toa)
-                db.add(tang)
-                db.flush()
-
-            # 3. Phong
-            phong = db.query(Phong).filter(Phong.ma_phong == "P101_A1").first()
-            if not phong:
-                phong = Phong(ma_phong="P101_A1", so_phong="101", suc_chua=4, loai_phong="TIÊU CHUẨN", ma_tang=tang.ma_tang)
-                db.add(phong)
-                db.flush()
-
-            # 4. Giuong
-            giuong = db.query(Giuong).filter(Giuong.ma_giuong == "G101_01").first()
-            if not giuong:
-                giuong = Giuong(ma_giuong="G101_01", ma_phong=phong.ma_phong, trang_thai="OCCUPIED")
-                db.add(giuong)
-                db.flush()
-
-            # 5. NguoiDung + SinhVien
-            from app.models.user import TaiKhoan, VaiTro
-            tk_sv = db.query(TaiKhoan).filter(TaiKhoan.vai_tro == VaiTro.SINH_VIEN).first()
-            if not tk_sv:
-                import uuid
-                tk_sv = TaiKhoan(
-                    ma_tai_khoan=str(uuid.uuid4()),
-                    ten_dang_nhap="sv_test_sample",
-                    mat_khau_hash="dummy_hash",
-                    vai_tro=VaiTro.SINH_VIEN,
-                )
-                db.add(tk_sv)
-                db.flush()
-
-            nd = db.query(NguoiDung).filter(NguoiDung.ma_tai_khoan == tk_sv.ma_tai_khoan).first()
-            if not nd:
-                import uuid
-                nd = NguoiDung(
-                    ma_nguoi_dung=str(uuid.uuid4()),
-                    ma_tai_khoan=tk_sv.ma_tai_khoan,
-                    ho_ten="Nguyễn Văn An",
-                    email="an.nv@student.edu.vn",
-                    so_dien_thoai="0987654321",
-                )
-                db.add(nd)
-                db.flush()
-
-            sv = db.query(SinhVien).filter(SinhVien.ma_nguoi_dung == nd.ma_nguoi_dung).first()
-            if not sv:
-                msv_val = tk_sv.ten_dang_nhap.upper() if tk_sv.ten_dang_nhap.startswith("dtc") else "DTC245180001"
-                sv = SinhVien(msv=msv_val, ma_nguoi_dung=nd.ma_nguoi_dung, lop="K18-CNTT", gioi_tinh="NAM")
-                db.add(sv)
-                db.flush()
-
-
-            # 6. HopDong
-            ma_hd = "HD-2026-0001"
-            hd = db.query(HopDong).filter(HopDong.ma_hop_dong == ma_hd).first()
-            if not hd:
-                hd = HopDong(
-                    ma_hop_dong=ma_hd,
-                    msv=sv.msv,
-                    ma_giuong=giuong.ma_giuong,
-                    ngay_bat_dau=date(2026, 9, 1),
-                    ngay_ket_thuc=date(2027, 1, 31),
-                    trang_thai="ACTIVE",
-                )
-                db.add(hd)
-
-            db.commit()
-            print(f"[INIT] Khởi tạo thành công hợp đồng mẫu: ma_hop_dong={ma_hd}, msv={sv.msv}")
-            return ma_hd, sv.msv
-        except Exception as e:
-            db.rollback()
-            print(f"[INIT ERROR] Không thể khởi tạo hợp đồng mẫu: {e}")
-            return None, None
+            contract = db.query(HopDong).filter(HopDong.trang_thai == "ACTIVE").first()
+            if not contract:
+                print("[SKIP] No ACTIVE contract exists; skipping contract dependent checks.")
+                return None, None
+            return contract.ma_hop_dong, contract.msv
         finally:
             db.close()
-    except Exception as e:
-        print(f"[INIT ERROR] Lỗi import database: {e}")
+    except Exception as exc:
+        print(f"[DB ERROR] Unable to read an existing contract: {exc}")
         return None, None
 
 
@@ -172,9 +78,9 @@ def run_tests():
     print("=" * 75)
 
     # Đảm bảo có hợp đồng trước
-    ma_hd_real, msv_real = ensure_sample_contract_exists()
-
-
+    ma_hd_real, msv_real = get_existing_active_contract()
+    if not ma_hd_real:
+        return
 
     # 1. Đăng nhập Kế toán
     status_kt, kt_data = http_request(
@@ -206,7 +112,7 @@ def run_tests():
 
     # 3. Đảm bảo có hợp đồng thực tế tồn tại trong CSDL
     print(f"\n[3] Kiểm tra và chuẩn bị dữ liệu hợp đồng thực tế trong CSDL:")
-    ma_hd_real, msv_real = ensure_sample_contract_exists()
+    ma_hd_real, msv_real = get_existing_active_contract()
     assert ma_hd_real is not None, "Không thể xác định hoặc tạo hợp đồng thực tế trong CSDL"
     print(f"  -> Hợp đồng hợp lệ: ma_hop_dong='{ma_hd_real}', msv='{msv_real}'")
 

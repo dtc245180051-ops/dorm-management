@@ -1,5 +1,5 @@
 import api, { dormService } from "./api";
-import { getStudentAccount } from "./studentAccountService";
+import { getStudentAccount, saveStudentAccount } from "./studentAccountService";
 
 const STORAGE_KEY = "dorm_registration_requests";
 
@@ -123,25 +123,7 @@ function getLocalStudentProfile() {
     const profile = raw
       ? { ...DEFAULT_STUDENT_PROFILE, ...JSON.parse(raw) }
       : { ...DEFAULT_STUDENT_PROFILE };
-    if (!localStorage.getItem(STUDENT_PROFILE_MIGRATION_KEY)) {
-      const legacyDefaults = {
-        ho_ten: "Nguyễn Văn A",
-        msv: "DTCxxxxxxxxx",
-        lop: "CNTT K23A",
-        so_dien_thoai: "09xxxxxxxx",
-        email: "DTCxxxxxxxxx@ictu.edu.vn",
-        ngay_sinh: "12/07/2007",
-        gioi_tinh: "Nữ",
-        dan_toc: "Kinh",
-        que_quan: "Xã A - Tỉnh Bắc Ninh",
-        khoa: "CNTT",
-      };
-      Object.entries(legacyDefaults).forEach(([field, value]) => {
-        if (profile[field] === value) profile[field] = "";
-      });
-      saveLocalStudentProfile(profile);
-      localStorage.setItem(STUDENT_PROFILE_MIGRATION_KEY, "true");
-    }
+
     const storedCode = (
       localStorage.getItem("ktx_username") ||
       localStorage.getItem("ktx_email")?.split("@")[0] ||
@@ -202,7 +184,7 @@ function getLocalStayContracts() {
     }
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((c) => c && c.id !== "HD26-A2P36-G07");
+    return parsed;
   } catch (e) {
     return [];
   }
@@ -278,1027 +260,46 @@ export const occupancyService = {
       );
     }
 
-    return [
-      { gia_tien: 4800000, label: "4.800.000 đ/năm" },
-      { gia_tien: 7200000, label: "7.200.000 đ/năm" },
-      { gia_tien: 9600000, label: "9.600.000 đ/năm" },
-      { gia_tien: 12000000, label: "12.000.000 đ/năm" },
-    ];
+    return [];
   },
 
   /**
    * Lấy danh sách toàn bộ phòng phục vụ tính năng Tra cứu phòng (Student Room Lookup)
    * Trả về bộ dữ liệu chuẩn 100% theo giao diện Figma Tra cứu phòng (P36, P26, P106, P11, P54, P86, P16, P51,...)
    */
-  getRooms: async (params = {}) => {
-    // Bộ dữ liệu chuẩn 100% theo giao diện Figma Tra cứu phòng (Phân hệ Sinh viên)
-    return [
-      // Hàng 1 (4 card đầu chuẩn theo ảnh Figma)
-      {
-        id: "P36",
-        ma_phong: "P36",
-        so_phong: "P36",
-        ten_phong: "P36",
-        toa: "Tòa A2",
-        ma_toa: "A2",
-        tang: "Tầng 3",
-        so_tang: 3,
-        loai_phong: "Phòng tiêu chuẩn",
-        suc_chua: 8,
-        da_o: 6,
-        si_so: "6/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "2.750.000 đ / năm",
-        gia_so: 2750000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-tieu-chuan.jpg",
-          "/images/rooms/phong-tieu-chuan-2.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-          "Wifi tốc độ cao",
-        ],
-        giuong_trong: ["G03", "G07"],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "TRONG", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "DA_O", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-          { ma: "G07", trang_thai: "TRONG", tang: 1 },
-          { ma: "G08", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      {
-        id: "P26",
-        ma_phong: "P26",
-        so_phong: "P26",
-        ten_phong: "P26",
-        toa: "Tòa A2",
-        ma_toa: "A2",
-        tang: "Tầng 2",
-        so_tang: 2,
-        loai_phong: "Phòng tiêu chuẩn",
-        suc_chua: 8,
-        da_o: 5,
-        si_so: "5/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "1.760.000 đ / năm",
-        gia_so: 1760000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-tieu-chuan.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-        ],
-        giuong_trong: ["G02", "G05", "G08"],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "TRONG", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "TRONG", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-          { ma: "G07", trang_thai: "DA_O", tang: 1 },
-          { ma: "G08", trang_thai: "TRONG", tang: 2 },
-        ],
-      },
-      {
-        id: "P106",
-        ma_phong: "P106",
-        so_phong: "P106",
-        ten_phong: "P106",
-        toa: "Tòa A19",
-        ma_toa: "A19",
-        tang: "Tầng 1",
-        so_tang: 1,
-        loai_phong: "Phòng tiêu chuẩn",
-        suc_chua: 8,
-        da_o: 5,
-        si_so: "5/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "1.760.000 đ / năm",
-        gia_so: 1760000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-tieu-chuan-2.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Wifi tốc độ cao",
-        ],
-        giuong_trong: ["G01", "G04", "G06"],
-        giuongs: [
-          { ma: "G01", trang_thai: "TRONG", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "TRONG", tang: 2 },
-          { ma: "G05", trang_thai: "DA_O", tang: 1 },
-          { ma: "G06", trang_thai: "TRONG", tang: 2 },
-          { ma: "G07", trang_thai: "DA_O", tang: 1 },
-          { ma: "G08", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      {
-        id: "P11",
-        ma_phong: "P11",
-        so_phong: "P11",
-        ten_phong: "P11",
-        toa: "Tòa A1",
-        ma_toa: "A1",
-        tang: "Tầng 3",
-        so_tang: 3,
-        loai_phong: "Phòng dịch vụ",
-        suc_chua: 8,
-        da_o: 8,
-        si_so: "8/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "1.930.000 đ / năm",
-        gia_so: 1930000,
-        trang_thai: "DA_DAY",
-        trang_thai_label: "Đã đầy",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-dich-vu.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-          "Tủ lạnh mini",
-        ],
-        giuong_trong: [],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "DA_O", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-          { ma: "G07", trang_thai: "DA_O", tang: 1 },
-          { ma: "G08", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      // Hàng 2 (4 card tiếp theo chuẩn theo ảnh Figma)
-      {
-        id: "P54",
-        ma_phong: "P54",
-        so_phong: "P54",
-        ten_phong: "P54",
-        toa: "Tòa A4",
-        ma_toa: "A4",
-        tang: "Tầng 2",
-        so_tang: 2,
-        loai_phong: "Phòng tiêu chuẩn",
-        suc_chua: 8,
-        da_o: 5,
-        si_so: "5/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "1.760.000 đ / năm",
-        gia_so: 1760000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-tieu-chuan.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-        ],
-        giuong_trong: ["G03", "G06", "G07"],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "TRONG", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "DA_O", tang: 1 },
-          { ma: "G06", trang_thai: "TRONG", tang: 2 },
-          { ma: "G07", trang_thai: "TRONG", tang: 1 },
-          { ma: "G08", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      {
-        id: "P86",
-        ma_phong: "P86",
-        so_phong: "P86",
-        ten_phong: "P86",
-        toa: "Tòa A7",
-        ma_toa: "A7",
-        tang: "Tầng 2",
-        so_tang: 2,
-        loai_phong: "Phòng dịch vụ",
-        suc_chua: 8,
-        da_o: 5,
-        si_so: "5/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "2.750.000 đ / năm",
-        gia_so: 2750000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-dich-vu.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-          "Tủ lạnh mini",
-        ],
-        giuong_trong: ["G02", "G05", "G08"],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "TRONG", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "TRONG", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-          { ma: "G07", trang_thai: "DA_O", tang: 1 },
-          { ma: "G08", trang_thai: "TRONG", tang: 2 },
-        ],
-      },
-      {
-        id: "P16",
-        ma_phong: "P16",
-        so_phong: "P16",
-        ten_phong: "P16",
-        toa: "Tòa A1",
-        ma_toa: "A1",
-        tang: "Tầng 3",
-        so_tang: 3,
-        loai_phong: "Phòng dịch vụ",
-        suc_chua: 8,
-        da_o: 5,
-        si_so: "5/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "1.930.000 đ / năm",
-        gia_so: 1930000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-dich-vu.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-        ],
-        giuong_trong: ["G01", "G04", "G07"],
-        giuongs: [
-          { ma: "G01", trang_thai: "TRONG", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "TRONG", tang: 2 },
-          { ma: "G05", trang_thai: "DA_O", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-          { ma: "G07", trang_thai: "TRONG", tang: 1 },
-          { ma: "G08", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      {
-        id: "P51",
-        ma_phong: "P51",
-        so_phong: "P51",
-        ten_phong: "P51",
-        toa: "Tòa A5",
-        ma_toa: "A5",
-        tang: "Tầng 2",
-        so_tang: 2,
-        loai_phong: "Phòng dịch vụ",
-        suc_chua: 8,
-        da_o: 5,
-        si_so: "5/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "1.930.000 đ / năm",
-        gia_so: 1930000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-dich-vu.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-        ],
-        giuong_trong: ["G02", "G04", "G06"],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "TRONG", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "TRONG", tang: 2 },
-          { ma: "G05", trang_thai: "DA_O", tang: 1 },
-          { ma: "G06", trang_thai: "TRONG", tang: 2 },
-          { ma: "G07", trang_thai: "DA_O", tang: 1 },
-          { ma: "G08", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      // Trang 2: Dữ liệu phong phú cho phân trang & bộ lọc
-      {
-        id: "P12",
-        ma_phong: "P12",
-        so_phong: "P12",
-        ten_phong: "P12",
-        toa: "Tòa A1",
-        ma_toa: "A1",
-        tang: "Tầng 1",
-        so_tang: 1,
-        loai_phong: "Phòng tiêu chuẩn",
-        suc_chua: 8,
-        da_o: 4,
-        si_so: "4/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "1.760.000 đ / năm",
-        gia_so: 1760000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-tieu-chuan.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-        ],
-        giuong_trong: ["G01", "G03", "G05", "G07"],
-        giuongs: [
-          { ma: "G01", trang_thai: "TRONG", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "TRONG", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "TRONG", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-          { ma: "G07", trang_thai: "TRONG", tang: 1 },
-          { ma: "G08", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      {
-        id: "P22",
-        ma_phong: "P22",
-        so_phong: "P22",
-        ten_phong: "P22",
-        toa: "Tòa A2",
-        ma_toa: "A2",
-        tang: "Tầng 2",
-        so_tang: 2,
-        loai_phong: "Phòng dịch vụ",
-        suc_chua: 6,
-        da_o: 6,
-        si_so: "6/6 người",
-        so_nguoi_display: "6 người",
-        gia_thue: "2.500.000 đ / năm",
-        gia_so: 2500000,
-        trang_thai: "DA_DAY",
-        trang_thai_label: "Đã đầy",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-dich-vu.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-        ],
-        giuong_trong: [],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "DA_O", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      {
-        id: "P31",
-        ma_phong: "P31",
-        so_phong: "P31",
-        ten_phong: "P31",
-        toa: "Tòa A4",
-        ma_toa: "A4",
-        tang: "Tầng 3",
-        so_tang: 3,
-        loai_phong: "Phòng dịch vụ",
-        suc_chua: 4,
-        da_o: 3,
-        si_so: "3/4 người",
-        so_nguoi_display: "4 người",
-        gia_thue: "3.200.000 đ / năm",
-        gia_so: 3200000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-dich-vu.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-          "Tủ lạnh mini",
-        ],
-        giuong_trong: ["G04"],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "TRONG", tang: 2 },
-        ],
-      },
-      {
-        id: "P45",
-        ma_phong: "P45",
-        so_phong: "P45",
-        ten_phong: "P45",
-        toa: "Tòa A7",
-        ma_toa: "A7",
-        tang: "Tầng 4",
-        so_tang: 4,
-        loai_phong: "Phòng tiêu chuẩn",
-        suc_chua: 8,
-        da_o: 7,
-        si_so: "7/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "1.760.000 đ / năm",
-        gia_so: 1760000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-tieu-chuan.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-        ],
-        giuong_trong: ["G05"],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "TRONG", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-          { ma: "G07", trang_thai: "DA_O", tang: 1 },
-          { ma: "G08", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      {
-        id: "P62",
-        ma_phong: "P62",
-        so_phong: "P62",
-        ten_phong: "P62",
-        toa: "Tòa A19",
-        ma_toa: "A19",
-        tang: "Tầng 2",
-        so_tang: 2,
-        loai_phong: "Phòng tiêu chuẩn",
-        suc_chua: 8,
-        da_o: 4,
-        si_so: "4/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "1.760.000 đ / năm",
-        gia_so: 1760000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-tieu-chuan-2.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Wifi tốc độ cao",
-        ],
-        giuong_trong: ["G02", "G04", "G06", "G08"],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "TRONG", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "TRONG", tang: 2 },
-          { ma: "G05", trang_thai: "DA_O", tang: 1 },
-          { ma: "G06", trang_thai: "TRONG", tang: 2 },
-          { ma: "G07", trang_thai: "DA_O", tang: 1 },
-          { ma: "G08", trang_thai: "TRONG", tang: 2 },
-        ],
-      },
-      {
-        id: "P73",
-        ma_phong: "P73",
-        so_phong: "P73",
-        ten_phong: "P73",
-        toa: "Tòa A5",
-        ma_toa: "A5",
-        tang: "Tầng 3",
-        so_tang: 3,
-        loai_phong: "Phòng dịch vụ",
-        suc_chua: 8,
-        da_o: 6,
-        si_so: "6/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "2.100.000 đ / năm",
-        gia_so: 2100000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-dich-vu.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-        ],
-        giuong_trong: ["G03", "G07"],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "TRONG", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "DA_O", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-          { ma: "G07", trang_thai: "TRONG", tang: 1 },
-          { ma: "G08", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      {
-        id: "P88",
-        ma_phong: "P88",
-        so_phong: "P88",
-        ten_phong: "P88",
-        toa: "Tòa A2",
-        ma_toa: "A2",
-        tang: "Tầng 4",
-        so_tang: 4,
-        loai_phong: "Phòng tiêu chuẩn",
-        suc_chua: 8,
-        da_o: 8,
-        si_so: "8/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "1.760.000 đ / năm",
-        gia_so: 1760000,
-        trang_thai: "DA_DAY",
-        trang_thai_label: "Đã đầy",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-tieu-chuan.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-        ],
-        giuong_trong: [],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "DA_O", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-          { ma: "G07", trang_thai: "DA_O", tang: 1 },
-          { ma: "G08", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      {
-        id: "P95",
-        ma_phong: "P95",
-        so_phong: "P95",
-        ten_phong: "P95",
-        toa: "Tòa A1",
-        ma_toa: "A1",
-        tang: "Tầng 2",
-        so_tang: 2,
-        loai_phong: "Phòng dịch vụ",
-        suc_chua: 8,
-        da_o: 5,
-        si_so: "5/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "1.930.000 đ / năm",
-        gia_so: 1930000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-dich-vu.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-        ],
-        giuong_trong: ["G02", "G04", "G08"],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "TRONG", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "TRONG", tang: 2 },
-          { ma: "G05", trang_thai: "DA_O", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-          { ma: "G07", trang_thai: "DA_O", tang: 1 },
-          { ma: "G08", trang_thai: "TRONG", tang: 2 },
-        ],
-      },
-      // Trang 3:
-      {
-        id: "P102",
-        ma_phong: "P102",
-        so_phong: "P102",
-        ten_phong: "P102",
-        toa: "Tòa A19",
-        ma_toa: "A19",
-        tang: "Tầng 1",
-        so_tang: 1,
-        loai_phong: "Phòng tiêu chuẩn",
-        suc_chua: 8,
-        da_o: 6,
-        si_so: "6/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "1.760.000 đ / năm",
-        gia_so: 1760000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-tieu-chuan-2.jpg",
-        ],
-        tien_ich: ["Điều hòa", "Nóng lạnh", "Tủ đồ cá nhân", "Bàn học"],
-        giuong_trong: ["G03", "G06"],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "TRONG", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "DA_O", tang: 1 },
-          { ma: "G06", trang_thai: "TRONG", tang: 2 },
-          { ma: "G07", trang_thai: "DA_O", tang: 1 },
-          { ma: "G08", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      {
-        id: "P115",
-        ma_phong: "P115",
-        so_phong: "P115",
-        ten_phong: "P115",
-        toa: "Tòa A4",
-        ma_toa: "A4",
-        tang: "Tầng 1",
-        so_tang: 1,
-        loai_phong: "Phòng dịch vụ",
-        suc_chua: 6,
-        da_o: 4,
-        si_so: "4/6 người",
-        so_nguoi_display: "6 người",
-        gia_thue: "2.400.000 đ / năm",
-        gia_so: 2400000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-dich-vu.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-        ],
-        giuong_trong: ["G02", "G05"],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "TRONG", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "TRONG", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      {
-        id: "P120",
-        ma_phong: "P120",
-        so_phong: "P120",
-        ten_phong: "P120",
-        toa: "Tòa A7",
-        ma_toa: "A7",
-        tang: "Tầng 3",
-        so_tang: 3,
-        loai_phong: "Phòng tiêu chuẩn",
-        suc_chua: 8,
-        da_o: 8,
-        si_so: "8/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "1.760.000 đ / năm",
-        gia_so: 1760000,
-        trang_thai: "DA_DAY",
-        trang_thai_label: "Đã đầy",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-tieu-chuan.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-        ],
-        giuong_trong: [],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "DA_O", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-          { ma: "G07", trang_thai: "DA_O", tang: 1 },
-          { ma: "G08", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      {
-        id: "P135",
-        ma_phong: "P135",
-        so_phong: "P135",
-        ten_phong: "P135",
-        toa: "Tòa A5",
-        ma_toa: "A5",
-        tang: "Tầng 1",
-        so_tang: 1,
-        loai_phong: "Phòng dịch vụ",
-        suc_chua: 6,
-        da_o: 3,
-        si_so: "3/6 người",
-        so_nguoi_display: "6 người",
-        gia_thue: "2.200.000 đ / năm",
-        gia_so: 2200000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-dich-vu.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-        ],
-        giuong_trong: ["G01", "G03", "G06"],
-        giuongs: [
-          { ma: "G01", trang_thai: "TRONG", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "TRONG", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "DA_O", tang: 1 },
-          { ma: "G06", trang_thai: "TRONG", tang: 2 },
-        ],
-      },
-      {
-        id: "P142",
-        ma_phong: "P142",
-        so_phong: "P142",
-        ten_phong: "P142",
-        toa: "Tòa A2",
-        ma_toa: "A2",
-        tang: "Tầng 1",
-        so_tang: 1,
-        loai_phong: "Phòng tiêu chuẩn",
-        suc_chua: 8,
-        da_o: 5,
-        si_so: "5/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "1.760.000 đ / năm",
-        gia_so: 1760000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-tieu-chuan.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-        ],
-        giuong_trong: ["G02", "G05", "G08"],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "TRONG", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "TRONG", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-          { ma: "G07", trang_thai: "DA_O", tang: 1 },
-          { ma: "G08", trang_thai: "TRONG", tang: 2 },
-        ],
-      },
-      {
-        id: "P156",
-        ma_phong: "P156",
-        so_phong: "P156",
-        ten_phong: "P156",
-        toa: "Tòa A1",
-        ma_toa: "A1",
-        tang: "Tầng 4",
-        so_tang: 4,
-        loai_phong: "Phòng dịch vụ",
-        suc_chua: 4,
-        da_o: 4,
-        si_so: "4/4 người",
-        so_nguoi_display: "4 người",
-        gia_thue: "3.500.000 đ / năm",
-        gia_so: 3500000,
-        trang_thai: "DA_DAY",
-        trang_thai_label: "Đã đầy",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-dich-vu.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-          "Tủ lạnh mini",
-        ],
-        giuong_trong: [],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      {
-        id: "P168",
-        ma_phong: "P168",
-        so_phong: "P168",
-        ten_phong: "P168",
-        toa: "Tòa A19",
-        ma_toa: "A19",
-        tang: "Tầng 3",
-        so_tang: 3,
-        loai_phong: "Phòng tiêu chuẩn",
-        suc_chua: 8,
-        da_o: 6,
-        si_so: "6/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "1.760.000 đ / năm",
-        gia_so: 1760000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-tieu-chuan-2.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Wifi tốc độ cao",
-        ],
-        giuong_trong: ["G01", "G04"],
-        giuongs: [
-          { ma: "G01", trang_thai: "TRONG", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "DA_O", tang: 1 },
-          { ma: "G04", trang_thai: "TRONG", tang: 2 },
-          { ma: "G05", trang_thai: "DA_O", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-          { ma: "G07", trang_thai: "DA_O", tang: 1 },
-          { ma: "G08", trang_thai: "DA_O", tang: 2 },
-        ],
-      },
-      {
-        id: "P175",
-        ma_phong: "P175",
-        so_phong: "P175",
-        ten_phong: "P175",
-        toa: "Tòa A7",
-        ma_toa: "A7",
-        tang: "Tầng 1",
-        so_tang: 1,
-        loai_phong: "Phòng dịch vụ",
-        suc_chua: 8,
-        da_o: 4,
-        si_so: "4/8 người",
-        so_nguoi_display: "8 người",
-        gia_thue: "2.750.000 đ / năm",
-        gia_so: 2750000,
-        trang_thai: "CON_CHO",
-        trang_thai_label: "Còn chỗ",
-        hinh_anh: "/images/phong_thuc_te.jpg",
-        images: [
-          "/images/phong_thuc_te.jpg",
-          "/images/rooms/phong-dich-vu.jpg",
-        ],
-        tien_ich: [
-          "Điều hòa",
-          "Nóng lạnh",
-          "Tủ đồ cá nhân",
-          "Bàn học",
-          "Ban công",
-          "Tủ lạnh mini",
-        ],
-        giuong_trong: ["G03", "G05", "G07", "G08"],
-        giuongs: [
-          { ma: "G01", trang_thai: "DA_O", tang: 1 },
-          { ma: "G02", trang_thai: "DA_O", tang: 2 },
-          { ma: "G03", trang_thai: "TRONG", tang: 1 },
-          { ma: "G04", trang_thai: "DA_O", tang: 2 },
-          { ma: "G05", trang_thai: "TRONG", tang: 1 },
-          { ma: "G06", trang_thai: "DA_O", tang: 2 },
-          { ma: "G07", trang_thai: "TRONG", tang: 1 },
-          { ma: "G08", trang_thai: "TRONG", tang: 2 },
-        ],
-      },
-    ];
+  getRooms: async () => {
+    try {
+      const response = await api.get('/rooms/buildings');
+      const buildings = Array.isArray(response.data) ? response.data : [];
+      return buildings.flatMap((building) =>
+        (building.tangs || []).flatMap((floor) =>
+          (floor.phongs || []).map((room) => {
+            const beds = room.giuongs || [];
+            const occupied = beds.filter((bed) => bed.trang_thai !== 'TRONG').length;
+            const capacity = Number(room.suc_chua || beds.length || 0);
+            return {
+              ...room,
+              id: room.ma_phong,
+              toa: building.ten_toa,
+              ma_toa: building.ma_toa,
+              tang: `T?ng ${floor.so_tang}`,
+              so_tang: floor.so_tang,
+              da_o: occupied,
+              si_so: `${occupied}/${capacity} ng??i`,
+              gia_thue: room.gia_tien_nam == null ? '' : `${Number(room.gia_tien_nam).toLocaleString('vi-VN')} ? / n?m`,
+              trang_thai: occupied >= capacity ? 'DA_DAY' : 'CON_CHO',
+              giuongs: beds,
+              giuong_trong: beds.filter((bed) => bed.trang_thai === 'TRONG').map((bed) => bed.ma_giuong),
+            };
+          }),
+        ),
+      );
+    } catch (error) {
+      console.error('Kh?ng th? t?i danh s?ch ph?ng t? API:', error);
+      return [];
+    }
   },
 
-  /**
-   * Sinh viên gửi đơn đăng ký chỗ ở
-   * -> Lưu trực tiếp vào kho lưu trữ để Quản lý tiếp nhận ngay lập tức!
-   */
   registerRoom: async (registrationData) => {
     const newId = `DK-${Date.now().toString().slice(-4)}`;
 
@@ -1379,6 +380,30 @@ export const occupancyService = {
           ),
         ];
         saveLocalRequests(updatedList);
+
+        // Đồng bộ chuẩn hóa vào studentAccount
+        try {
+          const studentCode = (savedReq.msv || registrationData.msv || "").trim().toLowerCase();
+          if (studentCode) {
+            const acc = getStudentAccount(studentCode);
+            acc.registrationHistory = [
+              {
+                id: savedReq.id || savedReq.ma_yeu_cau,
+                date: savedReq.ngay_dang_ky || dateFormatted,
+                roomType: savedReq.loai_phong || "Phòng tiêu chuẩn",
+                status: "PENDING",
+                assignedRoom: savedReq.nguyen_vong || savedReq.nguyen_vong_label || "",
+              },
+              ...(acc.registrationHistory || []).filter(
+                (r) => r.id !== (savedReq.id || savedReq.ma_yeu_cau)
+              ),
+            ];
+            saveStudentAccount(acc);
+          }
+        } catch (syncErr) {
+          console.warn("Lỗi đồng bộ registrationHistory:", syncErr);
+        }
+
         return {
           ...res.data,
           data: savedReq,
@@ -1406,6 +431,27 @@ export const occupancyService = {
       ),
     ];
     saveLocalRequests(updatedList);
+
+    // Đồng bộ chuẩn hóa vào studentAccount
+    try {
+      const studentCode = (newRequest.msv || registrationData.msv || "").trim().toLowerCase();
+      if (studentCode) {
+        const acc = getStudentAccount(studentCode);
+        acc.registrationHistory = [
+          {
+            id: newRequest.id,
+            date: dateFormatted,
+            roomType: newRequest.loai_phong || "Phòng tiêu chuẩn",
+            status: "PENDING",
+            assignedRoom: newRequest.nguyen_vong || newRequest.nguyen_vong_label || "",
+          },
+          ...(acc.registrationHistory || []).filter((r) => r.id !== newRequest.id),
+        ];
+        saveStudentAccount(acc);
+      }
+    } catch (syncErr) {
+      console.warn("Lỗi đồng bộ registrationHistory offline:", syncErr);
+    }
 
     return {
       status: "success",
@@ -1769,162 +815,18 @@ export const occupancyService = {
    * Sinh viên gửi đơn xin chuyển phòng
    */
   submitTransferRequest: async (data) => {
-    const today = new Date();
-    const dateStr = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
-    const all = getLocalTransferCheckoutRequests();
-    const nextNum = all.length + 231;
-    const reqId = `YC-${String(nextNum).padStart(4, "0")}`;
-
-    const targetRoom = data.phong_mong_muon || "P36 - Tòa A3 - Tầng 3";
-    const targetShort = targetRoom.includes(" - ")
-      ? targetRoom.split(" - ")[0]
-      : targetRoom;
-    const currentShort = data.phong_hien_tai || "P36";
-
-    const newReq = {
-      id: reqId,
-      ma_yeu_cau: `#${reqId}`,
-      loai_yeu_cau: "Chuyển phòng",
-      loai_don: "CHUYEN_PHONG",
-      msv: data.msv || "DTC245180051",
-      ho_ten: data.ho_ten || "Nguyễn Quốc Huy",
-      gioi_tinh: data.gioi_tinh || "Nam",
-      khoa: "Công nghệ thông tin",
-      lop: "DTC-K20",
-      vi_tri_hien_tai: data.vi_tri_hien_tai || "Phòng A102 - Giường G01",
-      cong_no: "Đã hoàn thành toàn bộ phí",
-      ngay_gui: dateStr,
-      phong_lien_quan: `${currentShort} → ${targetShort}`,
-      phong_hien_tai: currentShort,
-      phong_dich: targetRoom,
-      ly_do: data.ly_do || "Phòng hiện tại quá tải",
-      ngay_mong_muon: data.ngay_mong_muon || "",
-      mo_ta:
-        data.mo_ta_chi_tiet ||
-        data.mo_ta ||
-        "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học...",
-      trang_thai: "CHO_DUYET",
-      trang_thai_label: "Chờ duyệt",
-      goi_y: {
-        ma_toa: "A",
-        ma_phong: "A203",
-        ma_giuong: "G04",
-      },
-      created_at: new Date().toISOString(),
-    };
-
-    // Lưu ngay vào LocalStorage
-    const updated = [newReq, ...all];
-    saveLocalTransferCheckoutRequests(updated);
-
-    // Kích hoạt event cập nhật
+    const response = await api.post("/student/requests/transfer", data);
     window.dispatchEvent(new Event("occupancy-updated"));
-
-    // Gửi lên Backend nếu backend online
-    try {
-      const res = await api.post("/student/requests/transfer", {
-        msv: newReq.msv,
-        ho_ten: newReq.ho_ten,
-        phong_hien_tai: currentShort,
-        ly_do: data.ly_do,
-        ngay_mong_muon: data.ngay_mong_muon,
-        phong_mong_muon: targetRoom,
-        mo_ta_chi_tiet: newReq.mo_ta,
-      });
-      if (res.data?.data) {
-        return res.data;
-      }
-    } catch (err) {
-      console.warn(
-        "Backend POST /student/requests/transfer offline, using local response:",
-        err,
-      );
-    }
-
-    return {
-      status: "success",
-      message: "Gửi yêu cầu chuyển phòng thành công",
-      data: newReq,
-    };
+    return response.data;
   },
 
   /**
    * Sinh viên gửi đơn xin trả phòng
    */
   submitCheckoutRequest: async (data) => {
-    const today = new Date();
-    const dateStr = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
-    const all = getLocalTransferCheckoutRequests();
-    const nextNum = all.length + 231;
-    const reqId = `YC-${String(nextNum).padStart(4, "0")}`;
-    const currentShort = data.phong_hien_tai || "P36";
-
-    const newReq = {
-      id: reqId,
-      ma_yeu_cau: `#${reqId}`,
-      loai_yeu_cau: "Trả phòng",
-      loai_don: "TRA_PHONG",
-      msv: data.msv || "DTC245180051",
-      ho_ten: data.ho_ten || "Nguyễn Quốc Huy",
-      gioi_tinh: data.gioi_tinh || "Nam",
-      khoa: "Công nghệ thông tin",
-      lop: "DTC-K20",
-      vi_tri_hien_tai: data.vi_tri_hien_tai || "Phòng A102 - Giường G01",
-      cong_no: "Đã hoàn thành toàn bộ phí",
-      ngay_gui: dateStr,
-      phong_lien_quan: currentShort,
-      phong_hien_tai: currentShort,
-      ly_do: data.ly_do || "Đã tốt nghiệp",
-      ngay_mong_muon: data.ngay_mong_muon || "",
-      dia_chi_sau_tra:
-        data.dia_chi_lien_he || "Số 123 Đường Cầu Giấy, Quận Cầu Giấy, Hà Nội",
-      dia_chi_chi_tiet: data.dia_chi_chi_tiet || {
-        tinh: "Hà Nội",
-        huyen: "Quận Cầu Giấy",
-        so_nha: "Số 123 Đường Cầu Giấy",
-      },
-      mo_ta:
-        data.mo_ta_chi_tiet ||
-        data.mo_ta ||
-        "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học...",
-      trang_thai: "CHO_DUYET",
-      trang_thai_label: "Chờ duyệt",
-      created_at: new Date().toISOString(),
-    };
-
-    // Lưu ngay vào LocalStorage
-    const updated = [newReq, ...all];
-    saveLocalTransferCheckoutRequests(updated);
-
-    // Kích hoạt event cập nhật
+    const response = await api.post("/student/requests/checkout", data);
     window.dispatchEvent(new Event("occupancy-updated"));
-
-    // Gửi lên Backend nếu backend online
-    try {
-      const res = await api.post("/student/requests/checkout", {
-        msv: newReq.msv,
-        ho_ten: newReq.ho_ten,
-        phong_hien_tai: currentShort,
-        ly_do: data.ly_do,
-        ngay_mong_muon: data.ngay_mong_muon,
-        dia_chi_lien_he: data.dia_chi_lien_he,
-        mo_ta_chi_tiet: newReq.mo_ta,
-      });
-      if (res.data?.data) {
-        return res.data;
-      }
-    } catch (err) {
-      console.warn(
-        "Backend POST /student/requests/checkout offline, using local response:",
-        err,
-      );
-    }
-
-    return {
-      status: "success",
-      message: "Gửi yêu cầu trả phòng thành công",
-      data: newReq,
-    };
+    return response.data;
   },
 
   /**
@@ -1978,41 +880,7 @@ export const occupancyService = {
       "dtc245180051"
     ).trim().toUpperCase();
 
-    // 1. Tích hợp từ chuẩn hóa studentAccountService
-    const account = getStudentAccount(currentCode);
-    const accResidenceHistory = Array.isArray(account.residenceHistory) ? account.residenceHistory : [];
-
-    if (accResidenceHistory.length > 0) {
-      return accResidenceHistory.map((item, idx) => {
-        const isActive = item.status === "ACTIVE" && !item.endDate;
-        const roomNum = String(item.roomNumber || "501").replace(/^P/i, "");
-        const buildingStr = item.building || "Tòa A4";
-        const floorStr = roomNum.startsWith("5") ? "5" : (roomNum[0] || "5");
-        return {
-          id: item.id || `RES-${String(idx + 1).padStart(2, "0")}`,
-          ma_hop_dong: `HD26-${buildingStr.replace(/[^A-Za-z0-9]/g, "")}${roomNum}-G01`,
-          msv: (account.studentId || "dtc245180051").toUpperCase(),
-          phong: `P${roomNum}`,
-          so_phong: roomNum,
-          roomNumber: roomNum,
-          toa: buildingStr,
-          building: buildingStr,
-          tang: floorStr,
-          giuong: "G01",
-          loai_phong: item.roomType || "Phòng tiêu chuẩn",
-          roomType: item.roomType || "Phòng tiêu chuẩn",
-          thoi_gian_o: item.endDate ? `${item.startDate} – ${item.endDate}` : `${item.startDate} – Nay`,
-          nam_hoc: "2026-2027",
-          trang_thai: isActive ? "DANG_O" : "DA_TRA_PHONG",
-          trang_thai_label: isActive ? "Đang ở" : "Đã kết thúc",
-          startDate: item.startDate,
-          endDate: item.endDate,
-          status: item.status,
-        };
-      });
-    }
-
-    // 2. Thử gọi backend API nếu có mã sinh viên
+    // 1. Thử gọi backend API nếu có mã sinh viên để lấy dữ liệu thực tế từ CSDL MySQL
     if (currentCode) {
       try {
         const res = await api.get("/student/requests/my-contracts", {
@@ -2024,6 +892,53 @@ export const occupancyService = {
       } catch (err) {
         console.warn("Backend GET /student/requests/my-contracts offline:", err);
       }
+    }
+
+    // 2. Tích hợp từ chuẩn hóa studentAccountService
+    const account = getStudentAccount(currentCode);
+    const accResidenceHistory = Array.isArray(account.residenceHistory) ? account.residenceHistory : [];
+
+    if (accResidenceHistory.length > 0) {
+      return accResidenceHistory.map((item, idx) => {
+        const isActive = item.status === "ACTIVE" && !item.endDate;
+        const roomNum = String(item.roomNumber || "501").replace(/^P/i, "");
+        const buildingStr = item.building || "Tòa A4";
+        const floorStr = roomNum.startsWith("5") ? "5" : (roomNum[0] || "5");
+        const sDate = item.startDate || "02/10/2026";
+        const eDate = item.endDate || "02/10/2027";
+        const sucChua = item.suc_chua || (item.roomType?.includes("dịch vụ") ? "4 người" : "8 người");
+        const shortBed = (item.bed || item.ma_giuong || "G01").split("_").pop() || "G01";
+
+        return {
+          id: item.id || `RES-${String(idx + 1).padStart(2, "0")}`,
+          ma_hop_dong: `HD26-${buildingStr.replace(/[^A-Za-z0-9]/g, "")}${roomNum}-${shortBed}`,
+          msv: (account.studentId || "dtc245180051").toUpperCase(),
+          phong: `P${roomNum}`,
+          so_phong: roomNum,
+          roomNumber: roomNum,
+          toa: buildingStr,
+          building: buildingStr,
+          tang: floorStr,
+          giuong: shortBed,
+          so_giuong: shortBed,
+          ma_giuong: item.ma_giuong || item.bed || shortBed,
+          loai_phong: item.roomType || "Phòng tiêu chuẩn",
+          roomType: item.roomType || "Phòng tiêu chuẩn",
+          suc_chua: sucChua,
+          ngay_nhan_phong: sDate,
+          ngay_bat_dau: sDate,
+          ngay_duyet: sDate,
+          ngay_ket_thuc: eDate,
+          thoi_han_hop_dong: `${sDate} - ${eDate}`,
+          thoi_gian_o: "2026-2027",
+          nam_hoc: "2026-2027",
+          trang_thai: isActive ? "DANG_O" : "DA_TRA_PHONG",
+          trang_thai_label: isActive ? "Đang ở" : "Đã kết thúc",
+          startDate: sDate,
+          endDate: eDate,
+          status: item.status,
+        };
+      });
     }
 
     // 3. Fallback sang LocalStorage (chỉ lấy hợp đồng thuộc về mã sinh viên hiện tại)

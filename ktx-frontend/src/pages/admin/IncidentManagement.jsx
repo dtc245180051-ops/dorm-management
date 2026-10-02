@@ -13,8 +13,11 @@ import {
   Check,
   X,
   FileText,
+  Sparkles,
+  ShieldAlert,
 } from 'lucide-react';
 import feedbackService from '../../services/feedbackService';
+import IncidentSummaryCard from '../../components/IncidentSummaryCard';
 
 export default function IncidentManagement({ searchTerm = '' }) {
   const [incidents, setIncidents] = useState([]);
@@ -93,7 +96,8 @@ export default function IncidentManagement({ searchTerm = '' }) {
       return false;
     }
     // 2. Lọc theo danh mục
-    if (categoryFilter !== 'ALL' && item.loai_phan_anh !== categoryFilter) {
+    const itemCat = item.phan_loai || item.loai_phan_anh || 'Khác';
+    if (categoryFilter !== 'ALL' && itemCat !== categoryFilter) {
       return false;
     }
     // 3. Lọc theo từ khóa tìm kiếm
@@ -114,9 +118,14 @@ export default function IncidentManagement({ searchTerm = '' }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-2xl font-black uppercase tracking-tight text-slate-800">
-          PHẢN ÁNH SỰ CỐ
-        </h1>
+        <div>
+          <h1 className="text-2xl font-black uppercase tracking-tight text-slate-800">
+            TIẾP NHẬN PHẢN ÁNH & SỰ CỐ
+          </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            Trung tâm điều phối sự cố KTX tích hợp AI tự động phân tích và trích xuất dữ liệu
+          </p>
+        </div>
       </div>
 
       {/* Thông báo cập nhật */}
@@ -135,14 +144,20 @@ export default function IncidentManagement({ searchTerm = '' }) {
           <button
             type="button"
             onClick={() => setNotification(null)}
-            className="text-slate-400 hover:text-slate-700"
+            className="text-slate-400 hover:text-slate-700 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Header và 4 thẻ thống kê */}
+      {/* CARD AI TÓM TẮT SỰ CỐ TRONG NGÀY (IncidentSummaryCard) */}
+      <IncidentSummaryCard
+        refreshTrigger={incidents.length}
+        onRefresh={fetchIncidents}
+      />
+
+      {/* 4 thẻ thống kê */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Tổng số */}
         <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
@@ -209,7 +224,7 @@ export default function IncidentManagement({ searchTerm = '' }) {
         </div>
       </div>
 
-      {/* Bảng danh sách phản ánh */}
+      {/* Bảng danh sách tiếp nhận phản ánh & Báo hỏng KTX */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
         {/* Toolbar lọc và tìm kiếm */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-100">
@@ -231,11 +246,10 @@ export default function IncidentManagement({ searchTerm = '' }) {
               className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-700 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
             >
               <option value="ALL">Tất cả phân loại</option>
-              <option value="Cơ sở vật chất">Cơ sở vật chất</option>
               <option value="Điện nước">Điện nước</option>
+              <option value="Cơ sở vật chất">Cơ sở vật chất</option>
               <option value="An ninh trật tự">An ninh trật tự</option>
-              <option value="Vệ sinh môi trường">Vệ sinh môi trường</option>
-              <option value="Nội quy ký túc xá">Nội quy ký túc xá</option>
+              <option value="Vệ sinh">Vệ sinh</option>
               <option value="Khác">Khác</option>
             </select>
 
@@ -299,6 +313,8 @@ export default function IncidentManagement({ searchTerm = '' }) {
                   const isProcessing = item.trang_thai === 'DANG_XU_LY';
                   const isResolved = item.trang_thai === 'DA_XU_LY';
                   const isRejected = item.trang_thai === 'TU_CHOI';
+                  const isUrgent = item.muc_do_uu_tien === 'Khẩn cấp';
+                  const categoryName = item.phan_loai || item.loai_phan_anh || 'Cơ sở vật chất';
 
                   return (
                     <tr key={idx} className="hover:bg-slate-50/80 transition">
@@ -310,22 +326,44 @@ export default function IncidentManagement({ searchTerm = '' }) {
                         <div className="text-xs font-mono text-slate-500">{item.msv}</div>
                       </td>
                       <td className="py-3.5 px-4 font-semibold text-slate-800">
-                        {item.phong || 'P36'}
+                        {item.phong || '---'}
                       </td>
+                      {/* Cột Phân loại: Hiển thị nhãn do AI tự gắn */}
                       <td className="py-3.5 px-4">
-                        <span className="inline-block px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                          {item.loai_phan_anh || 'Cơ sở vật chất'}
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-semibold border ${
+                            categoryName === 'Điện nước'
+                              ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
+                              : categoryName === 'An ninh trật tự'
+                              ? 'bg-purple-50 text-purple-700 border-purple-200'
+                              : categoryName === 'Vệ sinh'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : categoryName === 'Cơ sở vật chất'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {categoryName}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 max-w-xs">
-                        <div className="font-bold text-slate-900 truncate" title={item.tieu_de}>
-                          {item.tieu_de}
+                      {/* Cột Tiêu đề & Nội dung: Dòng trên in đậm Tiêu đề ngắn do AI sinh ra, dòng dưới hiển thị Mô tả chi tiết của sinh viên */}
+                      <td className="py-3.5 px-4 max-w-sm">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-900 leading-snug" title={item.tieu_de}>
+                            {item.tieu_de || 'Sự cố phòng'}
+                          </span>
+                          {isUrgent && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-100 text-rose-700 border border-rose-200">
+                              <ShieldAlert className="w-3 h-3" />
+                              Khẩn cấp
+                            </span>
+                          )}
                         </div>
-                        <div className="text-xs text-slate-500 truncate" title={item.mo_ta}>
+                        <div className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed" title={item.mo_ta}>
                           {item.mo_ta}
                         </div>
                         {item.ghi_chu_xu_ly && (
-                          <div className="text-[11px] text-blue-600 mt-0.5 truncate" title={item.ghi_chu_xu_ly}>
+                          <div className="text-[11px] text-blue-600 mt-1 truncate" title={item.ghi_chu_xu_ly}>
                             <span className="font-semibold">Ghi chú:</span> {item.ghi_chu_xu_ly}
                           </div>
                         )}
@@ -356,6 +394,7 @@ export default function IncidentManagement({ searchTerm = '' }) {
                           ? new Date(item.ngay_gui).toLocaleDateString('vi-VN')
                           : 'Hôm nay'}
                       </td>
+                      {/* Cột Trạng thái: Mặc định là "Chờ tiếp nhận" */}
                       <td className="py-3.5 px-4">
                         {isResolved ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -421,7 +460,7 @@ export default function IncidentManagement({ searchTerm = '' }) {
               <button
                 type="button"
                 onClick={() => setSelectedIncident(null)}
-                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -437,21 +476,29 @@ export default function IncidentManagement({ searchTerm = '' }) {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Phòng:</span>
-                <span className="font-semibold text-slate-800">{selectedIncident.phong}</span>
+                <span className="font-semibold text-slate-800">{selectedIncident.phong || 'Chưa xếp'}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Phân loại:</span>
-                <span className="font-semibold text-blue-700">
-                  {selectedIncident.loai_phan_anh}
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Phân loại AI:</span>
+                <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                  {selectedIncident.phan_loai || selectedIncident.loai_phan_anh}
                 </span>
               </div>
+              {selectedIncident.muc_do_uu_tien === 'Khẩn cấp' && (
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Mức độ ưu tiên:</span>
+                  <span className="font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                    Khẩn cấp
+                  </span>
+                </div>
+              )}
               <div className="pt-1 border-t border-slate-200">
                 <span className="font-semibold text-slate-700 block mb-0.5">Tiêu đề:</span>
-                <span className="text-slate-800 font-medium">{selectedIncident.tieu_de}</span>
+                <span className="text-slate-800 font-bold">{selectedIncident.tieu_de}</span>
               </div>
               <div>
-                <span className="font-semibold text-slate-700 block mb-0.5">Nội dung chi tiết:</span>
-                <span className="text-slate-600">{selectedIncident.mo_ta}</span>
+                <span className="font-semibold text-slate-700 block mb-0.5">Mô tả sự cố:</span>
+                <span className="text-slate-600 leading-relaxed">{selectedIncident.mo_ta}</span>
               </div>
             </div>
 

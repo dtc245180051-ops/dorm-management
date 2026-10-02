@@ -34,11 +34,7 @@ def get_room_candidates(
         "Năm học 2026 – 2027",
         description="Năm học / kỳ học cần lập hóa đơn",
     ),
-    don_gia_thang: float = Query(
-        600000.0,
-        ge=0,
-        description="Đơn giá tiền phòng (VND/tháng)",
-    ),
+    don_gia_thang: Optional[float] = Query(None, ge=0, description="??n gi? ti?n ph?ng (VND/th?ng)"),
     thoi_gian_o_thang: int = Query(
         11,
         ge=1,

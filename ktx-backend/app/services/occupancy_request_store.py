@@ -136,8 +136,8 @@ def add_transfer_request(data: dict) -> dict:
     req_id = data.get("id") or f"YC-{req_num:04d}"
     today_str = datetime.datetime.now().strftime("%d/%m/%Y")
     
-    phong_hien_tai = data.get("phong_hien_tai", "P36")
-    phong_mong_muon = data.get("phong_mong_muon", "P36 - Tòa A3 - Tầng 3")
+    phong_hien_tai = data.get("phong_hien_tai", "")
+    phong_mong_muon = data.get("phong_mong_muon", "")
     target_short = phong_mong_muon.split(" - ")[0] if " - " in phong_mong_muon else phong_mong_muon
     
     new_req = {
@@ -145,8 +145,8 @@ def add_transfer_request(data: dict) -> dict:
         "ma_yeu_cau": f"#{req_id}",
         "loai_yeu_cau": "Chuyển phòng",
         "loai_don": "CHUYEN_PHONG",
-        "msv": data.get("msv", "DTC245180051"),
-        "ho_ten": data.get("ho_ten", "Nguyễn Quốc Huy"),
+        "msv": data.get("msv", ""),
+        "ho_ten": data.get("ho_ten", ""),
         "gioi_tinh": data.get("gioi_tinh", "Nam"),
         "khoa": data.get("khoa", "Công nghệ thông tin"),
         "lop": data.get("lop", "DTC-K20"),
@@ -177,15 +177,15 @@ def add_checkout_request(data: dict) -> dict:
     req_id = data.get("id") or f"YC-{req_num:04d}"
     today_str = datetime.datetime.now().strftime("%d/%m/%Y")
     
-    phong_hien_tai = data.get("phong_hien_tai", "P36")
+    phong_hien_tai = data.get("phong_hien_tai", "")
     
     new_req = {
         "id": req_id,
         "ma_yeu_cau": f"#{req_id}",
         "loai_yeu_cau": "Trả phòng",
         "loai_don": "TRA_PHONG",
-        "msv": data.get("msv", "DTC245180051"),
-        "ho_ten": data.get("ho_ten", "Nguyễn Quốc Huy"),
+        "msv": data.get("msv", ""),
+        "ho_ten": data.get("ho_ten", ""),
         "gioi_tinh": data.get("gioi_tinh", "Nam"),
         "khoa": data.get("khoa", "Công nghệ thông tin"),
         "lop": data.get("lop", "DTC-K20"),

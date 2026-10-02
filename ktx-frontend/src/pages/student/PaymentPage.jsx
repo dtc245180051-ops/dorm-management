@@ -63,18 +63,12 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
   const maSV =
     accountData.studentId ||
     localStorage.getItem("ktx_username") ||
-    "dtc245180051";
+    "";
 
   // Lấy hóa đơn từ accountData.bills theo Schema chuẩn hóa
-  const currentBill =
-    accountData.bills?.find((b) => b.status === "UNPAID") ||
-    accountData.bills?.[0] || {
-      id: "BILL-10-2026",
-      title: "Tiền phòng & Dịch vụ KTX Tháng 10/2026",
-      amount: 400000,
-      status: "UNPAID",
-      dueDate: "15/10/2026",
-    };
+  const currentBill = accountData.bills?.find((bill) => bill.status === "UNPAID") || accountData.bills?.[0] || {
+    id: "", title: "", amount: 0, status: "UNPAID", dueDate: "",
+  };
 
   const isBillPaid = currentBill.status === "PAID";
   const loaiTienNop = "TIEN KTX T10";
@@ -83,33 +77,9 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
   const rawContent = `${maSV.toUpperCase()}_${formatText(loaiTienNop)}`;
 
   // Danh sách các khoản phí chuẩn hóa theo tổng 400.000đ
-  const feeItems = [
-    {
-      id: "room",
-      name: "Phí phòng KTX",
-      subtext: "Tiền thuê phòng ở theo hợp đồng lưu trú",
-      unitPrice: "350.000đ",
-      quantity: "1 tháng",
-      total: "350.000đ",
-      amount: 350000,
-      icon: CircleDollarSign,
-      iconBg: "bg-purple-100 text-purple-600",
-    },
-    {
-      id: "service",
-      name: "Dịch vụ KTX & Quản lý",
-      subtext: "Vệ sinh, an ninh, tiện ích công cộng KTX",
-      unitPrice: "50.000đ",
-      quantity: "1 tháng",
-      total: "50.000đ",
-      amount: 50000,
-      icon: MoreHorizontal,
-      iconBg: "bg-blue-100 text-blue-500",
-    },
-  ];
+  const feeItems = [];
 
-  // Tính tổng tiền động theo bill
-  const totalAmount = currentBill.amount || feeItems.reduce((acc, item) => acc + item.amount, 0);
+  const totalAmount = Number(currentBill.amount ?? 0) || feeItems.reduce((acc, item) => acc + item.amount, 0);
   const formattedTotal = totalAmount.toLocaleString("vi-VN") + "đ";
 
   // URL VietQR động theo chuẩn VietQR API

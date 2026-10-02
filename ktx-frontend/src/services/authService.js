@@ -32,9 +32,13 @@ export const authService = {
 
       // Lưu trữ token và thông tin phiên đăng nhập
       if (data.access_token) {
+        localStorage.setItem("token", data.access_token);
+        localStorage.setItem("access_token", data.access_token);
         localStorage.setItem("ktx_token", data.access_token);
         localStorage.setItem("ktx_user_role", data.role);
+        localStorage.setItem("user_role", data.role);
         localStorage.setItem("ktx_username", data.username);
+        localStorage.setItem("user_name", data.username);
         if (data.full_name) {
           localStorage.setItem("ktx_fullname", data.full_name);
         }
@@ -134,15 +138,24 @@ export const authService = {
    * Lấy token hiện tại từ localStorage
    */
   getToken() {
-    return localStorage.getItem("ktx_token");
+    return (
+      localStorage.getItem("token") ||
+      localStorage.getItem("access_token") ||
+      localStorage.getItem("ktx_token")
+    );
   },
 
   /**
    * Đăng xuất
    */
   logout() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("access_token");
     localStorage.removeItem("ktx_token");
     localStorage.removeItem("ktx_user_role");
+    localStorage.removeItem("user_role");
     localStorage.removeItem("ktx_username");
+    localStorage.removeItem("user_name");
+    localStorage.removeItem("ktx_fullname");
   },
 };

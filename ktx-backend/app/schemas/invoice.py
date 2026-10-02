@@ -34,8 +34,8 @@ class RoomBillingCandidate(BaseModel):
     ma_hop_dong: Optional[str] = None
     thoi_han_hop_dong: str
     thoi_gian_o_thang: int = 1
-    don_gia_thang: float = 350000.0
-    so_tien: float = 350000.0
+    don_gia_thang: Optional[float] = None
+    so_tien: Optional[float] = None
     da_lap_hoa_don: bool = False
 
 
@@ -55,7 +55,7 @@ class RoomInvoicePublishRequest(BaseModel):
         description="Thời gian ở tính theo tháng (mặc định 1 tháng)",
     )
     don_gia_thang: Optional[float] = Field(
-        default=350000.0,
+        default=None,
         ge=0,
         description="Đơn giá tiền phòng tham chiếu",
     )
@@ -133,4 +133,5 @@ class PublishResultResponse(BaseModel):
     message: str
     tong_hoa_don: int
     tong_so_tien: float
-    invoices: List[HoaDonResponse]
+    invoices: List[HoaDonResponse] = []
+    danh_sach_hoa_don: Optional[List[HoaDonResponse]] = None

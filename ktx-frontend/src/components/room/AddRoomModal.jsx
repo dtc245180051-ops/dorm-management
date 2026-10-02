@@ -29,12 +29,12 @@ export default function AddRoomModal({
   isOpen,
   onClose,
   buildings = [],
-  activeBuildingId = 'A1',
+  activeBuildingId = '',
   initialFloor = 1,
   onRoomAdded,
 }) {
   const getInitialFormData = (buildingId, floor) => ({
-    ma_toa: buildingId || (buildings[0]?.ma_toa || 'A1'),
+    ma_toa: buildingId || (buildings[0]?.ma_toa || ''),
     so_tang: floor || 1,
     so_phong: '',
     suc_chua: 4,
@@ -46,7 +46,7 @@ export default function AddRoomModal({
   const [formData, setFormData] = useState(() => getInitialFormData(activeBuildingId, initialFloor));
 
   // State thêm tòa nhà mới: nhập tên tòa, chọn nam/nữ và số tầng
-  const [isAddingNewBuilding, setIsAddingNewBuilding] = useState(false);
+  const [isAddingNewBuilding, setIsAddingNewBuilding] = useState(buildings.length === 0);
   const [newBuilding, setNewBuilding] = useState({
     ten_toa: '',
     gioi_tinh: 'Nam',
@@ -66,7 +66,7 @@ export default function AddRoomModal({
   // Hàm reset form về trạng thái ban đầu sạch sẽ
   const resetForm = () => {
     setFormData(getInitialFormData(activeBuildingId, initialFloor));
-    setIsAddingNewBuilding(false);
+    setIsAddingNewBuilding(buildings.length === 0);
     setNewBuilding({ ten_toa: '', gioi_tinh: 'Nam', so_tang: 5 });
     setImageFile(null);
     setImagePreview('');

@@ -108,10 +108,10 @@ export default function StudentDetailPage({
       phong_giuong: roomInfo
         ? `${roomInfo.ten_toa || 'Tòa A1'} – Phòng ${roomInfo.so_phong || '102'} – ${roomInfo.ten_giuong || 'Giường 1'}`
         : 'Tòa A – Phòng 102 – Giường 1',
-      ngay_bat_dau: roomInfo?.ngay_bat_dau ? roomInfo.ngay_bat_dau.split('-').reverse().join('/') : '14/01/2026',
-      ngay_ket_thuc: roomInfo?.ngay_ket_thuc ? roomInfo.ngay_ket_thuc.split('-').reverse().join('/') : '13/01/2027',
+      ngay_bat_dau: roomInfo?.ngay_bat_dau ? roomInfo.ngay_bat_dau.split('-').reverse().join('/') : '',
+      ngay_ket_thuc: roomInfo?.ngay_ket_thuc ? roomInfo.ngay_ket_thuc.split('-').reverse().join('/') : '',
       trang_thai: 'ACTIVE',
-      ma_giuong: roomInfo?.ma_giuong || 'A1_P102_G01',
+      ma_giuong: roomInfo?.ma_giuong || '',
     };
     setViewingContract(contractObj);
   };
