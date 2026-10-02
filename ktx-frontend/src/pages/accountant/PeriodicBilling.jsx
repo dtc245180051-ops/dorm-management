@@ -50,95 +50,12 @@ const LISTED_PRICES = {
 /**
  * Danh sách sinh viên mẫu theo tháng (kèm loại phòng và đơn giá niêm yết)
  */
-const MOCK_ROOM_BILLING_STUDENTS = [
-  {
-    id: 'DTC245180037',
-    name: 'Ngô Phương Mai',
-    room: 'P101 - Tòa A1',
-    building: 'A1',
-    roomType: 'Phòng tiêu chuẩn',
-    monthlyPrice: 350000,
-    contractTerm: '01/09/2026 - 31/01/2027',
-  },
-  {
-    id: 'DTC245160037',
-    name: 'bún đậu mắm tôm',
-    room: 'P203 - Tòa A1',
-    building: 'A1',
-    roomType: 'Phòng dịch vụ',
-    monthlyPrice: 650000,
-    contractTerm: '02/10/2026 - 02/10/2027',
-  },
-  {
-    id: 'DTC245040017',
-    name: 'Nguyễn Hoàng Long',
-    room: 'P102 - Tòa A1',
-    building: 'A1',
-    roomType: 'Phòng tiêu chuẩn',
-    monthlyPrice: 350000,
-    contractTerm: '02/10/2026 - 02/10/2027',
-  },
-  {
-    id: 'DTC245180088',
-    name: 'Lê Thị Thu Thảo',
-    room: 'P205 - Tòa A2',
-    building: 'A2',
-    roomType: 'Phòng tiêu chuẩn',
-    monthlyPrice: 350000,
-    contractTerm: '01/09/2026 - 31/07/2027',
-  },
-  {
-    id: 'DTC245180120',
-    name: 'Nguyễn Tiến Dũng',
-    room: 'P301 - Tòa A3',
-    building: 'A3',
-    roomType: 'Phòng dịch vụ',
-    monthlyPrice: 650000,
-    contractTerm: '01/09/2026 - 31/07/2027',
-  },
-];
+const MOCK_ROOM_BILLING_STUDENTS = [];
 
 /**
  * Dữ liệu mẫu hóa đơn điện nước theo tháng
  */
-const MOCK_UTILITY_BILLING_ROOMS = [
-  {
-    room: 'P203 - Tòa A1',
-    elecMeter: '1000 - 1100',
-    elecUsage: '100 kWh',
-    waterMeter: '400 - 410',
-    waterUsage: '10 m³',
-    totalAmount: '450.000 VND',
-    rawAmount: 450000,
-  },
-  {
-    room: 'P101 - Tòa A1',
-    elecMeter: '1000 - 1100',
-    elecUsage: '100 kWh',
-    waterMeter: '400 - 410',
-    waterUsage: '10 m³',
-    totalAmount: '450.000 VND',
-    rawAmount: 450000,
-  },
-  {
-    room: 'P102 - Tòa A1',
-    elecMeter: '1000 - 1100',
-    elecUsage: '100 kWh',
-    waterMeter: '400 - 410',
-    waterUsage: '10 m³',
-    totalAmount: '450.000 VND',
-    rawAmount: 450000,
-  },
-  {
-    room: 'P205 - Tòa A2',
-    elecMeter: '1540 - 1670',
-    elecUsage: '130 kWh',
-    waterMeter: '540 - 554',
-    waterUsage: '14 m³',
-    totalAmount: '600.000 VND',
-    rawAmount: 600000,
-  },
-];
+const MOCK_UTILITY_BILLING_ROOMS = [];
 
 /**
  * Trang "LẬP HÓA ĐƠN ĐỊNH KỲ" (Dành riêng cho Kế Toán)

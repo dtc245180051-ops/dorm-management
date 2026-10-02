@@ -117,7 +117,7 @@ export default function FeedbackPage({
       const payload = {
         msv: studentMsv,
         ho_ten: studentName,
-        phong: room.trim() || 'P36',
+        phong: room.trim() || 'Chưa xếp',
         loai_phan_anh: category,
         tieu_de: title.trim(),
         mo_ta: description.trim(),
@@ -364,7 +364,7 @@ export default function FeedbackPage({
                         type="text"
                         value={room}
                         onChange={(e) => setRoom(e.target.value)}
-                        placeholder="VD:P36"
+                        placeholder="VD: P101"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-500 text-slate-800 placeholder-slate-400 transition"
                       />
                     </div>
@@ -555,7 +555,7 @@ export default function FeedbackPage({
                               {pa.ma_phan_anh || pa.id}
                             </td>
                             <td className="py-3.5 px-4 font-medium text-slate-800">
-                              {pa.phong || 'P36'}
+                              {pa.phong || '---'}
                             </td>
                             <td className="py-3.5 px-4 text-xs">
                               <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md font-medium border border-blue-100">

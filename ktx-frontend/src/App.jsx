@@ -56,12 +56,7 @@ export default function App() {
   const [addStudentRequestKey, setAddStudentRequestKey] = useState(0);
 
   // Thông tin phòng hiện tại cho Student
-  const [currentRoomInfo, setCurrentRoomInfo] = useState({
-    phong_hien_tai: "P36 – Tòa A2 – Tầng 3",
-    thanh_vien: "6/8 người",
-    thoi_gian_luu_tru: "09/2025 – Nay",
-    so_phong: "P36",
-  });
+  const [currentRoomInfo, setCurrentRoomInfo] = useState(null);
 
   const loadRequests = useCallback(async () => {
     setIsLoadingRequests(true);
@@ -113,6 +108,33 @@ export default function App() {
     }
   }, [currentPath]);
 
+  // Tự động dọn dẹp dữ liệu mẫu / test cũ nếu còn lưu trong LocalStorage
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("ktx_test_data_cleaned_v3") !== "true") {
+        const studentAcc = localStorage.getItem("ktx_student_account");
+        if (studentAcc && (studentAcc.includes("REG-01") || studentAcc.includes("RES-01") || studentAcc.includes("BILL-10-2026"))) {
+          localStorage.removeItem("ktx_student_account");
+        }
+        const transferReqs = localStorage.getItem("dorm_transfer_checkout_requests");
+        if (transferReqs && (transferReqs.includes("YC-0231") || transferReqs.includes("YC-0232"))) {
+          localStorage.removeItem("dorm_transfer_checkout_requests");
+        }
+        const incidents = localStorage.getItem("dorm_student_incidents");
+        if (incidents && (incidents.includes("PA-001") || incidents.includes("PA-002"))) {
+          localStorage.removeItem("dorm_student_incidents");
+        }
+        const cachedRoom = localStorage.getItem("dorm_current_room_info");
+        if (cachedRoom && (cachedRoom.includes("P36") || cachedRoom.includes('"so_phong":"36"'))) {
+          localStorage.removeItem("dorm_current_room_info");
+        }
+        localStorage.setItem("ktx_test_data_cleaned_v3", "true");
+        window.dispatchEvent(new Event("student-account-updated"));
+        window.dispatchEvent(new Event("occupancy-updated"));
+      }
+    } catch (_) {}
+  }, []);
+
   useEffect(() => {
     loadRequests();
     loadRoomInfo();
@@ -122,8 +144,12 @@ export default function App() {
       loadRoomInfo();
     };
     window.addEventListener("occupancy-updated", handleUpdate);
+    window.addEventListener("student-account-updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
     return () => {
       window.removeEventListener("occupancy-updated", handleUpdate);
+      window.removeEventListener("student-account-updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
     };
   }, [currentPath, adminActiveTab, loadRequests, loadRoomInfo]);
 
@@ -351,7 +377,7 @@ export default function App() {
   // 1b. Xử lý yêu cầu chuyển phòng
   if (currentPath.startsWith("/admin/requests/transfer")) {
     const match = currentPath.match(/\/admin\/requests\/transfer\/?(.*)/);
-    const requestId = match && match[1] ? match[1] : "YC-0231";
+    const requestId = match && match[1] ? match[1] : "";
 
     return (
       <div className="relative">

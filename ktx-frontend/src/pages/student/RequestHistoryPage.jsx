@@ -180,7 +180,7 @@ export default function RequestHistoryPage({
       const studentMsv =
         localStorage.getItem("ktx_username") ||
         localStorage.getItem("ktx_email")?.split("@")[0] ||
-        "dtc245180051";
+        "";
 
       const [reqs, contracts, transferReqs, statusRes] = await Promise.all([
         occupancyService.getMyRequests(studentMsv),
@@ -211,8 +211,8 @@ export default function RequestHistoryPage({
               ma_yeu_cau: `#${reg.id}`,
               ngay_dang_ky: reg.date || "01/10/2026",
               loai_phong: reg.roomType || "Phòng tiêu chuẩn",
-              nguyen_vong: reg.assignedRoom || "501 - Tòa A4",
-              nguyen_vong_label: reg.assignedRoom || "501 - Tòa A4",
+              nguyen_vong: reg.assignedRoom || "Đang xét duyệt",
+              nguyen_vong_label: reg.assignedRoom || "Đang xét duyệt",
               nam_hoc: "2026–2027",
               trang_thai: reg.status,
               trang_thai_label: reg.status === "APPROVED" ? "Đã duyệt" : reg.status,
@@ -257,15 +257,15 @@ export default function RequestHistoryPage({
       if (stayList.length === 0 && Array.isArray(account.residenceHistory) && account.residenceHistory.length > 0) {
         stayList = account.residenceHistory.map((item, idx) => {
           const isActive = item.status === "ACTIVE" && !item.endDate;
-          const roomNum = String(item.roomNumber || "501").replace(/^P/i, "");
-          const bld = item.building || "Tòa A4";
+          const roomNum = String(item.roomNumber || "").replace(/^P/i, "");
+          const bld = item.building || "";
           return {
             id: item.id || `RES-${String(idx + 1).padStart(2, "0")}`,
             so_phong: roomNum,
-            phong: `P${roomNum}`,
+            phong: roomNum ? `P${roomNum}` : "Chưa có",
             toa: bld,
-            tang: roomNum.startsWith("5") ? "5" : "1",
-            giuong: "G01",
+            tang: item.floor || (roomNum.startsWith("5") ? "5" : (roomNum[0] || "1")),
+            giuong: item.bed || "G01",
             thoi_gian_o: item.endDate ? `${item.startDate} – ${item.endDate}` : `${item.startDate} – Nay`,
             nam_hoc: "2026-2027",
             trang_thai: isActive ? "DANG_O" : "DA_TRA_PHONG",

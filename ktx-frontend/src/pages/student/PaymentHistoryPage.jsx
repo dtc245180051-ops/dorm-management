@@ -18,71 +18,7 @@ import {
 const PAYMENT_STATUS_STORAGE_KEY = "ktx_payment_2026_09_status";
 const PAYMENT_DATE_STORAGE_KEY = "ktx_payment_2026_09_date";
 
-const invoiceRows = [
-  {
-    period: "Tháng 09/2026",
-    paymentDate: "---",
-    method: "QR code",
-    amount: 592500,
-    status: "waiting",
-    invoiceNumber: "HD-2026-0901",
-    fees: [
-      { label: "Tiền phòng", amount: 350000 },
-      { label: "Tiền điện", amount: 157500 },
-      { label: "Tiền nước", amount: 75000 },
-      { label: "Phí gửi xe / dịch vụ khác", amount: 10000 },
-    ],
-  },
-  {
-    period: "Tháng 08/2026",
-    paymentDate: "---",
-    method: "QR code",
-    amount: 692500,
-    status: "overdue",
-  },
-  {
-    period: "Tháng 07/2026",
-    paymentDate: "07/07/2026",
-    method: "QR code",
-    amount: 552300,
-    status: "paid",
-    invoiceNumber: "HD-2026-0701",
-    fees: [
-      { label: "Tiền phòng", amount: 350000 },
-      { label: "Tiền điện", amount: 117500 },
-      { label: "Tiền nước", amount: 74800 },
-      { label: "Phí gửi xe / dịch vụ khác", amount: 10000 },
-    ],
-  },
-  {
-    period: "Tháng 06/2026",
-    paymentDate: "11/06/2026",
-    method: "QR code",
-    amount: 792500,
-    status: "paid",
-    invoiceNumber: "HD-2026-0601",
-    fees: [
-      { label: "Tiền phòng", amount: 600000 },
-      { label: "Tiền điện", amount: 112500 },
-      { label: "Tiền nước", amount: 70000 },
-      { label: "Phí gửi xe / dịch vụ khác", amount: 10000 },
-    ],
-  },
-  {
-    period: "Tháng 05/2026",
-    paymentDate: "03/05/2026",
-    method: "QR code",
-    amount: 492500,
-    status: "paid",
-    invoiceNumber: "HD-2026-0501",
-    fees: [
-      { label: "Tiền phòng", amount: 350000 },
-      { label: "Tiền điện", amount: 87500 },
-      { label: "Tiền nước", amount: 45000 },
-      { label: "Phí gửi xe / dịch vụ khác", amount: 10000 },
-    ],
-  },
-];
+const invoiceRows = [];
 
 const formatMoney = (amount) => `${amount.toLocaleString("vi-VN")} đ`;
 
@@ -286,11 +222,11 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [studentStatus, setStudentStatus] = useState(STUDENT_STATUS.ACTIVE_RESIDENT);
 
-  const studentName = accountData.fullName || "Nguyễn Thị Ánh";
-  const studentId = accountData.studentId || "dtc245180051";
+  const studentName = accountData.fullName || localStorage.getItem("ktx_fullname") || "";
+  const studentId = accountData.studentId || localStorage.getItem("ktx_username") || "";
   const room = accountData.currentResidence?.isActive
     ? `${accountData.currentResidence.roomNumber} - ${accountData.currentResidence.building}`
-    : "Phòng 501 - Tòa A4";
+    : "Chưa xếp phòng";
 
   useEffect(() => {
     const syncData = () => {
@@ -320,30 +256,29 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
     };
   }, []);
 
-  // Lấy danh sách hóa đơn theo chuẩn hóa Schema (Bao gồm Tháng 10/2026 400.000đ)
-  const currentBill = accountData.bills?.find((b) => b.id === "BILL-10-2026") || accountData.bills?.[0];
-  const isPaid = currentBill?.status === "PAID";
-  const billStatus = isPaid
-    ? "paid"
-    : paymentStatus === "pending"
-      ? "pending"
-      : "waiting";
-
-  const rows = [
-    {
-      period: "Tháng 10/2026",
-      paymentDate: isPaid ? "02/10/2026" : (paymentStatus === "pending" ? paymentDate : "---"),
+  // Lấy danh sách hóa đơn từ dữ liệu tài khoản thực
+  const rows = (accountData.bills || []).map((bill, index) => {
+    const isBillPaid = bill.status === "PAID";
+    const billStatus = isBillPaid
+      ? "paid"
+      : paymentStatus === "pending"
+        ? "pending"
+        : "waiting";
+    return {
+      period: bill.title || `Hóa đơn #${bill.id}`,
+      paymentDate: isBillPaid
+        ? (bill.paymentDate || "02/10/2026")
+        : (paymentStatus === "pending" ? paymentDate : "---"),
       method: "QR code",
-      amount: currentBill?.amount || 400000,
+      amount: bill.amount || 0,
       status: billStatus,
-      invoiceNumber: "HD-2026-1001",
+      invoiceNumber: bill.id || `HD-${index + 1}`,
       fees: [
-        { label: "Phí phòng KTX", amount: 350000 },
-        { label: "Dịch vụ KTX & Quản lý", amount: 50000 },
+        { label: "Phí phòng KTX", amount: Math.max(0, (bill.amount || 0) - 50000) },
+        { label: "Dịch vụ KTX & Quản lý", amount: Math.min(bill.amount || 0, 50000) },
       ],
-    },
-    ...invoiceRows,
-  ];
+    };
+  });
 
   const navigateToPayment = () => {
     if (onNavigate) {

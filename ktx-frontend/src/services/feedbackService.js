@@ -2,49 +2,19 @@ import api from './api';
 
 const STORAGE_KEY = 'dorm_student_incidents';
 
-// Dữ liệu mẫu ban đầu đồng bộ với thiết kế và backend
-const DEFAULT_INCIDENTS = [
-  {
-    id: 'PA-001',
-    ma_phan_anh: 'PA-001',
-    msv: 'DTC245180051',
-    ho_ten: 'Nguyễn Văn A',
-    phong: 'P36',
-    loai_phan_anh: 'Cơ sở vật chất',
-    tieu_de: 'Bóng đèn hành lang tầng 2 bị hỏng',
-    mo_ta: 'Bóng đèn trước cửa phòng 204 bị chớp tắt liên tục và đã cháy tối qua, mong ban quản lý cử kỹ thuật thay thế sớm.',
-    hinh_anh: null,
-    ngay_gui: '2026-09-26T14:30:00',
-    trang_thai: 'DANG_XU_LY',
-    ghi_chu_xu_ly: 'Đã giao tổ kỹ thuật điện kiểm tra và chuẩn bị bóng thay thế.',
-  },
-  {
-    id: 'PA-002',
-    ma_phan_anh: 'PA-002',
-    msv: 'DTC2151001',
-    ho_ten: 'Trần Thị Mai',
-    phong: 'P102',
-    loai_phan_anh: 'Điện nước',
-    tieu_de: 'Vòi nước bồn rửa mặt bị rỉ nước',
-    mo_ta: 'Vòi rửa mặt trong nhà vệ sinh phòng 102 bị rỉ nước liên tục gây lãng phí nước và ẩm ướt sàn.',
-    hinh_anh: null,
-    ngay_gui: '2026-09-25T09:15:00',
-    trang_thai: 'DA_XU_LY',
-    ghi_chu_xu_ly: 'Đã thay gioăng cao su và van khóa mới sáng 26/09.',
-  },
-];
+// Khởi tạo danh sách phản ánh rỗng
+const DEFAULT_INCIDENTS = [];
 
 function getLocalIncidents() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_INCIDENTS));
-      return DEFAULT_INCIDENTS;
+      return [];
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_INCIDENTS;
+    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    return DEFAULT_INCIDENTS;
+    return [];
   }
 }
 

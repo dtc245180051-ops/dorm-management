@@ -6,46 +6,20 @@
 const STORAGE_KEY = "ktx_student_account";
 
 export const DEFAULT_STUDENT_ACCOUNT = {
-  studentId: "dtc245180051",
-  fullName: "Nguyễn Thị Ánh",
+  studentId: "",
+  fullName: "",
   currentResidence: {
-    isActive: true, // false nếu chưa có phòng hoặc hợp đồng đã kết thúc
-    building: "Tòa A4",
-    roomNumber: "501",
-    roomType: "Phòng tiêu chuẩn",
-    contractStatus: "ACTIVE", // "ACTIVE" (Đang hiệu lực), "EXPIRED" (Đã kết thúc)
-    startDate: "01/10/2026",
-    endDate: "30/06/2027",
+    isActive: false, // false nếu chưa có phòng hoặc hợp đồng đã kết thúc
+    building: "",
+    roomNumber: "",
+    roomType: "",
+    contractStatus: "EXPIRED", // "ACTIVE" (Đang hiệu lực), "EXPIRED" (Đã kết thúc)
+    startDate: "",
+    endDate: "",
   },
-  registrationHistory: [
-    {
-      id: "REG-01",
-      date: "01/10/2026",
-      roomType: "Phòng tiêu chuẩn",
-      status: "APPROVED",
-      assignedRoom: "501 - Tòa A4",
-    },
-  ],
-  residenceHistory: [
-    {
-      id: "RES-01",
-      building: "Tòa A4",
-      roomNumber: "501",
-      roomType: "Phòng tiêu chuẩn",
-      startDate: "01/10/2026",
-      endDate: null, // null biểu thị đang ở
-      status: "ACTIVE", // Chuyển thành "COMPLETED" khi kết thúc hợp đồng
-    },
-  ],
-  bills: [
-    {
-      id: "BILL-10-2026",
-      title: "Tiền phòng & Dịch vụ KTX Tháng 10/2026",
-      amount: 400000,
-      status: "UNPAID",
-      dueDate: "15/10/2026",
-    },
-  ],
+  registrationHistory: [],
+  residenceHistory: [],
+  bills: [],
 };
 
 /**
@@ -56,7 +30,7 @@ export function getStudentAccount(studentId) {
   const currentId = (
     studentId ||
     localStorage.getItem("ktx_username") ||
-    "dtc245180051"
+    ""
   )
     .trim()
     .toLowerCase();
@@ -67,7 +41,7 @@ export function getStudentAccount(studentId) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object") {
         const accId = String(parsed.studentId || "").trim().toLowerCase();
-        if (!currentId || accId === currentId || currentId.includes("dtc245180051") || accId.includes("dtc245180051")) {
+        if (!currentId || !accId || accId === currentId) {
           return normalizeAccount(parsed);
         }
       }
@@ -76,7 +50,7 @@ export function getStudentAccount(studentId) {
     console.error("Lỗi đọc tài khoản sinh viên từ localStorage:", e);
   }
 
-  // Khởi tạo mặc định nếu chưa có
+  // Khởi tạo mặc định trống nếu chưa có
   const defaultAcc = {
     ...DEFAULT_STUDENT_ACCOUNT,
     studentId: currentId || DEFAULT_STUDENT_ACCOUNT.studentId,
@@ -91,26 +65,21 @@ export function getStudentAccount(studentId) {
  */
 function normalizeAccount(acc) {
   const normalized = {
-    studentId: String(acc.studentId || "dtc245180051").toLowerCase(),
-    fullName: acc.fullName || "Nguyễn Thị Ánh",
+    studentId: String(acc?.studentId || "").toLowerCase(),
+    fullName: acc?.fullName || "",
     currentResidence: {
-      isActive: Boolean(acc.currentResidence?.isActive),
-      building: acc.currentResidence?.building || "Tòa A4",
-      roomNumber: acc.currentResidence?.roomNumber || "501",
-      roomType: acc.currentResidence?.roomType || "Phòng tiêu chuẩn",
-      contractStatus: acc.currentResidence?.contractStatus || (acc.currentResidence?.isActive ? "ACTIVE" : "EXPIRED"),
-      startDate: acc.currentResidence?.startDate || "01/10/2026",
-      endDate: acc.currentResidence?.endDate || "30/06/2027",
+      isActive: Boolean(acc?.currentResidence?.isActive),
+      building: acc?.currentResidence?.building || "",
+      roomNumber: acc?.currentResidence?.roomNumber || "",
+      roomType: acc?.currentResidence?.roomType || "",
+      contractStatus: acc?.currentResidence?.contractStatus || (acc?.currentResidence?.isActive ? "ACTIVE" : "EXPIRED"),
+      startDate: acc?.currentResidence?.startDate || "",
+      endDate: acc?.currentResidence?.endDate || "",
     },
-    registrationHistory: Array.isArray(acc.registrationHistory) ? acc.registrationHistory : [],
-    residenceHistory: Array.isArray(acc.residenceHistory) ? acc.residenceHistory : [],
-    bills: Array.isArray(acc.bills) ? acc.bills : [],
+    registrationHistory: Array.isArray(acc?.registrationHistory) ? acc.registrationHistory : [],
+    residenceHistory: Array.isArray(acc?.residenceHistory) ? acc.residenceHistory : [],
+    bills: Array.isArray(acc?.bills) ? acc.bills : [],
   };
-
-  // Đảm bảo có ít nhất 1 khoản phí mẫu nếu bills trống
-  if (normalized.bills.length === 0) {
-    normalized.bills = [...DEFAULT_STUDENT_ACCOUNT.bills];
-  }
 
   return normalized;
 }
@@ -294,10 +263,35 @@ export function payStudentBill(studentId, billId) {
   return saveStudentAccount(account);
 }
 
+/**
+ * Xóa toàn bộ dữ liệu mẫu / test trong LocalStorage của trình duyệt
+ */
+export function clearAllTestData() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem("dorm_registration_requests");
+    localStorage.removeItem("dorm_transfer_checkout_requests");
+    localStorage.removeItem("dorm_current_room_info");
+    localStorage.removeItem("dorm_student_incidents");
+    localStorage.removeItem("dorm_stay_contracts");
+    localStorage.removeItem("dorm_student_profile");
+    localStorage.removeItem("ktx_payment_2026_09_status");
+    localStorage.removeItem("ktx_payment_2026_09_date");
+    localStorage.removeItem("ktx_room");
+    window.dispatchEvent(new Event("student-account-updated"));
+    window.dispatchEvent(new Event("occupancy-updated"));
+    window.dispatchEvent(new Event("ktx-payment-updated"));
+    window.dispatchEvent(new Event("storage"));
+  } catch (e) {
+    console.error("Lỗi khi xóa dữ liệu test:", e);
+  }
+}
+
 export default {
   getStudentAccount,
   saveStudentAccount,
   approveStudentRoom,
   terminateStudentContract,
   payStudentBill,
+  clearAllTestData,
 };

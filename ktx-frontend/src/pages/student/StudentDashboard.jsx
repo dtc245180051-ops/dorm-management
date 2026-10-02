@@ -69,34 +69,32 @@ export default function StudentDashboard({ user, onNavigate }) {
       const acc = getStudentAccount();
       if (acc?.currentResidence?.isActive && acc.currentResidence.contractStatus === "ACTIVE") {
         const cr = acc.currentResidence;
-        const roomNum = String(cr.roomNumber || "501").replace(/^P/i, "");
-        const bld = cr.building || "Tòa A4";
-        const floor = roomNum.startsWith("5") ? "5" : (roomNum[0] || "5");
+        const roomNum = String(cr.roomNumber || "").replace(/^P/i, "");
+        const bld = cr.building || "";
+        const floor = cr.floor || (roomNum.startsWith("5") ? "5" : (roomNum[0] || ""));
         const firstBill = acc.bills?.[0];
-        setCurrentRoomInfo({
-          phong_hien_tai: `P${roomNum} – ${bld} – Tầng ${floor}`,
-          so_phong: `P${roomNum}`,
-          toa: bld,
-          tang: floor,
-          thanh_vien: "6/8 người",
-          thoi_gian_luu_tru: `${cr.startDate || "01/10/2026"} – Nay`,
-          so_thanh_vien: 6,
-          suc_chua: 8,
-        });
-        setBilling(
-          firstBill
-            ? {
-                amount: `${(firstBill.amount || 400000).toLocaleString("vi-VN")}đ`,
-                period: "/tháng",
-                status: firstBill.isPaid ? "Đã thanh toán" : "Chờ thanh toán",
-              }
-            : {
-                amount: "400.000đ",
-                period: "/tháng",
-                status: "Đã thanh toán",
-              }
-        );
-        return;
+        if (roomNum) {
+          setCurrentRoomInfo({
+            phong_hien_tai: `P${roomNum}${bld ? ` – ${bld}` : ""}${floor ? ` – Tầng ${floor}` : ""}`,
+            so_phong: `P${roomNum}`,
+            toa: bld,
+            tang: floor,
+            thanh_vien: cr.members || "--",
+            thoi_gian_luu_tru: cr.startDate ? `${cr.startDate} – Nay` : "Đang lưu trú",
+            so_thanh_vien: cr.memberCount || 0,
+            suc_chua: cr.capacity || 8,
+          });
+          setBilling(
+            firstBill
+              ? {
+                  amount: `${(firstBill.amount || 0).toLocaleString("vi-VN")}đ`,
+                  period: "/tháng",
+                  status: firstBill.isPaid ? "Đã thanh toán" : "Chờ thanh toán",
+                }
+              : null
+          );
+          return;
+        }
       }
 
       // Nếu hợp đồng đã kết thúc hoặc không active

@@ -128,57 +128,7 @@ def update_request_status(req_id: str, new_status: str, extra_data: Optional[dic
 
 
 # Danh sách các yêu cầu chuyển phòng và trả phòng
-TRANSFER_CHECKOUT_REQUESTS: List[Dict] = [
-    {
-        "id": "YC-0231",
-        "ma_yeu_cau": "#YC-0231",
-        "loai_yeu_cau": "Chuyển phòng",
-        "loai_don": "CHUYEN_PHONG",
-        "msv": "DTC245180051",
-        "ho_ten": "Nguyễn Quốc Huy",
-        "gioi_tinh": "Nam",
-        "khoa": "Công nghệ thông tin",
-        "lop": "DTC-K20",
-        "vi_tri_hien_tai": "Phòng A102 - Giường G01",
-        "cong_no": "Đã hoàn thành toàn bộ phí",
-        "ngay_gui": "25/11/2025",
-        "phong_lien_quan": "P12 → P36",
-        "phong_hien_tai": "P12",
-        "phong_dich": "P36",
-        "ly_do": "Phòng hiện tại quá tải",
-        "ngay_mong_muon": "01/12/2025",
-        "mo_ta": "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học...",
-        "trang_thai": "DA_DUYET",
-        "trang_thai_label": "Đã duyệt",
-    },
-    {
-        "id": "YC-0232",
-        "ma_yeu_cau": "#YC-0232",
-        "loai_yeu_cau": "Trả phòng",
-        "loai_don": "TRA_PHONG",
-        "msv": "DTC245180051",
-        "ho_ten": "Nguyễn Quốc Huy",
-        "gioi_tinh": "Nam",
-        "khoa": "Công nghệ thông tin",
-        "lop": "DTC-K20",
-        "vi_tri_hien_tai": "Phòng A102 - Giường G01",
-        "cong_no": "Đã hoàn thành toàn bộ phí",
-        "ngay_gui": "25/08/2026",
-        "phong_lien_quan": "P36",
-        "phong_hien_tai": "P36",
-        "ly_do": "Đã tốt nghiệp",
-        "ngay_mong_muon": "01/09/2026",
-        "dia_chi_sau_tra": "Số 123 Đường Cầu Giấy, Quận Cầu Giấy, Hà Nội",
-        "dia_chi_chi_tiet": {
-            "tinh": "Hà Nội",
-            "huyen": "Quận Cầu Giấy",
-            "so_nha": "Số 123 Đường Cầu Giấy",
-        },
-        "mo_ta": "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học...",
-        "trang_thai": "CHO_DUYET",
-        "trang_thai_label": "Chờ duyệt",
-    },
-]
+TRANSFER_CHECKOUT_REQUESTS: List[Dict] = []
 
 
 def add_transfer_request(data: dict) -> dict:

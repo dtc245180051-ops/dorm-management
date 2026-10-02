@@ -55,76 +55,18 @@ const DEFAULT_CURRENT_ROOM_INFO = null;
 
 const DEFAULT_STAY_CONTRACTS = [];
 
-const DEFAULT_TRANSFER_CHECKOUT_REQUESTS = [
-  {
-    id: "YC-0231",
-    ma_yeu_cau: "#YC-0231",
-    loai_yeu_cau: "Chuyển phòng",
-    loai_don: "CHUYEN_PHONG",
-    msv: "DTC245180051",
-    ho_ten: "Nguyễn Quốc Huy",
-    gioi_tinh: "Nam",
-    khoa: "Công nghệ thông tin",
-    lop: "DTC-K20",
-    vi_tri_hien_tai: "Phòng A102 - Giường G01",
-    cong_no: "Đã hoàn thành toàn bộ phí",
-    ngay_gui: "25/11/2025",
-    phong_lien_quan: "P12 → P36",
-    phong_hien_tai: "P12",
-    phong_dich: "P36",
-    ly_do: "Phòng hiện tại quá tải",
-    ngay_mong_muon: "01/12/2025",
-    mo_ta:
-      "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học...",
-    trang_thai: "DA_DUYET",
-    trang_thai_label: "Đã duyệt",
-  },
-  {
-    id: "YC-0232",
-    ma_yeu_cau: "#YC-0232",
-    loai_yeu_cau: "Trả phòng",
-    loai_don: "TRA_PHONG",
-    msv: "DTC245180051",
-    ho_ten: "Nguyễn Quốc Huy",
-    gioi_tinh: "Nam",
-    khoa: "Công nghệ thông tin",
-    lop: "DTC-K20",
-    vi_tri_hien_tai: "Phòng A102 - Giường G01",
-    cong_no: "Đã hoàn thành toàn bộ phí",
-    ngay_gui: "25/08/2026",
-    phong_lien_quan: "P36",
-    phong_hien_tai: "P36",
-    ly_do: "Đã tốt nghiệp",
-    ngay_mong_muon: "01/09/2026",
-    dia_chi_sau_tra: "Số 123 Đường Cầu Giấy, Quận Cầu Giấy, Hà Nội",
-    dia_chi_chi_tiet: {
-      tinh: "Hà Nội",
-      huyen: "Quận Cầu Giấy",
-      so_nha: "Số 123 Đường Cầu Giấy",
-    },
-    mo_ta:
-      "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học...",
-    trang_thai: "CHO_DUYET",
-    trang_thai_label: "Chờ duyệt",
-  },
-];
+const DEFAULT_TRANSFER_CHECKOUT_REQUESTS = [];
 
 function getLocalTransferCheckoutRequests() {
   try {
     const raw = localStorage.getItem(TRANSFER_CHECKOUT_STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(
-        TRANSFER_CHECKOUT_STORAGE_KEY,
-        JSON.stringify(DEFAULT_TRANSFER_CHECKOUT_REQUESTS),
-      );
-      return DEFAULT_TRANSFER_CHECKOUT_REQUESTS;
+      return [];
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0
-      ? parsed
-      : DEFAULT_TRANSFER_CHECKOUT_REQUESTS;
+    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    return DEFAULT_TRANSFER_CHECKOUT_REQUESTS;
+    return [];
   }
 }
 
@@ -141,16 +83,17 @@ function getLocalCurrentRoomInfo() {
     const acc = getStudentAccount();
     if (acc?.currentResidence?.isActive && acc.currentResidence.contractStatus === "ACTIVE") {
       const cr = acc.currentResidence;
-      const roomNum = String(cr.roomNumber || "501").replace(/^P/i, "");
-      const bld = cr.building || "Tòa A4";
-      const floor = roomNum.startsWith("5") ? "5" : (roomNum[0] || "5");
+      const roomNum = String(cr.roomNumber || "").replace(/^P/i, "");
+      const bld = cr.building || "";
+      const floor = cr.floor || (roomNum.startsWith("5") ? "5" : (roomNum[0] || ""));
+      if (!roomNum) return null;
       return {
-        phong_hien_tai: `P${roomNum} – ${bld} – Tầng ${floor}`,
+        phong_hien_tai: `P${roomNum}${bld ? ` – ${bld}` : ""}${floor ? ` – Tầng ${floor}` : ""}`,
         so_phong: `P${roomNum}`,
         toa: bld,
         tang: floor,
-        thanh_vien: "6/8 người",
-        thoi_gian_luu_tru: `${cr.startDate || "01/10/2026"} – Nay`,
+        thanh_vien: cr.members || "--",
+        thoi_gian_luu_tru: cr.startDate ? `${cr.startDate} – Nay` : "Đang lưu trú",
         loai_phong: cr.roomType || "Phòng tiêu chuẩn",
       };
     }

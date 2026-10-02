@@ -56,11 +56,11 @@ export default function StudentProfilePage({ onSelectTab }) {
 
   // 2. Dữ liệu phòng ở (đồng bộ với occupancyService)
   const [roomInfo, setRoomInfo] = useState({
-    toa: "A2",
-    so_phong: "36",
-    tang: "3",
-    giuong: "4",
-    ngay_nhan_phong: "01/09/2024",
+    toa: "---",
+    so_phong: "Chưa xếp",
+    tang: "---",
+    giuong: "---",
+    ngay_nhan_phong: "---",
   });
 
   // 3. State modal chỉnh sửa & Toast
@@ -166,20 +166,20 @@ export default function StudentProfilePage({ onSelectTab }) {
       if (occupancyService.getCurrentRoomInfo) {
         const currentRoom = await occupancyService.getCurrentRoomInfo();
         if (currentRoom) {
-          const rawToa = currentRoom.toa || "A4";
+          const rawToa = currentRoom.toa || "";
           const cleanToa = rawToa.replace("Tòa ", "").trim();
-          const rawPhong = currentRoom.so_phong || currentRoom.phong || "501";
+          const rawPhong = currentRoom.so_phong || currentRoom.phong || "";
           const cleanPhong = rawPhong.replace(/^P/i, "").trim();
-          const rawGiuong = currentRoom.giuong || "1";
+          const rawGiuong = currentRoom.giuong || "";
           const cleanGiuong =
-            rawGiuong.replace(/^G/i, "").replace(/^0+/, "").trim() || "1";
+            rawGiuong.replace(/^G/i, "").replace(/^0+/, "").trim() || "";
 
           setRoomInfo({
-            toa: cleanToa || "A4",
-            so_phong: cleanPhong || "501",
-            tang: currentRoom.tang || "5",
-            giuong: cleanGiuong || "1",
-            ngay_nhan_phong: currentRoom.ngay_nhan_phong || currentRoom.thoi_gian_luu_tru || "01/10/2026",
+            toa: cleanToa || "---",
+            so_phong: cleanPhong || "Chưa xếp",
+            tang: currentRoom.tang || "---",
+            giuong: cleanGiuong || "---",
+            ngay_nhan_phong: currentRoom.ngay_nhan_phong || currentRoom.thoi_gian_luu_tru || "---",
           });
         } else {
           setRoomInfo({

@@ -241,10 +241,10 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
                   Phòng hiện tại
                 </div>
                 <div className="text-xl font-bold text-slate-900 mt-0.5 truncate">
-                  P36
+                  {accountData?.currentResidence?.roomNumber ? `P${accountData.currentResidence.roomNumber}` : "Chưa có"}
                 </div>
                 <div className="text-xs text-slate-400 mt-0.5 truncate">
-                  Tòa A2 – Tầng 2 – Phòng 10
+                  {accountData?.currentResidence?.building || "Chưa xếp phòng"}
                 </div>
               </div>
             </div>
@@ -443,7 +443,9 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
                       Phòng hiện tại:
                     </span>
                     <span className="font-semibold text-slate-800">
-                      P36 – Tòa A2 – Tầng 3
+                      {accountData?.currentResidence?.roomNumber
+                        ? `P${accountData.currentResidence.roomNumber} – ${accountData.currentResidence.building || ""}`
+                        : "Chưa có phòng"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-slate-600">

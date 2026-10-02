@@ -39,10 +39,10 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
 
   // 2. Thông tin phòng hiện tại (Banner trên cùng)
   const [currentRoomInfo, setCurrentRoomInfo] = useState({
-    phong_hien_tai: "P36 – Tòa A2 – Tầng 3",
-    thanh_vien: "6/8 người",
-    thoi_gian_luu_tru: "09/2025 – Nay",
-    so_phong: "P36",
+    phong_hien_tai: "Chưa có phòng",
+    thanh_vien: "—",
+    thoi_gian_luu_tru: "—",
+    so_phong: "",
   });
 
   // 3. Danh sách phòng khả dụng cho dropdown chọn phòng đích
@@ -189,15 +189,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
           value: opt.label || `P${opt.so_phong} - ${opt.ten_toa || "Tòa KTX"}`,
           label: opt.label || `P${opt.so_phong} - ${opt.ten_toa || "Tòa KTX"}`,
         }));
-        // Đảm bảo P36 - Tòa A3 - Tầng 3 luôn ở vị trí đầu tiên chuẩn Figma
-        const filtered = mapped.filter(
-          (m) =>
-            !m.value.includes("A3_P36") && m.value !== "P36 - Tòa A3 - Tầng 3",
-        );
-        setRoomOptions([
-          { value: "P36 - Tòa A3 - Tầng 3", label: "P36 - Tòa A3 - Tầng 3" },
-          ...filtered,
-        ]);
+        setRoomOptions(mapped);
       }
     } catch (err) {
       console.error("Error loading transfer page data:", err);
@@ -269,13 +261,13 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
 
     try {
       const payload = {
-        phong_hien_tai: currentRoomInfo.so_phong || "P36",
+        phong_hien_tai: currentRoomInfo.so_phong || "",
         ly_do: transferForm.ly_do,
         ngay_mong_muon: formatInputDateToDisplay(transferForm.ngay_mong_muon),
         phong_mong_muon: transferForm.phong_mong_muon,
         mo_ta_chi_tiet: transferForm.mo_ta_chi_tiet,
-        msv: "B21DCCN001",
-        ho_ten: "Nguyễn Văn A",
+        msv: localStorage.getItem("ktx_username") || "",
+        ho_ten: localStorage.getItem("ktx_fullname") || "",
       };
 
       const res = await occupancyService.submitTransferRequest(payload);
@@ -284,7 +276,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
         ma_yeu_cau: `#YC-${Date.now().toString().slice(-4)}`,
         loai_yeu_cau: "Chuyển phòng",
         ngay_gui: new Date().toLocaleDateString("vi-VN"),
-        phong_lien_quan: `${currentRoomInfo.so_phong || "P36"} → ${transferForm.phong_mong_muon.split(" - ")[0]}`,
+        phong_lien_quan: `${currentRoomInfo.so_phong || ""} → ${transferForm.phong_mong_muon.split(" - ")[0]}`,
         trang_thai: "CHO_DUYET",
         trang_thai_label: "Chờ duyệt",
       };
@@ -355,13 +347,13 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
 
     try {
       const payload = {
-        phong_hien_tai: currentRoomInfo.so_phong || "P36",
+        phong_hien_tai: currentRoomInfo.so_phong || "",
         ly_do: checkoutForm.ly_do,
         ngay_mong_muon: formatInputDateToDisplay(checkoutForm.ngay_mong_muon),
         dia_chi_lien_he: checkoutForm.dia_chi_lien_he,
         mo_ta_chi_tiet: checkoutForm.mo_ta_chi_tiet,
-        msv: "B21DCCN001",
-        ho_ten: "Nguyễn Văn A",
+        msv: localStorage.getItem("ktx_username") || "",
+        ho_ten: localStorage.getItem("ktx_fullname") || "",
       };
 
       const res = await occupancyService.submitCheckoutRequest(payload);
@@ -370,7 +362,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
         ma_yeu_cau: `#YC-${Date.now().toString().slice(-4)}`,
         loai_yeu_cau: "Trả phòng",
         ngay_gui: new Date().toLocaleDateString("vi-VN"),
-        phong_lien_quan: currentRoomInfo.so_phong || "P36",
+        phong_lien_quan: currentRoomInfo.so_phong || "",
         trang_thai: "CHO_DUYET",
         trang_thai_label: "Chờ duyệt",
       };

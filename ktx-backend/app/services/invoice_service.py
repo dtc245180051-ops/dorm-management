@@ -22,52 +22,6 @@ from app.schemas.invoice import (
     UtilityMeterUploadResponse,
 )
 
-DEFAULT_DEMO_UTILITY_ROOMS = [
-    {
-        "ma_phong": "P102",
-        "so_phong": "102",
-        "toa_nha": "A1",
-        "so_sinh_vien": 4,
-        "chi_so_dien_cu_moi": "1240 - 1340",
-        "so_dien_kwh": 100,
-        "chi_so_nuoc_cu_moi": "450 - 460",
-        "so_nuoc_m3": 10,
-        "tong_tien": 450000.0,
-    },
-    {
-        "ma_phong": "P103",
-        "so_phong": "103",
-        "toa_nha": "A1",
-        "so_sinh_vien": 4,
-        "chi_so_dien_cu_moi": "2100 - 2215",
-        "so_dien_kwh": 115,
-        "chi_so_nuoc_cu_moi": "610 - 622",
-        "so_nuoc_m3": 12,
-        "tong_tien": 525000.0,
-    },
-    {
-        "ma_phong": "P201",
-        "so_phong": "201",
-        "toa_nha": "A2",
-        "so_sinh_vien": 4,
-        "chi_so_dien_cu_moi": "0890 - 0985",
-        "so_dien_kwh": 95,
-        "chi_so_nuoc_cu_moi": "320 - 328",
-        "so_nuoc_m3": 8,
-        "tong_tien": 405000.0,
-    },
-    {
-        "ma_phong": "P205",
-        "so_phong": "205",
-        "toa_nha": "A2",
-        "so_sinh_vien": 4,
-        "chi_so_dien_cu_moi": "1540 - 1670",
-        "so_dien_kwh": 130,
-        "chi_so_nuoc_cu_moi": "540 - 554",
-        "so_nuoc_m3": 14,
-        "tong_tien": 600000.0,
-    },
-]
 
 
 class InvoiceService:
