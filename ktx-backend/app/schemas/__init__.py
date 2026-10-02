@@ -5,6 +5,14 @@ from app.schemas.auth import (
     UserRegister,
     UserResponse,
 )
+from app.schemas.invoice import (
+    HoaDonResponse,
+    PublishResultResponse,
+    RoomBillingCandidate,
+    RoomInvoicePublishRequest,
+    UtilityBillingCandidate,
+    UtilityInvoicePublishRequest,
+)
 from app.schemas.dorm import (
     GiuongCreate,
     GiuongResponse,
@@ -32,6 +40,13 @@ __all__ = [
     "UserRegister",
     "NguoiDungResponse",
     "UserResponse",
+    # Invoice
+    "HoaDonResponse",
+    "RoomBillingCandidate",
+    "RoomInvoicePublishRequest",
+    "UtilityBillingCandidate",
+    "UtilityInvoicePublishRequest",
+    "PublishResultResponse",
     # Dorm
     "ToaNhaCreate",
     "ToaNhaResponse",
@@ -50,3 +65,5 @@ __all__ = [
     "SinhVienResponse",
     "ThongTinPhongHienTai",
 ]
+
+

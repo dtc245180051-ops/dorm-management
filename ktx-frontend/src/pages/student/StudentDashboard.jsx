@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './StudentDashboard.css';
 import campusBanner from '../../assets/image.png';
+import occupancyService from '../../services/occupancyService';
 
 /**
  * ============================================================================
@@ -76,18 +77,77 @@ const MOCK_STUDENT_DATA = {
   ],
 };
 
-export default function StudentDashboard({ user }) {
+export default function StudentDashboard({ user, onNavigate }) {
   const [activeModal, setActiveModal] = useState(null);
+  const [currentRoomInfo, setCurrentRoomInfo] = useState({
+    phong_hien_tai: 'P36 – Tòa A2 – Tầng 3',
+    thanh_vien: '6/8 người',
+    thoi_gian_luu_tru: '09/2025 – Nay',
+    so_phong: 'P36',
+    toa: 'Tòa A2',
+    tang: 'Tầng 3',
+    so_thanh_vien: 6,
+    suc_chua: 8,
+  });
 
-  // Lấy tên hiển thị của sinh viên: ưu tiên dữ liệu đăng nhập, fallback 'Nguyễn Văn A' chuẩn theo ảnh
+  const loadRoomInfo = async () => {
+    try {
+      const info = await occupancyService.getCurrentRoomInfo();
+      if (info) {
+        setCurrentRoomInfo((prev) => ({ ...prev, ...info }));
+      }
+    } catch (e) {
+      console.error('Error loading room info in StudentDashboard:', e);
+    }
+  };
+
+  useEffect(() => {
+    loadRoomInfo();
+    const handleUpdate = () => {
+      loadRoomInfo();
+    };
+    window.addEventListener('occupancy-updated', handleUpdate);
+    return () => {
+      window.removeEventListener('occupancy-updated', handleUpdate);
+    };
+  }, []);
+
+  // Lấy tên hiển thị của sinh viên: ưu tiên dữ liệu đăng nhập / localStorage, fallback 'Nguyễn Văn A' chuẩn theo ảnh
   const displayName =
-    user?.nguoi_dung?.ho_ten ||
     user?.ho_ten ||
+    user?.nguoi_dung?.ho_ten ||
+    localStorage.getItem('ktx_fullname') ||
     user?.username ||
     localStorage.getItem('ktx_username') ||
     'Nguyễn Văn A';
 
   const handleCardClick = (service) => {
+    if (onNavigate) {
+      if (service.id === 'reg-room') {
+        onNavigate('/student/register');
+        return;
+      }
+      if (service.id === 'move-room') {
+        onNavigate('/student/transfer-room');
+        return;
+      }
+      if (service.id === 'history-room') {
+        onNavigate('/student/history');
+        return;
+      }
+      if (service.id === 'search-room' || service.id === 'lookup') {
+        onNavigate('/student/lookup');
+        return;
+      }
+      if (service.id === 'feedback') {
+        onNavigate('/student/feedback');
+        return;
+      }
+      if (service.id === 'profile' || service.id === 'thong-tin-ca-nhan') {
+        onNavigate('/student/profile');
+        return;
+      }
+    }
     setActiveModal({
       title: service.title,
       desc: service.desc,
@@ -106,7 +166,7 @@ export default function StudentDashboard({ user }) {
   const closeModal = () => setActiveModal(null);
 
   return (
-    <>
+    <div className="student-main-content">
       {/* ================= BANNER CHÀO MỪNG ================= */}
       <section className="student-banner-card">
         <div
@@ -119,8 +179,10 @@ export default function StudentDashboard({ user }) {
           <p className="student-banner-subtitle">
             Chào mừng bạn trở lại. Đây là trang quản lý ký túc xá dành riêng cho sinh viên.
           </p>
-          <div className="student-banner-quote">
-            Học tập tốt - Sống khỏe - Tuổi trẻ rực rỡ
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginTop: '10px' }}>
+            <div className="student-banner-quote" style={{ marginTop: 0 }}>
+              Học tập tốt - Sống khỏe - Tuổi trẻ rực rỡ
+            </div>
           </div>
         </div>
       </section>
@@ -147,9 +209,9 @@ export default function StudentDashboard({ user }) {
             </div>
             <div className="student-stat-info">
               <span className="student-stat-label">Phòng hiện tại</span>
-              <span className="student-stat-value">{MOCK_STUDENT_DATA.room.roomNumber}</span>
+              <span className="student-stat-value">{currentRoomInfo.so_phong || 'P36'}</span>
               <span className="student-stat-subtext">
-                {MOCK_STUDENT_DATA.room.building} - {MOCK_STUDENT_DATA.room.floor}
+                {currentRoomInfo.toa || 'Tòa A2'} - {currentRoomInfo.tang ? `Tầng ${currentRoomInfo.tang}` : 'Tầng 3'}
               </span>
             </div>
           </div>
@@ -162,8 +224,8 @@ export default function StudentDashboard({ user }) {
           onClick={() =>
             setActiveModal({
               title: 'Danh sách thành viên phòng',
-              desc: `Hiện có ${MOCK_STUDENT_DATA.room.currentMembers} / ${MOCK_STUDENT_DATA.room.maxCapacity} sinh viên`,
-              detail: 'Phòng đang còn 2 chỗ trống cho đợt tiếp nhận kỳ mới.',
+              desc: `Hiện có ${currentRoomInfo.thanh_vien || '6/8 người'} sinh viên`,
+              detail: 'Phòng đang còn chỗ trống cho đợt tiếp nhận kỳ mới.',
             })
           }
         >
@@ -179,7 +241,7 @@ export default function StudentDashboard({ user }) {
             <div className="student-stat-info">
               <span className="student-stat-label">Số thành viên</span>
               <span className="student-stat-value">
-                {MOCK_STUDENT_DATA.room.currentMembers}/{MOCK_STUDENT_DATA.room.maxCapacity}
+                {currentRoomInfo.thanh_vien || '6/8 người'}
               </span>
               <span className="student-stat-subtext">Hiện tại / sức chứa</span>
             </div>
@@ -223,13 +285,17 @@ export default function StudentDashboard({ user }) {
         {/* Thẻ 4: Phản ánh */}
         <div
           className="student-stat-card"
-          onClick={() =>
-            setActiveModal({
-              title: 'Phản ánh sự cố',
-              desc: 'Tình trạng khiếu nại & báo hỏng thiết bị',
-              detail: 'Hiện chưa có khiếu nại hay báo hỏng thiết bị nào đang chờ xử lý.',
-            })
-          }
+          onClick={() => {
+            if (onNavigate) {
+              onNavigate('/student/feedback');
+            } else {
+              setActiveModal({
+                title: 'Phản ánh sự cố',
+                desc: 'Tình trạng khiếu nại & báo hỏng thiết bị',
+                detail: 'Hiện chưa có khiếu nại hay báo hỏng thiết bị nào đang chờ xử lý.',
+              });
+            }
+          }}
         >
           <div className="student-stat-left">
             <div className="student-stat-icon-box green">
@@ -477,6 +543,6 @@ export default function StudentDashboard({ user }) {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

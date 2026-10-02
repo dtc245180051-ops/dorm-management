@@ -40,7 +40,7 @@ def register(
                 phone = raw_val
 
     # Tự động gán username nếu người dùng không truyền trực tiếp
-    username = user_in.username
+    username = user_in.username.strip()[:50] if user_in.username else None
     if not username:
         if email:
             username = email.split("@")[0][:50]
@@ -65,7 +65,7 @@ def register(
     # 2. Kiểm tra tên đăng nhập đã tồn tại chưa
     existing_username = (
         db.query(TaiKhoan)
-        .filter(TaiKhoan.ten_dang_nhap == username)
+        .filter(TaiKhoan.ten_dang_nhap.ilike(username))
         .first()
     )
     if existing_username:
@@ -76,6 +76,14 @@ def register(
 
     # 3. Kiểm tra email đã tồn tại chưa nếu có cung cấp
     if email:
+        if user_in.role == "SinhVien":
+            import re
+            if not re.match(r"^[^@\s]+@ictu\.edu\.vn$", email.strip(), re.IGNORECASE):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email sinh viên phải có định dạng @ictu.edu.vn",
+                )
+
         existing_email = (
             db.query(NguoiDung)
             .filter(NguoiDung.email == email)
@@ -120,6 +128,31 @@ def register(
         so_dien_thoai=phone,
     )
     db.add(new_user)
+    db.flush()
+
+    # 8. Tự động liên kết vào bảng sinh_vien nếu là vai trò SinhVien
+    if new_account.vai_tro == VaiTro.SINH_VIEN:
+        from app.models.user import SinhVien
+        msv_val = None
+        if username.upper().startswith("DTC"):
+            msv_val = username.upper()
+        elif email and email.split("@")[0].upper().startswith("DTC"):
+            msv_val = email.split("@")[0].upper()
+        else:
+            msv_val = username.upper()[:20]
+
+        existing_sv = db.query(SinhVien).filter(SinhVien.msv == msv_val).first()
+        if not existing_sv:
+            sv = SinhVien(
+                msv=msv_val,
+                ma_nguoi_dung=new_user.ma_nguoi_dung,
+                lop="DTC-KTX",
+                gioi_tinh=user_in.gender or "Nam",
+            )
+            db.add(sv)
+        elif not existing_sv.ma_nguoi_dung:
+            existing_sv.ma_nguoi_dung = new_user.ma_nguoi_dung
+
     db.commit()
     db.refresh(new_account)
 
@@ -140,14 +173,21 @@ def login(
     Hỗ trợ đăng nhập linh hoạt bằng: Tên đăng nhập, Email hoặc Số điện thoại.
     Trả về Access Token chứa username (sub) và vai trò (role).
     """
+    raw_username = form_data.username.strip()
+    prefix_username = raw_username.split("@")[0] if "@" in raw_username else raw_username
+
     account = (
         db.query(TaiKhoan)
         .outerjoin(NguoiDung, TaiKhoan.ma_tai_khoan == NguoiDung.ma_tai_khoan)
         .filter(
             or_(
-                TaiKhoan.ten_dang_nhap == form_data.username,
-                NguoiDung.email == form_data.username,
-                NguoiDung.so_dien_thoai == form_data.username,
+                TaiKhoan.ten_dang_nhap == raw_username,
+                TaiKhoan.ten_dang_nhap.ilike(raw_username),
+                TaiKhoan.ten_dang_nhap == prefix_username,
+                TaiKhoan.ten_dang_nhap.ilike(prefix_username),
+                NguoiDung.email == raw_username,
+                NguoiDung.email.ilike(raw_username),
+                NguoiDung.so_dien_thoai == raw_username,
             )
         )
         .first()
@@ -155,7 +195,7 @@ def login(
     if not account or not verify_password(form_data.password, account.mat_khau):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Tên đăng nhập hoặc mật khẩu không chính xác",
+            detail="Tên đăng nhập, email hoặc mật khẩu không chính xác",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -169,11 +209,14 @@ def login(
         data={"sub": account.ten_dang_nhap, "role": role_value}
     )
 
+    full_name_val = account.nguoi_dung.ho_ten if account.nguoi_dung else None
+
     return Token(
         access_token=access_token,
         token_type="bearer",
         role=role_value,
         username=account.ten_dang_nhap,
+        full_name=full_name_val,
     )
 
 

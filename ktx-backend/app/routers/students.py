@@ -101,7 +101,11 @@ def get_student_by_msv(
         else str(current_user.vai_tro)
     )
 
-    if user_role == "SinhVien" and current_user.ten_dang_nhap != msv:
+    user_msv = None
+    if current_user.nguoi_dung and current_user.nguoi_dung.sinh_vien:
+        user_msv = current_user.nguoi_dung.sinh_vien.msv
+
+    if user_role == "SinhVien" and current_user.ten_dang_nhap != msv and user_msv != msv:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Bạn chỉ được phép xem thông tin hồ sơ của chính mình.",
@@ -132,7 +136,11 @@ def update_student(
         else str(current_user.vai_tro)
     )
 
-    if user_role == "SinhVien" and current_user.ten_dang_nhap != msv:
+    user_msv = None
+    if current_user.nguoi_dung and current_user.nguoi_dung.sinh_vien:
+        user_msv = current_user.nguoi_dung.sinh_vien.msv
+
+    if user_role == "SinhVien" and current_user.ten_dang_nhap != msv and user_msv != msv:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Bạn chỉ được phép cập nhật thông tin hồ sơ của chính mình.",

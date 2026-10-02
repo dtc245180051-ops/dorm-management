@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+export const API_BASE_URL = "http://localhost:8000/api/v1";
 
 /**
  * Service gọi API xác thực (Authentication) cho KTX ICTU
@@ -12,13 +12,13 @@ export const authService = {
   async login(identifier, password) {
     try {
       const formData = new URLSearchParams();
-      formData.append('username', identifier.trim());
-      formData.append('password', password);
+      formData.append("username", identifier.trim());
+      formData.append("password", password);
 
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          "Content-Type": "application/x-www-form-urlencoded",
         },
         body: formData.toString(),
       });
@@ -26,7 +26,7 @@ export const authService = {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Đăng nhập không thành công');
+        throw new Error(data.detail || "Đăng nhập không thành công");
       }
 
       // Lưu trữ token và thông tin phiên đăng nhập
@@ -34,14 +34,23 @@ export const authService = {
         localStorage.setItem('ktx_token', data.access_token);
         localStorage.setItem('ktx_user_role', data.role);
         localStorage.setItem('ktx_username', data.username);
+        if (data.full_name) {
+          localStorage.setItem('ktx_fullname', data.full_name);
+        }
+        const email = identifier.trim();
+        if (/^[^\s@]+@ictu\.edu\.vn$/i.test(email)) {
+          localStorage.setItem("ktx_email", email);
+        }
       }
 
       return { success: true, data };
     } catch (error) {
-      console.error('Lỗi đăng nhập:', error);
+      console.error("Lỗi đăng nhập:", error);
       return {
         success: false,
-        message: error.message || 'Không thể kết nối đến máy chủ backend (http://localhost:8000)',
+        message:
+          error.message ||
+          "Không thể kết nối đến máy chủ backend (http://localhost:8000)",
       };
     }
   },
@@ -50,30 +59,26 @@ export const authService = {
    * Đăng ký tài khoản Sinh viên mới
    * @param {Object} registerData
    */
-  async register({ fullName, gender, emailOrPhone, password }) {
+  async register({ fullName, username, email, emailOrPhone, password }) {
     try {
-      const isEmail = emailOrPhone.includes('@');
-      const isPhone = /^[0-9+() -]+$/.test(emailOrPhone.trim());
+      const emailVal = (email || emailOrPhone || "").trim();
+      const isEmail = emailVal.includes("@");
 
-      // Tạo username hợp lệ từ email/sđt
-      let username = emailOrPhone.trim();
-      if (isEmail) {
-        username = emailOrPhone.split('@')[0];
-      }
+      // Dùng username do người đăng ký chọn; giữ cách suy ra cũ cho các lời gọi không truyền username.
+      const finalUsername = username?.trim() || (isEmail ? emailVal.split("@")[0] : emailVal);
 
       const payload = {
-        username: username,
+        username: finalUsername,
         password: password,
-        role: 'SinhVien',
+        role: "SinhVien",
         full_name: fullName.trim(),
-        email: isEmail ? emailOrPhone.trim() : null,
-        phone: isPhone && !isEmail ? emailOrPhone.trim() : null,
+        email: emailVal,
       };
 
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
       });
@@ -81,15 +86,17 @@ export const authService = {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Đăng ký không thành công');
+        throw new Error(data.detail || "Đăng ký không thành công");
       }
 
       return { success: true, data };
     } catch (error) {
-      console.error('Lỗi đăng ký:', error);
+      console.error("Lỗi đăng ký:", error);
       return {
         success: false,
-        message: error.message || 'Không thể kết nối đến máy chủ backend (http://localhost:8000)',
+        message:
+          error.message ||
+          "Không thể kết nối đến máy chủ backend (http://localhost:8000)",
       };
     }
   },
@@ -98,7 +105,7 @@ export const authService = {
    * Lấy thông tin tài khoản hiện tại từ Token
    */
   async getCurrentUser() {
-    const token = localStorage.getItem('ktx_token');
+    const token = localStorage.getItem("ktx_token");
     if (!token) return null;
 
     try {
@@ -115,17 +122,24 @@ export const authService = {
 
       return await response.json();
     } catch (error) {
-      console.error('Lỗi lấy thông tin người dùng:', error);
+      console.error("Lỗi lấy thông tin người dùng:", error);
       return null;
     }
+  },
+
+  /**
+   * Lấy token hiện tại từ localStorage
+   */
+  getToken() {
+    return localStorage.getItem("ktx_token");
   },
 
   /**
    * Đăng xuất
    */
   logout() {
-    localStorage.removeItem('ktx_token');
-    localStorage.removeItem('ktx_user_role');
-    localStorage.removeItem('ktx_username');
+    localStorage.removeItem("ktx_token");
+    localStorage.removeItem("ktx_user_role");
+    localStorage.removeItem("ktx_username");
   },
 };

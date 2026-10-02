@@ -1,60 +1,70 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from "react";
 import {
   ChevronLeft,
   RotateCcw,
   Save,
   AlertCircle,
   MapPin,
-  Calendar,
-} from 'lucide-react';
-import studentService from '../../services/studentService';
-import { dormService } from '../../services/api';
-import { VIETNAM_PROVINCES } from '../../data/vietnamAddressData';
+} from "lucide-react";
+import studentService from "../../services/studentService";
+import { dormService } from "../../services/api";
+import { VIETNAM_PROVINCES } from "../../data/vietnamAddressData";
+
+const addOneYear = (dateValue) => {
+  if (!dateValue) return "";
+
+  const [year, month, day] = dateValue.split("-").map(Number);
+  if (!year || !month || !day) return "";
+
+  const nextYear = year + 1;
+  const nextDay = Math.min(day, new Date(nextYear, month, 0).getDate());
+  return `${nextYear}-${String(month).padStart(2, "0")}-${String(nextDay).padStart(2, "0")}`;
+};
 
 export default function AddStudentPage({ onBack, onStudentAdded }) {
   // Address selection states
-  const [selectedProvince, setSelectedProvince] = useState('');
-  const [selectedDistrict, setSelectedDistrict] = useState('');
-  const [detailStreet, setDetailStreet] = useState('');
+  const [selectedProvince, setSelectedProvince] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [detailStreet, setDetailStreet] = useState("");
 
   // Form State
   const [formData, setFormData] = useState({
     // Thông tin sinh viên
-    msv: '',
-    ho_ten: '',
-    gioi_tinh: 'Nam',
-    ngay_sinh: '',
-    cccd: '',
-    so_dien_thoai: '',
-    email: '',
-    khoa: '',
-    lop: '',
-    dia_chi: '',
-    doi_tuong_uu_tien: '',
+    msv: "",
+    ho_ten: "",
+    gioi_tinh: "Nam",
+    ngay_sinh: "",
+    cccd: "",
+    so_dien_thoai: "",
+    email: "",
+    khoa: "",
+    lop: "",
+    dia_chi: "",
+    doi_tuong_uu_tien: "",
 
     // Thông tin liên hệ khẩn cấp
-    nguoi_giam_ho: '',
-    moi_quan_he: '',
-    sdt_nguoi_giam_ho: '',
+    nguoi_giam_ho: "",
+    moi_quan_he: "",
+    sdt_nguoi_giam_ho: "",
 
     // Chỉ định vị trí lưu trú
-    ma_toa: '',
-    so_tang: '',
-    ma_phong: '',
-    ma_giuong: '',
+    ma_toa: "",
+    so_tang: "",
+    ma_phong: "",
+    ma_giuong: "",
 
     // Thiết lập hợp đồng lưu trú & nghĩa vụ tài chính
-    ma_hop_dong: '',
-    thoi_han_luu_tru: '',
-    ngay_bat_dau: '',
-    ngay_ket_thuc: '',
-    don_gia_dinh_ky: '',
-    tong_tien_thue: '',
+    ma_hop_dong: "",
+    thoi_han_luu_tru: "",
+    ngay_bat_dau: "",
+    ngay_ket_thuc: "",
+    don_gia_dinh_ky: "",
+    tong_tien_thue: "",
   });
 
   const [buildings, setBuildings] = useState([]);
   const [submitting, setSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState("");
 
   // Danh sách quận/huyện tương ứng với Tỉnh/Thành đang chọn
   const provinceObj = useMemo(() => {
@@ -69,9 +79,12 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
   // Cập nhật lại quận/huyện khi đổi tỉnh/thành
   useEffect(() => {
     if (!selectedProvince) {
-      setSelectedDistrict('');
-    } else if (availableDistricts.length > 0 && !availableDistricts.includes(selectedDistrict)) {
-      setSelectedDistrict('');
+      setSelectedDistrict("");
+    } else if (
+      availableDistricts.length > 0 &&
+      !availableDistricts.includes(selectedDistrict)
+    ) {
+      setSelectedDistrict("");
     }
   }, [selectedProvince, availableDistricts]);
 
@@ -81,7 +94,7 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
     if (detailStreet.trim()) parts.push(detailStreet.trim());
     if (selectedDistrict) parts.push(selectedDistrict);
     if (selectedProvince) parts.push(selectedProvince);
-    const fullAddress = parts.join(', ');
+    const fullAddress = parts.join(", ");
     setFormData((prev) => ({
       ...prev,
       dia_chi: fullAddress,
@@ -97,7 +110,7 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
           setBuildings(data);
         }
       } catch (err) {
-        console.error('Error fetching buildings:', err);
+        console.error("Error fetching buildings:", err);
       }
     };
     fetchBuildings();
@@ -119,7 +132,9 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
 
     let targetRooms = [];
     if (formData.so_tang) {
-      const floor = bld.tangs.find((t) => Number(t.so_tang) === Number(formData.so_tang));
+      const floor = bld.tangs.find(
+        (t) => Number(t.so_tang) === Number(formData.so_tang),
+      );
       if (floor && floor.phongs) {
         targetRooms = floor.phongs;
       }
@@ -130,7 +145,7 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
     }
 
     return targetRooms.filter((p) => {
-      const freeBeds = p.giuongs?.filter((g) => g.trang_thai === 'TRONG') || [];
+      const freeBeds = p.giuongs?.filter((g) => g.trang_thai === "TRONG") || [];
       return freeBeds.length > 0;
     });
   }, [buildings, formData.ma_toa, formData.so_tang]);
@@ -145,7 +160,7 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
       if (t.phongs) {
         const found = t.phongs.find((p) => p.ma_phong === formData.ma_phong);
         if (found && found.giuongs) {
-          return found.giuongs.filter((g) => g.trang_thai === 'TRONG');
+          return found.giuongs.filter((g) => g.trang_thai === "TRONG");
         }
       }
     }
@@ -157,9 +172,12 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
     if (!formData.ngay_bat_dau || !formData.ngay_ket_thuc) return null;
     const start = new Date(formData.ngay_bat_dau);
     const end = new Date(formData.ngay_ket_thuc);
-    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return null;
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start)
+      return null;
 
-    let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+    let months =
+      (end.getFullYear() - start.getFullYear()) * 12 +
+      (end.getMonth() - start.getMonth());
     if (end.getDate() - start.getDate() >= 20) {
       months += 1;
     } else if (end.getDate() - start.getDate() < -10) {
@@ -173,14 +191,14 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
     if (calculatedDurationMonths === null) {
       setFormData((prev) => ({
         ...prev,
-        thoi_han_luu_tru: '',
+        thoi_han_luu_tru: "",
       }));
       return;
     }
 
     const durationText =
       calculatedDurationMonths === 12
-        ? '1 năm (12 tháng)'
+        ? "1 năm (12 tháng)"
         : `${calculatedDurationMonths} tháng`;
 
     setFormData((prev) => ({
@@ -194,14 +212,16 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
     if (!formData.ma_phong) {
       setFormData((prev) => ({
         ...prev,
-        don_gia_dinh_ky: '',
-        tong_tien_thue: '',
+        don_gia_dinh_ky: "",
+        tong_tien_thue: "",
       }));
       return;
     }
 
     // Tìm thông tin phòng đang chọn
-    const roomObj = availableRooms.find((r) => r.ma_phong === formData.ma_phong);
+    const roomObj = availableRooms.find(
+      (r) => r.ma_phong === formData.ma_phong,
+    );
     let unitPrice = 800000;
 
     if (roomObj) {
@@ -209,18 +229,20 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
         unitPrice = Math.round(Number(roomObj.gia_tien_nam) / 12);
       } else {
         const isService =
-          (roomObj.loai_phong || '').toLowerCase().includes('dịch vụ') ||
-          (roomObj.loai_phong || '').toLowerCase().includes('dich vu');
+          (roomObj.loai_phong || "").toLowerCase().includes("dịch vụ") ||
+          (roomObj.loai_phong || "").toLowerCase().includes("dich vu");
         unitPrice = isService ? 800000 : 400000;
       }
     }
 
-    const total = calculatedDurationMonths ? unitPrice * calculatedDurationMonths : '';
+    const total = calculatedDurationMonths
+      ? unitPrice * calculatedDurationMonths
+      : "";
 
     setFormData((prev) => ({
       ...prev,
       don_gia_dinh_ky: String(unitPrice),
-      tong_tien_thue: total ? String(total) : '',
+      tong_tien_thue: total ? String(total) : "",
     }));
   }, [formData.ma_phong, calculatedDurationMonths, availableRooms]);
 
@@ -229,22 +251,22 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
     if (!formData.ma_phong || !formData.ma_giuong) {
       setFormData((prev) => ({
         ...prev,
-        ma_hop_dong: '',
+        ma_hop_dong: "",
       }));
       return;
     }
 
-    const cleanToa = formData.ma_toa || 'A1';
-    let roomNum = '101';
+    const cleanToa = formData.ma_toa || "A1";
+    let roomNum = "101";
     if (formData.ma_phong) {
-      const parts = formData.ma_phong.split('_P');
+      const parts = formData.ma_phong.split("_P");
       if (parts.length > 1) roomNum = parts[1];
       else roomNum = formData.ma_phong;
     }
 
-    let bedNum = '1';
+    let bedNum = "1";
     if (formData.ma_giuong) {
-      const parts = formData.ma_giuong.split('_G');
+      const parts = formData.ma_giuong.split("_G");
       if (parts.length > 1) {
         try {
           bedNum = String(parseInt(parts[1], 10));
@@ -256,14 +278,19 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
 
     const yearYY = formData.ngay_bat_dau
       ? formData.ngay_bat_dau.slice(2, 4)
-      : '26';
+      : "26";
 
     const generatedCode = `HD${yearYY}-${cleanToa}${roomNum}-G${bedNum}`;
     setFormData((prev) => ({
       ...prev,
       ma_hop_dong: generatedCode,
     }));
-  }, [formData.ma_toa, formData.ma_phong, formData.ma_giuong, formData.ngay_bat_dau]);
+  }, [
+    formData.ma_toa,
+    formData.ma_phong,
+    formData.ma_giuong,
+    formData.ngay_bat_dau,
+  ]);
 
   // Xử lý thay đổi input thông thường
   const handleChange = (e) => {
@@ -271,20 +298,27 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
     setFormData((prev) => {
       const updated = { ...prev, [name]: value };
 
-      if (name === 'ma_toa') {
-        updated.so_tang = '';
-        updated.ma_phong = '';
-        updated.ma_giuong = '';
-      } else if (name === 'so_tang') {
-        updated.ma_phong = '';
-        updated.ma_giuong = '';
-      } else if (name === 'ma_phong') {
-        updated.ma_giuong = '';
+      if (name === "ngay_bat_dau") {
+        updated.ngay_ket_thuc = addOneYear(value);
+      } else if (name === "ma_toa") {
+        updated.so_tang = "";
+        updated.ma_phong = "";
+        updated.ma_giuong = "";
+      } else if (name === "so_tang") {
+        updated.ma_phong = "";
+        updated.ma_giuong = "";
+      } else if (name === "ma_phong") {
+        updated.ma_giuong = "";
       }
 
       // Tự động gợi ý email theo MSV nếu chưa nhập
-      if (name === 'msv' && (!prev.email || prev.email.includes('@ictu.edu.vn'))) {
-        updated.email = value.trim() ? `${value.trim().toLowerCase()}@ictu.edu.vn` : '';
+      if (
+        name === "msv" &&
+        (!prev.email || prev.email.includes("@ictu.edu.vn"))
+      ) {
+        updated.email = value.trim()
+          ? `${value.trim().toLowerCase()}@ictu.edu.vn`
+          : "";
       }
 
       return updated;
@@ -295,17 +329,17 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.msv.trim()) {
-      setErrorMsg('Vui lòng nhập Mã sinh viên.');
+      setErrorMsg("Vui lòng nhập Mã sinh viên.");
       return;
     }
     if (!formData.ho_ten.trim()) {
-      setErrorMsg('Vui lòng nhập Họ và tên sinh viên.');
+      setErrorMsg("Vui lòng nhập Họ và tên sinh viên.");
       return;
     }
 
     try {
       setSubmitting(true);
-      setErrorMsg('');
+      setErrorMsg("");
 
       const payload = {
         msv: formData.msv.trim().toUpperCase(),
@@ -314,9 +348,10 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
         ngay_sinh: formData.ngay_sinh || null,
         cccd: formData.cccd || null,
         so_dien_thoai: formData.so_dien_thoai || null,
-        email: formData.email || `${formData.msv.trim().toLowerCase()}@ictu.edu.vn`,
+        email:
+          formData.email || `${formData.msv.trim().toLowerCase()}@ictu.edu.vn`,
         khoa: formData.khoa || null,
-        lop: formData.lop || 'CNTTK24M',
+        lop: formData.lop || "CNTTK24M",
         dia_chi: formData.dia_chi || null,
         doi_tuong_uu_tien: formData.doi_tuong_uu_tien || null,
         que_quan: selectedProvince || null,
@@ -334,8 +369,12 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
         thoi_han_luu_tru: formData.thoi_han_luu_tru || null,
         ngay_bat_dau: formData.ngay_bat_dau || null,
         ngay_ket_thuc: formData.ngay_ket_thuc || null,
-        don_gia_dinh_ky: formData.don_gia_dinh_ky ? parseFloat(formData.don_gia_dinh_ky) : null,
-        tong_tien_thue: formData.tong_tien_thue ? parseFloat(formData.tong_tien_thue) : null,
+        don_gia_dinh_ky: formData.don_gia_dinh_ky
+          ? parseFloat(formData.don_gia_dinh_ky)
+          : null,
+        tong_tien_thue: formData.tong_tien_thue
+          ? parseFloat(formData.tong_tien_thue)
+          : null,
       };
 
       const result = await studentService.createStudent(payload);
@@ -344,12 +383,12 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
       }
       onBack();
     } catch (err) {
-      console.error('Error creating student:', err);
+      console.error("Error creating student:", err);
       const detail = err.response?.data?.detail;
       setErrorMsg(
-        typeof detail === 'string'
+        typeof detail === "string"
           ? detail
-          : 'Không thể thêm hồ sơ sinh viên. Vui lòng kiểm tra lại thông tin.'
+          : "Không thể thêm hồ sơ sinh viên. Vui lòng kiểm tra lại thông tin.",
       );
     } finally {
       setSubmitting(false);
@@ -504,13 +543,27 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
                   className="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-[5px] text-slate-700 focus:outline-none focus:border-blue-500 transition shadow-2xs cursor-pointer"
                 >
                   <option value="">-- Chọn đối tượng ưu tiên --</option>
-                  <option value="Không thuộc diện ưu tiên">Không thuộc diện ưu tiên</option>
-                  <option value="Con liệt sĩ / Con thương binh, bệnh binh">Con liệt sĩ / Con thương binh, bệnh binh</option>
-                  <option value="Sinh viên khuyết tật">Sinh viên khuyết tật</option>
-                  <option value="Hộ nghèo / Hộ cận nghèo">Hộ nghèo / Hộ cận nghèo</option>
-                  <option value="Dân tộc thiểu số vùng sâu vùng xa">Dân tộc thiểu số vùng sâu vùng xa</option>
-                  <option value="Mồ côi cả cha lẫn mẹ">Mồ côi cả cha lẫn mẹ</option>
-                  <option value="Hoàn cảnh khó khăn đột xuất">Hoàn cảnh khó khăn đột xuất</option>
+                  <option value="Không thuộc diện ưu tiên">
+                    Không thuộc diện ưu tiên
+                  </option>
+                  <option value="Con liệt sĩ / Con thương binh, bệnh binh">
+                    Con liệt sĩ / Con thương binh, bệnh binh
+                  </option>
+                  <option value="Sinh viên khuyết tật">
+                    Sinh viên khuyết tật
+                  </option>
+                  <option value="Hộ nghèo / Hộ cận nghèo">
+                    Hộ nghèo / Hộ cận nghèo
+                  </option>
+                  <option value="Dân tộc thiểu số vùng sâu vùng xa">
+                    Dân tộc thiểu số vùng sâu vùng xa
+                  </option>
+                  <option value="Mồ côi cả cha lẫn mẹ">
+                    Mồ côi cả cha lẫn mẹ
+                  </option>
+                  <option value="Hoàn cảnh khó khăn đột xuất">
+                    Hoàn cảnh khó khăn đột xuất
+                  </option>
                   <option value="Khác">Khác</option>
                 </select>
               </div>
@@ -627,7 +680,7 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
                 <option value="">-- Chọn tòa --</option>
                 {buildings.map((b) => (
                   <option key={b.ma_toa} value={b.ma_toa}>
-                    {b.ten_toa || `Tòa ${b.ma_toa}`} ({b.gioi_tinh || 'Nam/Nữ'})
+                    {b.ten_toa || `Tòa ${b.ma_toa}`} ({b.gioi_tinh || "Nam/Nữ"})
                   </option>
                 ))}
               </select>
@@ -643,10 +696,13 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
               >
                 <option value="">-- Chọn phòng trống --</option>
                 {availableRooms.map((p) => {
-                  const freeCount = p.giuongs?.filter((g) => g.trang_thai === 'TRONG').length || 0;
+                  const freeCount =
+                    p.giuongs?.filter((g) => g.trang_thai === "TRONG").length ||
+                    0;
                   return (
                     <option key={p.ma_phong} value={p.ma_phong}>
-                      Phòng {p.so_phong} ({p.loai_phong || 'Tiêu chuẩn'} - Còn {freeCount} giường trống)
+                      Phòng {p.so_phong} ({p.loai_phong || "Tiêu chuẩn"} - Còn{" "}
+                      {freeCount} giường trống)
                     </option>
                   );
                 })}
@@ -680,8 +736,8 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
               >
                 <option value="">-- Chọn vị trí giường --</option>
                 {availableBeds.map((g, idx) => {
-                  const num = g.ma_giuong.includes('_G')
-                    ? g.ma_giuong.split('_G')[1]
+                  const num = g.ma_giuong.includes("_G")
+                    ? g.ma_giuong.split("_G")[1]
                     : idx + 1;
                   return (
                     <option key={g.ma_giuong} value={g.ma_giuong}>
@@ -695,17 +751,13 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
         </div>
 
         {/* Section 4: Thiết lập hợp đồng lưu trú & nghĩa vụ tài chính */}
-        {/* Yêu cầu 5:
-            - Mã hợp đồng tự động tạo & không cho chỉnh sửa (readOnly)
-            - Chọn ngày bắt đầu, kết thúc rồi tự động tính thời hạn lưu trú & không cho chỉnh sửa (readOnly)
-            - Sau khi chọn phòng xong thì đơn giá tự động cập nhật & không cho chỉnh sửa (readOnly)
-            - Bỏ phần hình ảnh bản scan hợp đồng */}
+        {/* Mã hợp đồng và ngày kết thúc tự cập nhật từ ngày bắt đầu; tiền thuê tính theo phòng. */}
         <div>
           <h2 className="text-base font-bold text-slate-900 mb-2.5">
             Thiết lập hợp đồng lưu trú & nghĩa vụ tài chính
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2.5">
-            {/* Cột trái: Mã HĐ, Ngày bắt đầu, Ngày kết thúc (khớp ảnh) */}
+            {/* Cột trái: Mã hợp đồng và ngày kết thúc */}
             <div className="space-y-2.5">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-500 mb-1">
@@ -724,6 +776,24 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                  Ngày kết thúc
+                </label>
+                <input
+                  type="date"
+                  name="ngay_ket_thuc"
+                  value={formData.ngay_ket_thuc}
+                  disabled
+                  placeholder="Ngày kết thúc"
+                  title="Ngày kết thúc được tự động đặt sau một năm kể từ ngày bắt đầu"
+                  className="w-full px-3.5 py-2 text-sm bg-slate-100 border border-slate-300 rounded-[5px] text-slate-600 cursor-not-allowed shadow-2xs"
+                />
+              </div>
+            </div>
+
+            {/* Tiền thuê cả năm được tính theo phòng và thời hạn hợp đồng. */}
+            <div className="space-y-2.5">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">
                   Ngày bắt đầu
                 </label>
                 <input
@@ -738,38 +808,6 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                  Ngày kết thúc
-                </label>
-                <input
-                  type="date"
-                  name="ngay_ket_thuc"
-                  value={formData.ngay_ket_thuc}
-                  onChange={handleChange}
-                  placeholder="Ngày kết thúc"
-                  className="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-[5px] text-slate-700 focus:outline-none focus:border-blue-500 transition shadow-2xs cursor-pointer"
-                />
-              </div>
-            </div>
-
-            {/* Cột phải: Thời hạn lưu trú, Tiền thuê cả năm, Đơn giá định kỳ (khớp ảnh) */}
-            <div className="space-y-2.5">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                  Thời hạn lưu trú
-                </label>
-                <input
-                  type="text"
-                  name="thoi_han_luu_tru"
-                  value={formData.thoi_han_luu_tru}
-                  readOnly
-                  placeholder="Thời hạn lưu trú"
-                  title="Thời hạn lưu trú được tính tự động từ ngày bắt đầu đến ngày kết thúc, không thể chỉnh sửa"
-                  className="w-full px-3.5 py-2 text-sm bg-white text-slate-700 border border-slate-300 rounded-[5px] font-medium cursor-default select-none shadow-2xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">
                   Tiền thuê cả năm
                 </label>
                 <input
@@ -777,31 +815,12 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
                   name="tong_tien_thue"
                   value={
                     formData.tong_tien_thue
-                      ? `${Number(formData.tong_tien_thue).toLocaleString('vi-VN')} đ`
-                      : ''
+                      ? `${Number(formData.tong_tien_thue).toLocaleString("vi-VN")} đ`
+                      : ""
                   }
                   readOnly
                   placeholder="Tiền thuê cả năm"
                   title="Tiền thuê cả năm được tính tự động theo đơn giá và thời hạn, không thể chỉnh sửa"
-                  className="w-full px-3.5 py-2 text-sm bg-white text-slate-700 border border-slate-300 rounded-[5px] font-medium cursor-default select-none shadow-2xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                  Đơn giá định kỳ
-                </label>
-                <input
-                  type="text"
-                  name="don_gia_dinh_ky"
-                  value={
-                    formData.don_gia_dinh_ky
-                      ? `${Number(formData.don_gia_dinh_ky).toLocaleString('vi-VN')} đ/tháng`
-                      : ''
-                  }
-                  readOnly
-                  placeholder="Đơn giá định kỳ"
-                  title="Đơn giá định kỳ tự động cập nhật theo phòng đã chọn, không thể chỉnh sửa"
                   className="w-full px-3.5 py-2 text-sm bg-white text-slate-700 border border-slate-300 rounded-[5px] font-medium cursor-default select-none shadow-2xs"
                 />
               </div>
@@ -828,7 +847,7 @@ export default function AddStudentPage({ onBack, onStudentAdded }) {
             className="flex items-center gap-2 px-5 py-2 bg-white hover:bg-sky-50 text-sky-600 border border-sky-400 rounded-full text-xs font-semibold transition cursor-pointer shadow-2xs disabled:opacity-50"
           >
             <Save className="w-3.5 h-3.5 text-sky-600" />
-            <span>{submitting ? 'Đang lưu...' : 'Lưu hồ sơ'}</span>
+            <span>{submitting ? "Đang lưu..." : "Lưu hồ sơ"}</span>
           </button>
         </div>
       </form>
