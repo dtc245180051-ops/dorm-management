@@ -17,6 +17,7 @@ import {
 import StudentLayout from "../../layouts/Student";
 import occupancyService from "../../services/occupancyService";
 import { resolveStudentStatus, STUDENT_STATUS } from "../../services/studentStatusService";
+import { getStudentAccount } from "../../services/studentAccountService";
 
 export default function RequestHistoryPage({
   onSelectTab,
@@ -164,8 +165,12 @@ export default function RequestHistoryPage({
       loadData();
     };
     window.addEventListener("occupancy-updated", handleUpdate);
+    window.addEventListener("student-account-updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
     return () => {
       window.removeEventListener("occupancy-updated", handleUpdate);
+      window.removeEventListener("student-account-updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
     };
   }, []);
 
@@ -175,7 +180,7 @@ export default function RequestHistoryPage({
       const studentMsv =
         localStorage.getItem("ktx_username") ||
         localStorage.getItem("ktx_email")?.split("@")[0] ||
-        "";
+        "dtc245180051";
 
       const [reqs, contracts, transferReqs, statusRes] = await Promise.all([
         occupancyService.getMyRequests(studentMsv),
@@ -184,14 +189,37 @@ export default function RequestHistoryPage({
         resolveStudentStatus(studentMsv),
       ]);
 
+      const account = getStudentAccount(studentMsv);
       setStudentStatus(statusRes.status);
 
-      const combinedReqs = Array.isArray(reqs)
+      let combinedReqs = Array.isArray(reqs)
         ? reqs.filter((r) => {
             const rMsv = (r.msv || "").trim().toUpperCase();
             return !studentMsv || !rMsv || rMsv === studentMsv.trim().toUpperCase();
           })
         : [];
+
+      // 1. Đồng bộ từ account.registrationHistory theo chuẩn Schema
+      if (Array.isArray(account.registrationHistory) && account.registrationHistory.length > 0) {
+        account.registrationHistory.forEach((reg) => {
+          const exists = combinedReqs.some(
+            (r) => r.id === reg.id || r.ma_yeu_cau === reg.id
+          );
+          if (!exists) {
+            combinedReqs.unshift({
+              id: reg.id,
+              ma_yeu_cau: `#${reg.id}`,
+              ngay_dang_ky: reg.date || "01/10/2026",
+              loai_phong: reg.roomType || "Phòng tiêu chuẩn",
+              nguyen_vong: reg.assignedRoom || "501 - Tòa A4",
+              nguyen_vong_label: reg.assignedRoom || "501 - Tòa A4",
+              nam_hoc: "2026–2027",
+              trang_thai: reg.status,
+              trang_thai_label: reg.status === "APPROVED" ? "Đã duyệt" : reg.status,
+            });
+          }
+        });
+      }
 
       if (transferReqs && Array.isArray(transferReqs)) {
         transferReqs.forEach((tc) => {
@@ -223,9 +251,51 @@ export default function RequestHistoryPage({
       }
 
       setRegistrationRequests(combinedReqs);
-      setStayContracts(Array.isArray(contracts) ? contracts : []);
+
+      // 2. Đồng bộ từ contracts / account.residenceHistory theo chuẩn Schema
+      let stayList = Array.isArray(contracts) && contracts.length > 0 ? [...contracts] : [];
+      if (stayList.length === 0 && Array.isArray(account.residenceHistory) && account.residenceHistory.length > 0) {
+        stayList = account.residenceHistory.map((item, idx) => {
+          const isActive = item.status === "ACTIVE" && !item.endDate;
+          const roomNum = String(item.roomNumber || "501").replace(/^P/i, "");
+          const bld = item.building || "Tòa A4";
+          return {
+            id: item.id || `RES-${String(idx + 1).padStart(2, "0")}`,
+            so_phong: roomNum,
+            phong: `P${roomNum}`,
+            toa: bld,
+            tang: roomNum.startsWith("5") ? "5" : "1",
+            giuong: "G01",
+            thoi_gian_o: item.endDate ? `${item.startDate} – ${item.endDate}` : `${item.startDate} – Nay`,
+            nam_hoc: "2026-2027",
+            trang_thai: isActive ? "DANG_O" : "DA_TRA_PHONG",
+            trang_thai_label: isActive ? "Đang ở" : "Đã kết thúc",
+            status: item.status,
+          };
+        });
+      }
+      setStayContracts(stayList);
     } catch (err) {
       console.error("Error loading history data:", err);
+      // Fallback an toàn với getStudentAccount
+      const account = getStudentAccount();
+      if (account.residenceHistory?.length > 0) {
+        setStayContracts(
+          account.residenceHistory.map((item, idx) => ({
+            id: item.id || `RES-${String(idx + 1).padStart(2, "0")}`,
+            so_phong: item.roomNumber,
+            phong: `P${item.roomNumber}`,
+            toa: item.building,
+            tang: String(item.roomNumber).startsWith("5") ? "5" : "1",
+            giuong: "G01",
+            thoi_gian_o: item.endDate ? `${item.startDate} – ${item.endDate}` : `${item.startDate} – Nay`,
+            nam_hoc: "2026-2027",
+            trang_thai: item.status === "ACTIVE" && !item.endDate ? "DANG_O" : "DA_TRA_PHONG",
+            trang_thai_label: item.status === "ACTIVE" && !item.endDate ? "Đang ở" : "Đã kết thúc",
+            status: item.status,
+          }))
+        );
+      }
     } finally {
       setIsLoading(false);
     }
@@ -751,11 +821,14 @@ export default function RequestHistoryPage({
 
                         {/* Trạng thái */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
-                          {stay.trang_thai === "DA_TRA_PHONG" ||
+                          {stay.status === "COMPLETED" ||
+                            stay.trang_thai === "DA_TRA_PHONG" ||
+                            stay.trang_thai === "KET_THUC" ||
+                            stay.trang_thai_label?.includes("kết thúc") ||
                             stay.trang_thai_label?.includes("trả") ? (
                             <span className="inline-block px-4 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
                               {stay.trang_thai_label ||
-                                "Đã trả phòng / Đã rời KTX"}
+                                "Đã kết thúc"}
                             </span>
                           ) : stay.trang_thai === "DA_CHUYEN" ||
                             stay.trang_thai_label?.includes("chuyển") ? (

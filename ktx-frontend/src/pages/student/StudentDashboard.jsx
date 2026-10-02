@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import "./StudentDashboard.css";
 import campusBanner from "../../assets/image.png";
 import occupancyService from "../../services/occupancyService";
+import { getStudentAccount } from "../../services/studentAccountService";
 
 /**
  * ============================================================================
@@ -79,23 +80,69 @@ const MOCK_STUDENT_DATA = {
 
 export default function StudentDashboard({ user, onNavigate }) {
   const [activeModal, setActiveModal] = useState(null);
-  const [currentRoomInfo, setCurrentRoomInfo] = useState({
-    phong_hien_tai: "P36 – Tòa A2 – Tầng 3",
-    thanh_vien: "6/8 người",
-    thoi_gian_luu_tru: "09/2025 – Nay",
-    so_phong: "P36",
-    toa: "Tòa A2",
-    tang: "Tầng 3",
-    so_thanh_vien: 6,
-    suc_chua: 8,
+  const [studentAccount, setStudentAccount] = useState(() => getStudentAccount());
+  const [currentRoomInfo, setCurrentRoomInfo] = useState(() => {
+    const acc = getStudentAccount();
+    if (acc?.currentResidence?.isActive && acc.currentResidence.contractStatus === "ACTIVE") {
+      const cr = acc.currentResidence;
+      const roomNum = String(cr.roomNumber || "501").replace(/^P/i, "");
+      const bld = cr.building || "Tòa A4";
+      const floor = roomNum.startsWith("5") ? "5" : (roomNum[0] || "5");
+      return {
+        phong_hien_tai: `P${roomNum} – ${bld} – Tầng ${floor}`,
+        thanh_vien: "6/8 người",
+        thoi_gian_luu_tru: `${cr.startDate || "01/10/2026"} – Nay`,
+        so_phong: `P${roomNum}`,
+        toa: bld,
+        tang: floor,
+        so_thanh_vien: 6,
+        suc_chua: 8,
+      };
+    }
+    return {
+      phong_hien_tai: acc?.currentResidence?.contractStatus === "EXPIRED" ? "Hợp đồng đã kết thúc" : "Chưa xếp phòng",
+      thanh_vien: "0 người",
+      thoi_gian_luu_tru: acc?.currentResidence?.contractStatus === "EXPIRED" ? "Đã kết thúc" : "Chưa lưu trú",
+      so_phong: acc?.currentResidence?.contractStatus === "EXPIRED" ? "Đã trả phòng" : "Chưa có",
+      toa: acc?.currentResidence?.contractStatus === "EXPIRED" ? "Đã rời KTX" : "Chưa xếp",
+      tang: "",
+      so_thanh_vien: 0,
+      suc_chua: 8,
+    };
   });
 
   const loadRoomInfo = async () => {
     try {
-      const info = await occupancyService.getCurrentRoomInfo();
-      if (info) {
-        setCurrentRoomInfo((prev) => ({ ...prev, ...info }));
+      const acc = getStudentAccount();
+      setStudentAccount(acc);
+      if (acc?.currentResidence?.isActive && acc.currentResidence.contractStatus === "ACTIVE") {
+        const cr = acc.currentResidence;
+        const roomNum = String(cr.roomNumber || "501").replace(/^P/i, "");
+        const bld = cr.building || "Tòa A4";
+        const floor = roomNum.startsWith("5") ? "5" : (roomNum[0] || "5");
+        setCurrentRoomInfo({
+          phong_hien_tai: `P${roomNum} – ${bld} – Tầng ${floor}`,
+          so_phong: `P${roomNum}`,
+          toa: bld,
+          tang: floor,
+          thanh_vien: "6/8 người",
+          thoi_gian_luu_tru: `${cr.startDate || "01/10/2026"} – Nay`,
+          so_thanh_vien: 6,
+          suc_chua: 8,
+        });
+        return;
       }
+
+      setCurrentRoomInfo({
+        phong_hien_tai: acc?.currentResidence?.contractStatus === "EXPIRED" ? "Hợp đồng đã kết thúc" : "Chưa xếp phòng",
+        so_phong: acc?.currentResidence?.contractStatus === "EXPIRED" ? "Đã trả phòng" : "Chưa có",
+        toa: acc?.currentResidence?.contractStatus === "EXPIRED" ? "Đã rời KTX" : "Chưa xếp",
+        tang: "",
+        thanh_vien: "0 người",
+        thoi_gian_luu_tru: acc?.currentResidence?.contractStatus === "EXPIRED" ? "Đã kết thúc" : "Chưa lưu trú",
+        so_thanh_vien: 0,
+        suc_chua: 8,
+      });
     } catch (e) {
       console.error("Error loading room info in StudentDashboard:", e);
     }
@@ -107,8 +154,12 @@ export default function StudentDashboard({ user, onNavigate }) {
       loadRoomInfo();
     };
     window.addEventListener("occupancy-updated", handleUpdate);
+    window.addEventListener("student-account-updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
     return () => {
       window.removeEventListener("occupancy-updated", handleUpdate);
+      window.removeEventListener("student-account-updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
     };
   }, []);
 
@@ -204,8 +255,10 @@ export default function StudentDashboard({ user, onNavigate }) {
           onClick={() =>
             setActiveModal({
               title: "Thông tin phòng hiện tại",
-              desc: `Phòng ${MOCK_STUDENT_DATA.room.roomNumber} - ${MOCK_STUDENT_DATA.room.building}`,
-              detail: `Vị trí: ${MOCK_STUDENT_DATA.room.floor}. Trạng thái giường đang lưu trú hiệu lực.`,
+              desc: `${currentRoomInfo.so_phong || "Chưa có"} - ${currentRoomInfo.toa || "Chưa xếp"}`,
+              detail: currentRoomInfo.tang
+                ? `Vị trí: Tầng ${currentRoomInfo.tang}. ${currentRoomInfo.thoi_gian_luu_tru}.`
+                : "Hợp đồng lưu trú đã kết thúc hoặc bạn chưa được xếp phòng.",
             })
           }
         >
@@ -228,13 +281,11 @@ export default function StudentDashboard({ user, onNavigate }) {
             <div className="student-stat-info">
               <span className="student-stat-label">Phòng hiện tại</span>
               <span className="student-stat-value">
-                {currentRoomInfo.so_phong || "P36"}
+                {currentRoomInfo.so_phong || "Chưa có"}
               </span>
               <span className="student-stat-subtext">
-                {currentRoomInfo.toa || "Tòa A2"} -{" "}
-                {currentRoomInfo.tang
-                  ? `Tầng ${currentRoomInfo.tang}`
-                  : "Tầng 3"}
+                {currentRoomInfo.toa || "Chưa xếp"}
+                {currentRoomInfo.tang ? ` - Tầng ${currentRoomInfo.tang}` : ""}
               </span>
             </div>
           </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import StudentLayout from "../../layouts/Student";
 import FeatureLockedNotice from "../../components/FeatureLockedNotice";
 import { resolveStudentStatus, STUDENT_STATUS } from "../../services/studentStatusService";
+import { getStudentAccount } from "../../services/studentAccountService";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -272,6 +273,7 @@ function InvoiceModal({ invoice, studentName, studentId, room, onClose }) {
 }
 
 export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
+  const [accountData, setAccountData] = useState(() => getStudentAccount());
   const [paymentStatus, setPaymentStatus] = useState(() =>
     localStorage.getItem(PAYMENT_STATUS_STORAGE_KEY) === "pending"
       ? "pending"
@@ -282,43 +284,66 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
   );
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [studentStatus, setStudentStatus] = useState(STUDENT_STATUS.NOT_REGISTERED);
+  const [studentStatus, setStudentStatus] = useState(STUDENT_STATUS.ACTIVE_RESIDENT);
 
-  const studentName =
-    localStorage.getItem("ktx_fullname") ||
-    localStorage.getItem("ktx_username") ||
-    "Nguyễn Văn A";
-  const studentId = localStorage.getItem("ktx_username") || "DTC123";
-  const room = localStorage.getItem("ktx_room") || "P36 - Tòa A2";
+  const studentName = accountData.fullName || "Nguyễn Thị Ánh";
+  const studentId = accountData.studentId || "dtc245180051";
+  const room = accountData.currentResidence?.isActive
+    ? `${accountData.currentResidence.roomNumber} - ${accountData.currentResidence.building}`
+    : "Phòng 501 - Tòa A4";
 
   useEffect(() => {
-    const syncPaymentStatus = () => {
+    const syncData = () => {
+      const acc = getStudentAccount();
+      setAccountData(acc);
       setPaymentStatus(
         localStorage.getItem(PAYMENT_STATUS_STORAGE_KEY) === "pending"
           ? "pending"
           : "unpaid",
       );
       setPaymentDate(localStorage.getItem(PAYMENT_DATE_STORAGE_KEY) || "---");
+      resolveStudentStatus(acc.studentId).then((res) => {
+        setStudentStatus(res.status);
+      });
     };
-    window.addEventListener("storage", syncPaymentStatus);
-    window.addEventListener("ktx-payment-updated", syncPaymentStatus);
+
+    syncData();
+    window.addEventListener("storage", syncData);
+    window.addEventListener("ktx-payment-updated", syncData);
+    window.addEventListener("student-account-updated", syncData);
+    window.addEventListener("occupancy-updated", syncData);
     return () => {
-      window.removeEventListener("storage", syncPaymentStatus);
-      window.removeEventListener("ktx-payment-updated", syncPaymentStatus);
+      window.removeEventListener("storage", syncData);
+      window.removeEventListener("ktx-payment-updated", syncData);
+      window.removeEventListener("student-account-updated", syncData);
+      window.removeEventListener("occupancy-updated", syncData);
     };
   }, []);
 
-  useEffect(() => {
-    resolveStudentStatus(studentId).then((res) => {
-      setStudentStatus(res.status);
-    });
-  }, [studentId]);
+  // Lấy danh sách hóa đơn theo chuẩn hóa Schema (Bao gồm Tháng 10/2026 400.000đ)
+  const currentBill = accountData.bills?.find((b) => b.id === "BILL-10-2026") || accountData.bills?.[0];
+  const isPaid = currentBill?.status === "PAID";
+  const billStatus = isPaid
+    ? "paid"
+    : paymentStatus === "pending"
+      ? "pending"
+      : "waiting";
 
-  const rows = invoiceRows.map((invoice, index) =>
-    index === 0 && paymentStatus === "pending"
-      ? { ...invoice, paymentDate, status: "pending" }
-      : invoice,
-  );
+  const rows = [
+    {
+      period: "Tháng 10/2026",
+      paymentDate: isPaid ? "02/10/2026" : (paymentStatus === "pending" ? paymentDate : "---"),
+      method: "QR code",
+      amount: currentBill?.amount || 400000,
+      status: billStatus,
+      invoiceNumber: "HD-2026-1001",
+      fees: [
+        { label: "Phí phòng KTX", amount: 350000 },
+        { label: "Dịch vụ KTX & Quản lý", amount: 50000 },
+      ],
+    },
+    ...invoiceRows,
+  ];
 
   const navigateToPayment = () => {
     if (onNavigate) {

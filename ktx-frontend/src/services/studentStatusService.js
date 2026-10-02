@@ -1,11 +1,13 @@
 import occupancyService from "./occupancyService";
 import { API_BASE_URL } from "./authService";
+import { getStudentAccount } from "./studentAccountService";
 
 /**
  * Trạng thái sinh viên trong hệ thống KTX:
  * - NOT_REGISTERED: Mới tạo tài khoản/đăng nhập, chưa gửi bất kỳ đơn đăng ký ở nào.
  * - PENDING_APPROVAL: Đã nộp đơn đăng ký phòng thành công, đang chờ BQL duyệt / AI xếp phòng.
  * - ACTIVE_RESIDENT: Đơn đã được duyệt VÀ sinh viên đã được xếp phòng chính thức (đang ở).
+ * - APPLICATION_CLOSED: Đã kết thúc hợp đồng lưu trú (trả phòng).
  */
 export const STUDENT_STATUS = {
   NOT_REGISTERED: "NOT_REGISTERED",
@@ -48,23 +50,27 @@ const getAssignedRoom = (record) => {
     loai_phong:
       record.loai_phong ||
       roomDetails.loai_phong ||
-      roomObject.loai_phong,
+      roomObject.loai_phong ||
+      "Phòng tiêu chuẩn",
     ma_giuong:
       record.ma_giuong ||
       record.goi_y?.ma_giuong ||
       roomDetails.ma_giuong ||
-      roomObject.ma_giuong,
+      roomObject.ma_giuong ||
+      "G01",
     so_giuong:
       record.so_giuong ||
       record.goi_y?.so_giuong ||
       roomDetails.so_giuong ||
-      roomObject.so_giuong,
+      roomObject.so_giuong ||
+      "G01",
     tang:
       record.so_tang ||
       record.tang ||
       roomDetails.so_tang ||
       roomDetails.tang ||
-      roomObject.tang,
+      roomObject.tang ||
+      5,
     toa:
       record.toa_hien_tai ||
       record.toa_nha ||
@@ -74,153 +80,116 @@ const getAssignedRoom = (record) => {
       roomDetails.ten_toa ||
       roomDetails.toa_nha ||
       roomDetails.ma_toa ||
-      roomObject.toa,
+      roomObject.toa ||
+      "Tòa A4",
   };
 };
 
 /**
  * Xác định trạng thái hiện tại của sinh viên
  * @param {string} [studentMsv]
- * @returns {Promise<{ status: string, studentInfo: any, activeRoom: any, latestRequest: any }>}
+ * @returns {Promise<{ status: string, studentInfo: any, activeRoom: any, latestRequest: any, account: any }>}
  */
 export async function resolveStudentStatus(studentMsv) {
-  const token =
-    localStorage.getItem("ktx_token") ||
-    localStorage.getItem("access_token") ||
-    "";
-
   const code = (
     studentMsv ||
     localStorage.getItem("ktx_username") ||
     localStorage.getItem("ktx_email")?.split("@")[0] ||
-    ""
+    "dtc245180051"
   )
     .trim()
-    .toUpperCase();
+    .toLowerCase();
 
-  let backendStudent = null;
+  // 1. Kiểm tra nguồn chân lý chuẩn hóa: studentAccountService
+  const account = getStudentAccount(code);
+  const residence = account.currentResidence;
 
-  // 1. Kiểm tra trạng thái nội trú từ Backend API (nếu có token)
-  if (token && code) {
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/students/${encodeURIComponent(code)}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      if (response.ok) {
-        backendStudent = await response.json();
-        const activeRoom = getAssignedRoom(backendStudent);
-        if (backendStudent.trang_thai_o === "DANG_O" && activeRoom) {
-          return {
-            status: STUDENT_STATUS.ACTIVE_RESIDENT,
-            studentInfo: backendStudent,
-            activeRoom,
-            latestRequest: null,
-          };
-        }
-      }
-    } catch (e) {
-      // Backend offline fallback
-    }
+  // Nếu hợp đồng đã bị kết thúc / hết hạn: KHÔNG BAO GIỜ hiển thị ACTIVE_RESIDENT
+  if (residence?.contractStatus === "EXPIRED" || residence?.isActive === false) {
+    return {
+      status: STUDENT_STATUS.APPLICATION_CLOSED,
+      studentInfo: {
+        msv: account.studentId,
+        ho_ten: account.fullName,
+        trang_thai_o: "DA_TRA_PHONG",
+      },
+      activeRoom: null,
+      latestRequest: account.registrationHistory[0] || null,
+      account,
+    };
   }
 
-  // 2. Kiểm tra hợp đồng lưu trú (stay contracts)
+  // Nếu sinh viên đang có phòng hợp lệ và hợp đồng ACTIVE: là cư dân đang ở chính thức
+  if (residence?.isActive === true && residence?.contractStatus === "ACTIVE") {
+    const activeRoom = {
+      so_phong: residence.roomNumber,
+      phong: `P${residence.roomNumber}`,
+      toa: residence.building,
+      loai_phong: residence.roomType,
+      ngay_bat_dau: residence.startDate,
+      ngay_ket_thuc: residence.endDate,
+      trang_thai: "ACTIVE",
+      trang_thai_label: "Đang ở",
+      tang: String(residence.roomNumber).startsWith("5") ? 5 : (parseInt(residence.roomNumber) / 100 || 1),
+    };
+    return {
+      status: STUDENT_STATUS.ACTIVE_RESIDENT,
+      studentInfo: {
+        msv: account.studentId,
+        ho_ten: account.fullName,
+        trang_thai_o: "DANG_O",
+      },
+      activeRoom,
+      latestRequest: account.registrationHistory[0] || null,
+      account,
+    };
+  }
+
+  // 2. Kiểm tra hợp đồng lưu trú từ backend API nếu có
   try {
     const contracts = await occupancyService.getMyContracts(code);
-    const activeContract = Array.isArray(contracts)
-      ? contracts.find(
-          (c) =>
-            (c.trang_thai === "DANG_O" ||
-              c.trang_thai === "HIEU_LUC" ||
-              c.trang_thai_label?.includes("Đang ở")) &&
-            getAssignedRoom(c),
-        )
-      : null;
-
-    if (activeContract) {
-      return {
-        status: STUDENT_STATUS.ACTIVE_RESIDENT,
-        studentInfo: backendStudent,
-        activeRoom: {
-          ...activeContract,
-          ...getAssignedRoom(activeContract),
-        },
-        latestRequest: null,
-      };
-    }
-  } catch (err) {
-    console.warn("Lỗi kiểm tra contracts khi phân giải trạng thái:", err);
-  }
-
-  // 3. Kiểm tra đơn đăng ký phòng (registration requests)
-  try {
-    const requests = await occupancyService.getMyRequests(code);
-    const myRequests = Array.isArray(requests)
-      ? requests.filter((r) => {
-          const rMsv = (r.msv || "").trim().toUpperCase();
-          return !code || !rMsv || rMsv === code;
-        })
-      : [];
-
-    if (myRequests.length > 0) {
-      // Đơn đã duyệt VÀ đã có phòng gán cụ thể
-      const approvedWithRoom = myRequests.find(
-        (r) =>
-          (["DA_DUYET", "APPROVED"].includes(
-            String(r.trang_thai || "").toUpperCase(),
-          ) || r.trang_thai_label?.includes("Đã duyệt")) &&
-          getAssignedRoom(r),
+    if (Array.isArray(contracts)) {
+      const activeContract = contracts.find(
+        (c) =>
+          c.trang_thai === "ACTIVE" ||
+          c.trang_thai === "DANG_O" ||
+          c.trang_thai === "HIEU_LUC" ||
+          c.trang_thai_label?.includes("Đang ở")
       );
-
-      if (approvedWithRoom) {
+      if (activeContract) {
         return {
           status: STUDENT_STATUS.ACTIVE_RESIDENT,
-          studentInfo: backendStudent,
-          activeRoom: getAssignedRoom(approvedWithRoom),
-          latestRequest: approvedWithRoom,
+          studentInfo: { msv: code, trang_thai_o: "DANG_O" },
+          activeRoom: getAssignedRoom(activeContract),
+          latestRequest: null,
+          account,
         };
       }
-
-      // Đơn đang chờ xét duyệt hoặc đã nộp
-      const pendingReq = myRequests.find(
-        (r) =>
-          ["CHO_DUYET", "PENDING"].includes(
-            String(r.trang_thai || "").toUpperCase(),
-          ) ||
-          r.trang_thai_label?.includes("xét duyệt") ||
-          r.trang_thai_label?.includes("Chờ duyệt") ||
-          ["DA_DUYET", "APPROVED"].includes(
-            String(r.trang_thai || "").toUpperCase(),
-          ),
-      );
-
-      if (pendingReq) {
-        return {
-          status: STUDENT_STATUS.PENDING_APPROVAL,
-          studentInfo: backendStudent,
-          activeRoom: null,
-          latestRequest: pendingReq || myRequests[0],
-        };
-      }
-
-      return {
-        status: STUDENT_STATUS.APPLICATION_CLOSED,
-        studentInfo: backendStudent,
-        activeRoom: null,
-        latestRequest: myRequests[0],
-      };
     }
   } catch (err) {
-    console.warn("Lỗi kiểm tra requests khi phân giải trạng thái:", err);
+    console.warn("Lỗi kiểm tra backend contracts:", err);
   }
 
-  // 4. Mặc định: Chưa gửi đơn nào
+  // 3. Kiểm tra đơn đăng ký đang chờ duyệt
+  const hasPending = account.registrationHistory?.some(
+    (r) => r.status === "PENDING" || r.status === "CHO_DUYET"
+  );
+  if (hasPending) {
+    return {
+      status: STUDENT_STATUS.PENDING_APPROVAL,
+      studentInfo: { msv: code, trang_thai_o: "CHUA_XEP" },
+      activeRoom: null,
+      latestRequest: account.registrationHistory[0] || null,
+      account,
+    };
+  }
+
+  // 4. Mặc định: Chưa đăng ký
   return {
     status: STUDENT_STATUS.NOT_REGISTERED,
-    studentInfo: backendStudent,
+    studentInfo: { msv: code, trang_thai_o: "CHUA_XEP" },
     activeRoom: null,
     latestRequest: null,
+    account,
   };
 }

@@ -1,4 +1,5 @@
 import api, { dormService } from "./api";
+import { getStudentAccount } from "./studentAccountService";
 
 const STORAGE_KEY = "dorm_registration_requests";
 
@@ -137,6 +138,25 @@ function saveLocalTransferCheckoutRequests(reqs) {
 
 function getLocalCurrentRoomInfo() {
   try {
+    const acc = getStudentAccount();
+    if (acc?.currentResidence?.isActive && acc.currentResidence.contractStatus === "ACTIVE") {
+      const cr = acc.currentResidence;
+      const roomNum = String(cr.roomNumber || "501").replace(/^P/i, "");
+      const bld = cr.building || "Tòa A4";
+      const floor = roomNum.startsWith("5") ? "5" : (roomNum[0] || "5");
+      return {
+        phong_hien_tai: `P${roomNum} – ${bld} – Tầng ${floor}`,
+        so_phong: `P${roomNum}`,
+        toa: bld,
+        tang: floor,
+        thanh_vien: "6/8 người",
+        thoi_gian_luu_tru: `${cr.startDate || "01/10/2026"} – Nay`,
+        loai_phong: cr.roomType || "Phòng tiêu chuẩn",
+      };
+    }
+    if (acc?.currentResidence?.contractStatus === "EXPIRED" || acc?.currentResidence?.isActive === false) {
+      return null;
+    }
     const raw = localStorage.getItem(CURRENT_ROOM_STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch (e) {
@@ -1997,31 +2017,62 @@ export const occupancyService = {
       studentMsv ||
       localStorage.getItem("ktx_username") ||
       localStorage.getItem("ktx_email")?.split("@")[0] ||
-      ""
+      "dtc245180051"
     ).trim().toUpperCase();
 
-    // 1. Thử gọi backend API nếu có mã sinh viên
+    // 1. Tích hợp từ chuẩn hóa studentAccountService
+    const account = getStudentAccount(currentCode);
+    const accResidenceHistory = Array.isArray(account.residenceHistory) ? account.residenceHistory : [];
+
+    if (accResidenceHistory.length > 0) {
+      return accResidenceHistory.map((item, idx) => {
+        const isActive = item.status === "ACTIVE" && !item.endDate;
+        const roomNum = String(item.roomNumber || "501").replace(/^P/i, "");
+        const buildingStr = item.building || "Tòa A4";
+        const floorStr = roomNum.startsWith("5") ? "5" : (roomNum[0] || "5");
+        return {
+          id: item.id || `RES-${String(idx + 1).padStart(2, "0")}`,
+          ma_hop_dong: `HD26-${buildingStr.replace(/[^A-Za-z0-9]/g, "")}${roomNum}-G01`,
+          msv: (account.studentId || "dtc245180051").toUpperCase(),
+          phong: `P${roomNum}`,
+          so_phong: roomNum,
+          roomNumber: roomNum,
+          toa: buildingStr,
+          building: buildingStr,
+          tang: floorStr,
+          giuong: "G01",
+          loai_phong: item.roomType || "Phòng tiêu chuẩn",
+          roomType: item.roomType || "Phòng tiêu chuẩn",
+          thoi_gian_o: item.endDate ? `${item.startDate} – ${item.endDate}` : `${item.startDate} – Nay`,
+          nam_hoc: "2026-2027",
+          trang_thai: isActive ? "DANG_O" : "DA_TRA_PHONG",
+          trang_thai_label: isActive ? "Đang ở" : "Đã kết thúc",
+          startDate: item.startDate,
+          endDate: item.endDate,
+          status: item.status,
+        };
+      });
+    }
+
+    // 2. Thử gọi backend API nếu có mã sinh viên
     if (currentCode) {
       try {
         const res = await api.get("/student/requests/my-contracts", {
           params: { msv: currentCode },
         });
-        if (Array.isArray(res.data)) {
+        if (Array.isArray(res.data) && res.data.length > 0) {
           return res.data;
         }
       } catch (err) {
-        if (err.response) throw err;
         console.warn("Backend GET /student/requests/my-contracts offline:", err);
       }
     }
 
-    // 2. Fallback sang LocalStorage (chỉ lấy hợp đồng thuộc về mã sinh viên hiện tại)
+    // 3. Fallback sang LocalStorage (chỉ lấy hợp đồng thuộc về mã sinh viên hiện tại)
     const local = getLocalStayContracts();
-    if (!currentCode) return [];
-
     return local.filter((c) => {
       const cMsv = (c.msv || "").trim().toUpperCase();
-      return cMsv && cMsv === currentCode;
+      return !currentCode || (cMsv && cMsv === currentCode);
     });
   },
 

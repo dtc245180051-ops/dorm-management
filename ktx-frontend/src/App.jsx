@@ -21,6 +21,7 @@ import PeriodicBilling from './pages/accountant/PeriodicBilling';
 import DebtLedger from './pages/accountant/DebtLedger';
 import occupancyService from './services/occupancyService';
 import { API_BASE_URL } from './services/authService';
+import { getStudentAccount } from './services/studentAccountService';
 import StudentProfilePage from "./pages/student/StudentProfilePage";
 import RoomSearchPage from "./pages/student/RoomSearchPage";
 import PaymentPage from "./pages/student/PaymentPage";
@@ -649,10 +650,11 @@ export default function App() {
 
   // 6. Trang chủ Sinh viên (Dashboard)
   if (currentPath === "/student/dashboard" || currentPath === "/student") {
+    const acc = getStudentAccount();
     const studentName =
+      acc.fullName ||
       localStorage.getItem("ktx_fullname") ||
-      localStorage.getItem("ktx_username") ||
-      "Nguyễn Văn A";
+      "Nguyễn Thị Ánh";
 
     return (
       <div className="relative">
@@ -665,7 +667,7 @@ export default function App() {
           <StudentDashboard
             user={{
               ho_ten: studentName,
-              username: localStorage.getItem("ktx_username") || "DTC245180051",
+              username: acc.studentId || "dtc245180051",
             }}
             onNavigate={navigateTo}
           />

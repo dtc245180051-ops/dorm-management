@@ -86,8 +86,12 @@ export default function StudentProfilePage({ onSelectTab }) {
     };
 
     window.addEventListener("occupancy-updated", handleOccupancyUpdate);
+    window.addEventListener("student-account-updated", handleOccupancyUpdate);
+    window.addEventListener("storage", handleOccupancyUpdate);
     return () => {
       window.removeEventListener("occupancy-updated", handleOccupancyUpdate);
+      window.removeEventListener("student-account-updated", handleOccupancyUpdate);
+      window.removeEventListener("storage", handleOccupancyUpdate);
     };
   }, []);
 
@@ -162,20 +166,28 @@ export default function StudentProfilePage({ onSelectTab }) {
       if (occupancyService.getCurrentRoomInfo) {
         const currentRoom = await occupancyService.getCurrentRoomInfo();
         if (currentRoom) {
-          const rawToa = currentRoom.toa || "A2";
+          const rawToa = currentRoom.toa || "A4";
           const cleanToa = rawToa.replace("Tòa ", "").trim();
-          const rawPhong = currentRoom.so_phong || currentRoom.phong || "36";
+          const rawPhong = currentRoom.so_phong || currentRoom.phong || "501";
           const cleanPhong = rawPhong.replace(/^P/i, "").trim();
-          const rawGiuong = currentRoom.giuong || "4";
+          const rawGiuong = currentRoom.giuong || "1";
           const cleanGiuong =
-            rawGiuong.replace(/^G/i, "").replace(/^0+/, "").trim() || "4";
+            rawGiuong.replace(/^G/i, "").replace(/^0+/, "").trim() || "1";
 
           setRoomInfo({
-            toa: cleanToa || "A2",
-            so_phong: cleanPhong || "36",
-            tang: currentRoom.tang || "3",
-            giuong: cleanGiuong || "4",
-            ngay_nhan_phong: currentRoom.ngay_nhan_phong || "01/09/2024",
+            toa: cleanToa || "A4",
+            so_phong: cleanPhong || "501",
+            tang: currentRoom.tang || "5",
+            giuong: cleanGiuong || "1",
+            ngay_nhan_phong: currentRoom.ngay_nhan_phong || currentRoom.thoi_gian_luu_tru || "01/10/2026",
+          });
+        } else {
+          setRoomInfo({
+            toa: "---",
+            so_phong: "Chưa xếp",
+            tang: "---",
+            giuong: "---",
+            ngay_nhan_phong: "---",
           });
         }
       }

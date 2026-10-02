@@ -1,9 +1,41 @@
 import datetime
+import json
+import os
 from typing import Dict, List, Optional
+
+STORE_FILE = os.path.join(os.path.dirname(__file__), "..", "data_store_requests.json")
 
 # In-memory store lưu trữ danh sách các đơn đăng ký chỗ ở để liên kết trực tiếp
 # giữa sinh viên và quản lý KTX
 REGISTRATION_REQUESTS: List[Dict] = []
+
+def _save_store():
+    try:
+        with open(STORE_FILE, "w", encoding="utf-8") as f:
+            json.dump({
+                "REGISTRATION_REQUESTS": REGISTRATION_REQUESTS,
+                "TRANSFER_CHECKOUT_REQUESTS": TRANSFER_CHECKOUT_REQUESTS,
+            }, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print("Lỗi lưu trữ file store:", e)
+
+def _load_store():
+    global REGISTRATION_REQUESTS, TRANSFER_CHECKOUT_REQUESTS
+    if os.path.exists(STORE_FILE):
+        try:
+            with open(STORE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if "REGISTRATION_REQUESTS" in data and isinstance(data["REGISTRATION_REQUESTS"], list):
+                    # Cập nhật danh sách đơn đăng ký từ file mà không làm mất các đơn đã có
+                    loaded_ids = {r.get("id") for r in data["REGISTRATION_REQUESTS"]}
+                    merged = list(data["REGISTRATION_REQUESTS"])
+                    for r in REGISTRATION_REQUESTS:
+                        if r.get("id") not in loaded_ids:
+                            merged.append(r)
+                    REGISTRATION_REQUESTS.clear()
+                    REGISTRATION_REQUESTS.extend(merged)
+        except Exception as e:
+            print("Lỗi tải file store:", e)
 
 
 def add_request(req_data: dict) -> dict:
@@ -46,21 +78,25 @@ def add_request(req_data: dict) -> dict:
 
     # Đưa lên đầu danh sách để quản lý thấy ngay đơn mới nhất
     REGISTRATION_REQUESTS.insert(0, new_req)
+    _save_store()
     return new_req
 
 
 def get_registration_requests() -> List[Dict]:
     """Lấy danh sách các đơn đăng ký chỗ ở."""
+    _load_store()
     return REGISTRATION_REQUESTS
 
 
 def get_all_requests() -> List[Dict]:
     """Lấy danh sách tất cả các đơn đăng ký, chuyển phòng và trả phòng."""
+    _load_store()
     return TRANSFER_CHECKOUT_REQUESTS + REGISTRATION_REQUESTS
 
 
 def get_request_by_id(req_id: str) -> Optional[Dict]:
     """Tìm đơn theo ID hoặc MSV."""
+    _load_store()
     clean_id = req_id.strip().lower().replace("#", "")
     for req in TRANSFER_CHECKOUT_REQUESTS:
         rid = req.get("id", "").lower().replace("#", "")
@@ -86,6 +122,7 @@ def update_request_status(req_id: str, new_status: str, extra_data: Optional[dic
         req["trang_thai_label"] = "Đã duyệt" if new_status in ("DA_DUYET", "APPROVED") else "Từ chối"
         if extra_data:
             req.update(extra_data)
+        _save_store()
         return req
     return None
 
@@ -181,6 +218,7 @@ def add_transfer_request(data: dict) -> dict:
         },
     }
     TRANSFER_CHECKOUT_REQUESTS.insert(0, new_req)
+    _save_store()
     return new_req
 
 
@@ -219,10 +257,16 @@ def add_checkout_request(data: dict) -> dict:
         "trang_thai_label": "Chờ duyệt",
     }
     TRANSFER_CHECKOUT_REQUESTS.insert(0, new_req)
+    _save_store()
     return new_req
 
 
 def get_transfer_checkout_requests() -> List[Dict]:
+    _load_store()
     return TRANSFER_CHECKOUT_REQUESTS
+
+
+# Tự động nạp dữ liệu khi nạp module
+_load_store()
 
 

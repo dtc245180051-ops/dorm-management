@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import StudentLayout from "../../layouts/Student";
 import FeatureLockedNotice from "../../components/FeatureLockedNotice";
 import { resolveStudentStatus, STUDENT_STATUS } from "../../services/studentStatusService";
+import { getStudentAccount, payStudentBill } from "../../services/studentAccountService";
 import {
   CreditCard,
   Home,
@@ -43,7 +44,8 @@ const formatText = (str) =>
 
 export default function PaymentPage({ onSelectTab, onNavigate }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [studentStatus, setStudentStatus] = useState(STUDENT_STATUS.NOT_REGISTERED);
+  const [studentStatus, setStudentStatus] = useState(STUDENT_STATUS.ACTIVE_RESIDENT);
+  const [accountData, setAccountData] = useState(() => getStudentAccount());
   const [paymentStatus, setPaymentStatus] = useState(() =>
     localStorage.getItem(PAYMENT_STATUS_STORAGE_KEY) === "pending"
       ? "pending"
@@ -54,22 +56,38 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
   const [timeLeft, setTimeLeft] = useState(900); // 15 phút đếm ngược (900s)
 
   const studentName =
+    accountData.fullName ||
     localStorage.getItem("ktx_fullname") ||
-    localStorage.getItem("ktx_username") ||
-    "Nguyễn Văn A";
+    "Nguyễn Thị Ánh";
 
-  const maSV = localStorage.getItem("ktx_username") || "DTC123";
-  const loaiTienNop = "TIEN DIEN NUOC T09";
+  const maSV =
+    accountData.studentId ||
+    localStorage.getItem("ktx_username") ||
+    "dtc245180051";
+
+  // Lấy hóa đơn từ accountData.bills theo Schema chuẩn hóa
+  const currentBill =
+    accountData.bills?.find((b) => b.status === "UNPAID") ||
+    accountData.bills?.[0] || {
+      id: "BILL-10-2026",
+      title: "Tiền phòng & Dịch vụ KTX Tháng 10/2026",
+      amount: 400000,
+      status: "UNPAID",
+      dueDate: "15/10/2026",
+    };
+
+  const isBillPaid = currentBill.status === "PAID";
+  const loaiTienNop = "TIEN KTX T10";
 
   // Tự động tạo chuỗi nội dung chuyển khoản theo cấu trúc: <MASV_LOAI NOP TIEN>
-  const rawContent = `${maSV}_${formatText(loaiTienNop)}`;
+  const rawContent = `${maSV.toUpperCase()}_${formatText(loaiTienNop)}`;
 
-  // Danh sách các khoản phí
+  // Danh sách các khoản phí chuẩn hóa theo tổng 400.000đ
   const feeItems = [
     {
       id: "room",
-      name: "Phí phòng",
-      subtext: "Tiền thuê phòng ở",
+      name: "Phí phòng KTX",
+      subtext: "Tiền thuê phòng ở theo hợp đồng lưu trú",
       unitPrice: "350.000đ",
       quantity: "1 tháng",
       total: "350.000đ",
@@ -78,42 +96,20 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
       iconBg: "bg-purple-100 text-purple-600",
     },
     {
-      id: "electric",
-      name: "Điện",
-      subtext: "Theo đồng hồ điện",
-      unitPrice: "3.500đ/kWh",
-      quantity: "45kWh",
-      total: "157.500 đ",
-      amount: 157500,
-      icon: Zap,
-      iconBg: "bg-amber-100 text-amber-500",
-    },
-    {
-      id: "water",
-      name: "Nước",
-      subtext: "Theo đồng hồ nước",
-      unitPrice: "15.000đ/m³",
-      quantity: "5m³",
-      total: "75.000 đ",
-      amount: 75000,
-      icon: Droplets,
-      iconBg: "bg-sky-100 text-sky-500",
-    },
-    {
-      id: "other",
-      name: "Dịch vụ khác",
-      subtext: "nước uống,...",
-      unitPrice: "10.000đ",
+      id: "service",
+      name: "Dịch vụ KTX & Quản lý",
+      subtext: "Vệ sinh, an ninh, tiện ích công cộng KTX",
+      unitPrice: "50.000đ",
       quantity: "1 tháng",
-      total: "10.000đ",
-      amount: 10000,
+      total: "50.000đ",
+      amount: 50000,
       icon: MoreHorizontal,
       iconBg: "bg-blue-100 text-blue-500",
     },
   ];
 
-  // Tính tổng tiền động
-  const totalAmount = feeItems.reduce((acc, item) => acc + item.amount, 0);
+  // Tính tổng tiền động theo bill
+  const totalAmount = currentBill.amount || feeItems.reduce((acc, item) => acc + item.amount, 0);
   const formattedTotal = totalAmount.toLocaleString("vi-VN") + "đ";
 
   // URL VietQR động theo chuẩn VietQR API
@@ -140,10 +136,26 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
     }
   }, [toastMessage]);
 
+  // Lắng nghe và đồng bộ trạng thái sinh viên theo thời gian thực
   useEffect(() => {
-    resolveStudentStatus(maSV).then((res) => {
-      setStudentStatus(res.status);
-    });
+    const updateData = () => {
+      const acc = getStudentAccount(maSV);
+      setAccountData(acc);
+      resolveStudentStatus(maSV).then((res) => {
+        setStudentStatus(res.status);
+      });
+    };
+    updateData();
+    window.addEventListener("student-account-updated", updateData);
+    window.addEventListener("occupancy-updated", updateData);
+    window.addEventListener("ktx-payment-updated", updateData);
+    window.addEventListener("storage", updateData);
+    return () => {
+      window.removeEventListener("student-account-updated", updateData);
+      window.removeEventListener("occupancy-updated", updateData);
+      window.removeEventListener("ktx-payment-updated", updateData);
+      window.removeEventListener("storage", updateData);
+    };
   }, [maSV]);
 
   const minutes = Math.floor(timeLeft / 60);
@@ -171,6 +183,7 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
 
   const handleConfirmPayment = () => {
     setIsModalOpen(false);
+    payStudentBill(maSV, currentBill.id);
     setPaymentStatus("pending");
     localStorage.setItem(PAYMENT_STATUS_STORAGE_KEY, "pending");
     const now = new Date();

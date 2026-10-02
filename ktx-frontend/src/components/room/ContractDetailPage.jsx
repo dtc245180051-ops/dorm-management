@@ -8,6 +8,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { contractService, dormService } from '../../services/api';
+import { terminateStudentContract } from '../../services/studentAccountService';
 
 /**
  * Tự động tạo mã hợp đồng theo công thức:
@@ -335,6 +336,14 @@ export default function ContractDetailPage({
         }
       }
 
+      // Cập nhật Schema tài khoản sinh viên dùng chung (Global State / localStorage)
+      const targetMsv = contractData.msv || initialContract?.msv || 'dtc245180051';
+      const now = new Date();
+      const todayStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+      terminateStudentContract(targetMsv, { endDate: todayStr });
+      localStorage.removeItem('dorm_current_room_info');
+      localStorage.removeItem('ktx_room');
+
       setContractData((prev) => ({
         ...prev,
         trang_thai: 'TERMINATED',
@@ -358,6 +367,12 @@ export default function ContractDetailPage({
           await dormService.updateBedStatus(targetBedId, 'TRONG');
         } catch (e) {}
       }
+      const targetMsv = contractData.msv || initialContract?.msv || 'dtc245180051';
+      const now = new Date();
+      const todayStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+      terminateStudentContract(targetMsv, { endDate: todayStr });
+      localStorage.removeItem('dorm_current_room_info');
+      localStorage.removeItem('ktx_room');
       setContractData((prev) => ({
         ...prev,
         trang_thai: 'TERMINATED',

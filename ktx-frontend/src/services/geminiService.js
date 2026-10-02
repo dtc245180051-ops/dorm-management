@@ -47,34 +47,96 @@ export async function matchRoomWithGemini(studentInfo, candidateRooms = []) {
     };
   }
 
-  // Thuật toán chọn phòng tối ưu ngoại tuyến (Fallback thông minh)
+  // Thuật toán chọn phòng tối ưu ngoại tuyến (Fallback thông minh phân tích ngữ nghĩa nguyện vọng)
   const getSmartFallback = () => {
-    const desiredFloor = String(
-      studentInfo.tang_mong_muon ||
-      (studentInfo.nguyen_vong?.toLowerCase().includes("tầng 1") ? "1" : "") ||
-      (studentInfo.nguyen_vong?.toLowerCase().includes("tầng 2") ? "2" : "") ||
-      (studentInfo.nguyen_vong?.toLowerCase().includes("tầng 3") ? "3" : "") ||
-      ""
-    ).replace(/\D/g, "");
+    const rawWish = [
+      studentInfo.tang_mong_muon,
+      studentInfo.nguyen_vong,
+      studentInfo.noi_dung_nguyen_vong,
+      studentInfo.nguyen_vong_label,
+      studentInfo.chi_tiet_nguyen_vong,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    // Phân tích nguyện vọng tầng cao / tầng thấp từ văn bản tự do
+    const wantsHighFloor = /tầng\s*cao|trên\s*cao|tầng\s*[4-9]|lầu\s*cao|ở\s*cao|tầng\s*trên/i.test(rawWish);
+    const wantsLowFloor = /tầng\s*thấp|tầng\s*1\b|tầng\s*trệt|ở\s*dưới|dưới\s*thấp|tầng\s*dưới/i.test(rawWish);
+
+    // Tìm số tầng cụ thể nếu có (ví dụ: tầng 2, tầng 3, tầng 5)
+    const specificFloorMatch = rawWish.match(/tầng\s*(\d+)/i);
+    const specificFloor = specificFloorMatch
+      ? specificFloorMatch[1]
+      : (studentInfo.tang_mong_muon ? String(studentInfo.tang_mong_muon).replace(/\D/g, "") : "");
+
+    // Sắp xếp danh sách phòng ứng viên theo mức độ ưu tiên tầng
+    let sortedRooms = [...eligibleRooms];
+    if (specificFloor) {
+      sortedRooms.sort((a, b) => {
+        const aMatch = String(a.so_tang) === specificFloor ? -1 : 1;
+        const bMatch = String(b.so_tang) === specificFloor ? -1 : 1;
+        return aMatch - bMatch;
+      });
+    } else if (wantsHighFloor) {
+      // Ưu tiên tầng cao nhất giảm dần (ví dụ: Tầng 5 -> Tầng 4 -> ...)
+      sortedRooms.sort((a, b) => Number(b.so_tang || 1) - Number(a.so_tang || 1));
+    } else if (wantsLowFloor) {
+      // Ưu tiên tầng thấp nhất tăng dần (ví dụ: Tầng 1 -> Tầng 2 -> ...)
+      sortedRooms.sort((a, b) => Number(a.so_tang || 1) - Number(b.so_tang || 1));
+    }
 
     // 1. Khớp cả Loại phòng & Tầng
-    const matchBoth = eligibleRooms.find((r) => {
-      const typeOk = !studentInfo.loai_phong || (r.loai_phong && r.loai_phong.toLowerCase() === studentInfo.loai_phong.toLowerCase());
-      const floorOk = !desiredFloor || String(r.so_tang) === desiredFloor;
+    const matchBoth = sortedRooms.find((r) => {
+      const typeOk =
+        !studentInfo.loai_phong ||
+        (r.loai_phong && r.loai_phong.toLowerCase() === studentInfo.loai_phong.toLowerCase());
+      let floorOk = true;
+      if (specificFloor) {
+        floorOk = String(r.so_tang) === specificFloor;
+      } else if (wantsHighFloor) {
+        floorOk = Number(r.so_tang || 1) >= 3;
+      } else if (wantsLowFloor) {
+        floorOk = Number(r.so_tang || 1) <= 2;
+      }
       return typeOk && floorOk;
     });
-    if (matchBoth) return { room: matchBoth, score: 95 };
 
-    // 2. Khớp Loại phòng
-    const matchType = eligibleRooms.find(
-      (r) => !studentInfo.loai_phong || (r.loai_phong && r.loai_phong.toLowerCase() === studentInfo.loai_phong.toLowerCase())
+    if (matchBoth) {
+      let floorDesc = "";
+      if (wantsHighFloor) floorDesc = ` và nguyện vọng ở tầng cao (Tầng ${matchBoth.so_tang})`;
+      else if (wantsLowFloor) floorDesc = ` và nguyện vọng ở tầng thấp (Tầng ${matchBoth.so_tang})`;
+      else if (specificFloor) floorDesc = ` và nguyện vọng ở Tầng ${matchBoth.so_tang}`;
+
+      return {
+        room: matchBoth,
+        score: 95,
+        reason: `Đề xuất tối ưu theo hệ thống: Phòng ${matchBoth.so_phong || matchBoth.ten_phong} (${matchBoth.toa}) đáp ứng loại phòng ${matchBoth.loai_phong}${floorDesc}, giới tính ${studentInfo.gioi_tinh || ""}.`,
+      };
+    }
+
+    // 2. Khớp Loại phòng (vẫn theo thứ tự ưu tiên tầng đã sắp xếp)
+    const matchType = sortedRooms.find(
+      (r) =>
+        !studentInfo.loai_phong ||
+        (r.loai_phong && r.loai_phong.toLowerCase() === studentInfo.loai_phong.toLowerCase()),
     );
-    if (matchType) return { room: matchType, score: 88 };
+    if (matchType) {
+      return {
+        room: matchType,
+        score: 88,
+        reason: `Đề xuất tối ưu theo hệ thống: Phòng ${matchType.so_phong || matchType.ten_phong} (${matchType.toa}) phù hợp với loại phòng ${matchType.loai_phong} và giới tính ${studentInfo.gioi_tinh || ""}.`,
+      };
+    }
 
-    return { room: eligibleRooms[0], score: 80 };
+    return {
+      room: sortedRooms[0],
+      score: 80,
+      reason: `Đề xuất theo hệ thống: Phòng ${sortedRooms[0].so_phong || sortedRooms[0].ten_phong} (${sortedRooms[0].toa}) phù hợp với giới tính ${studentInfo.gioi_tinh || ""}.`,
+    };
   };
 
-  const { room: fallbackRoom, score: fallbackScore } = getSmartFallback();
+  const { room: fallbackRoom, score: fallbackScore, reason: fallbackReason } = getSmartFallback();
   const availableBed =
     fallbackRoom.danh_sach_giuong?.find((g) => !g.da_co_nguoi)?.ma_giuong ||
     fallbackRoom.beds?.[0]?.ma_giuong ||
@@ -87,7 +149,7 @@ export async function matchRoomWithGemini(studentInfo, candidateRooms = []) {
       toa: fallbackRoom.toa,
       giuong: availableBed,
       match_score: fallbackScore,
-      ai_reason: `Gợi ý tự động từ hệ thống: Phòng ${fallbackRoom.so_phong || fallbackRoom.ten_phong} (${fallbackRoom.toa}) hoàn toàn phù hợp giới tính ${studentInfo.gioi_tinh || ""} và nguyện vọng của sinh viên.`,
+      ai_reason: fallbackReason,
     };
   }
 
@@ -105,7 +167,7 @@ Nhiệm vụ: Phân tích thông tin sinh viên và chọn ra DUY NHẤT 1 phòn
 2. NGUYỆN VỌNG ĐĂNG KÝ:
 - Loại phòng mong muốn: ${studentInfo.loai_phong || "Phòng tiêu chuẩn"}
 - Tầng mong muốn: ${studentInfo.tang_mong_muon || "Không chỉ định"}
-- Chi tiết nguyện vọng tự do: "${studentInfo.chi_tiet_nguyen_vong || studentInfo.nguyen_vong || "Không có mô tả thêm"}"
+- Chi tiết nguyện vọng tự do: "${studentInfo.chi_tiet_nguyen_vong || studentInfo.nguyen_vong || studentInfo.noi_dung_nguyen_vong || "Không có mô tả thêm"}"
 
 3. DANH SÁCH PHÒNG CÒN CHỖ TRỐNG (ĐÃ ĐƯỢC LỌC ĐÚNG THEO GIỚI TÍNH):
 ${JSON.stringify(
@@ -123,25 +185,37 @@ ${JSON.stringify(
   2,
 )}
 
-4. QUY TẮC ƯU TIÊN:
+4. QUY TẮC ƯU TIÊN TUYỆT ĐỐI:
 - Ưu tiên 1: Khớp đúng Giới tính và Loại phòng (Phòng tiêu chuẩn / Phòng dịch vụ).
-- Ưu tiên 2: Phân tích chi tiết nguyện vọng tự do (ví dụ: mong muốn ở tầng 1, thức khuya/dậy sớm, yên tĩnh).
+- Ưu tiên 2: PHÂN TÍCH KỸ NGUYỆN VỌNG TỰ DO CỦA SINH VIÊN VỀ TẦNG:
+  + Nếu sinh viên mong muốn ở "tầng cao", "trên cao", "ở trên": BẮT BUỘC ưu tiên chọn phòng ở tầng cao nhất có thể (ví dụ: Tầng 5, Tầng 4). TUYỆT ĐỐI KHÔNG xếp phòng tầng 1 khi có phòng tầng cao.
+  + Nếu sinh viên mong muốn ở "tầng thấp", "tầng 1", "ở dưới": Ưu tiên chọn tầng thấp nhất (Tầng 1, Tầng 2).
+  + Nếu sinh viên mong muốn số tầng cụ thể: Ưu tiên chọn đúng tầng đó.
 - Ưu tiên 3: Ưu tiên cùng Khoa/Ngành hoặc cùng quê quán, tối ưu tỷ lệ lấp đầy phòng.
 
 Trả về kết quả ở định dạng JSON thuần túy (không kèm markdown \`\`\`json):
 {
-  "best_room_id": "Mã phòng hoặc Tên phòng (ví dụ: A3_T1_P101 hoặc Phòng 101)",
-  "toa": "Tên tòa (ví dụ: Tòa A3 hoặc A3)",
-  "giuong": "Mã giường hoặc Tên giường trống (ví dụ: A3_T1_P101_G02 hoặc Giường G02)",
+  "best_room_id": "Mã phòng hoặc Tên phòng (ví dụ: A4_T5_P501 hoặc Phòng 501)",
+  "toa": "Tên tòa (ví dụ: Tòa A4 hoặc A4)",
+  "giuong": "Mã giường hoặc Tên giường trống (ví dụ: A4_T5_P501_G01 hoặc Giường G01)",
   "match_score": 95,
-  "ai_reason": "Giải thích ngắn gọn 1-2 câu lý do xếp phòng này (nhấn mạnh sự phù hợp giới tính, loại phòng và tầng/nguyện vọng)"
+  "ai_reason": "Giải thích ngắn gọn 1-2 câu lý do xếp phòng này (nhấn mạnh sự phù hợp giới tính, loại phòng và đáp ứng đúng nguyện vọng tầng cao/thấp)"
 }
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-    });
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model: "gemini-3.5-flash-lite",
+        contents: prompt,
+      });
+    } catch (modelErr) {
+      console.warn("Thử model gemini-3.5-flash-lite thất bại, thử lại gemini-3.8-flash:", modelErr);
+      response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: prompt,
+      });
+    }
 
     const cleanText = response.text
       .replace(/```json/g, "")
@@ -152,8 +226,8 @@ Trả về kết quả ở định dạng JSON thuần túy (không kèm markdow
       best_room_id: parsed.best_room_id || fallbackRoom.ma_phong || fallbackRoom.ten_phong,
       toa: parsed.toa || fallbackRoom.toa,
       giuong: parsed.giuong || availableBed,
-      match_score: parsed.match_score || 90,
-      ai_reason: parsed.ai_reason || `Phòng ${fallbackRoom.so_phong || fallbackRoom.ten_phong} (${fallbackRoom.toa}) hoàn toàn phù hợp với nguyện vọng và giới tính ${studentInfo.gioi_tinh}.`,
+      match_score: parsed.match_score || 95,
+      ai_reason: parsed.ai_reason || fallbackReason,
     };
   } catch (error) {
     console.error("Lỗi khi gọi Gemini AI Matching:", error);
@@ -162,7 +236,7 @@ Trả về kết quả ở định dạng JSON thuần túy (không kèm markdow
       toa: fallbackRoom.toa,
       giuong: availableBed,
       match_score: fallbackScore,
-      ai_reason: `Đề xuất tối ưu theo hệ thống: Phòng ${fallbackRoom.so_phong || fallbackRoom.ten_phong} (${fallbackRoom.toa}) phù hợp với loại phòng và giới tính ${studentInfo.gioi_tinh}.`,
+      ai_reason: fallbackReason,
     };
   }
 }

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.models.user import TaiKhoan, SinhVien
+from app.models.user import TaiKhoan, SinhVien, NguoiDung
 from app.models.contract import HopDong
 from app.services import dorm_service, occupancy_request_store
 
@@ -190,7 +190,7 @@ def register_room(
             detail="Bạn đang có hợp đồng lưu trú đang hiệu lực.",
         )
 
-    # Cập nhật thông tin sinh viên nếu tìm thấy trong CSDL
+    # Cập nhật thông tin sinh viên nếu tìm thấy trong CSDL, hoặc tự động tạo nếu chưa có
     student = db.query(SinhVien).filter(SinhVien.msv == clean_msv).first()
     if student:
         if req.nguoi_giam_ho:
@@ -203,6 +203,57 @@ def register_room(
             student.dia_chi = req.dia_chi
         if req.doi_tuong_uu_tien:
             student.doi_tuong_uu_tien = req.doi_tuong_uu_tien
+        if req.gioi_tinh:
+            student.gioi_tinh = req.gioi_tinh
+        if req.lop:
+            student.lop = req.lop
+        if req.khoa:
+            student.khoa = req.khoa
+        db.commit()
+    else:
+        email = (req.email or "").strip()
+        user = None
+        if email:
+            user = db.query(NguoiDung).filter(NguoiDung.email == email).first()
+        if not user and clean_msv:
+            user = db.query(NguoiDung).filter(
+                (NguoiDung.email.ilike(f"{clean_msv}@%")) |
+                (NguoiDung.ho_ten == req.ho_ten)
+            ).first()
+        if not user:
+            from app.models.user import VaiTro
+            from app.core.security import get_password_hash
+            new_tk = TaiKhoan(
+                ten_dang_nhap=clean_msv.lower(),
+                mat_khau=get_password_hash("password123"),
+                vai_tro=VaiTro.SINH_VIEN,
+            )
+            db.add(new_tk)
+            db.flush()
+            user = NguoiDung(
+                ma_tai_khoan=new_tk.ma_tai_khoan,
+                ho_ten=req.ho_ten or "Sinh viên",
+                email=email or f"{clean_msv.lower()}@ictu.edu.vn",
+                so_dien_thoai=req.so_dien_thoai or "",
+            )
+            db.add(user)
+            db.flush()
+
+        new_sv = SinhVien(
+            msv=clean_msv,
+            ma_nguoi_dung=user.ma_nguoi_dung,
+            lop=req.lop or "DTC-KTX",
+            gioi_tinh=req.gioi_tinh or "Nam",
+            khoa=req.khoa or "",
+            dia_chi=req.dia_chi or "",
+            cccd=req.cccd or "",
+            ngay_sinh=req.ngay_sinh or "",
+            doi_tuong_uu_tien=req.doi_tuong_uu_tien or "Không thuộc diện ưu tiên",
+            nguoi_giam_ho=req.nguoi_giam_ho or "",
+            moi_quan_he=req.moi_quan_he or "",
+            sdt_nguoi_giam_ho=req.sdt_nguoi_giam_ho or "",
+        )
+        db.add(new_sv)
         db.commit()
 
     request_id = f"DK-{uuid.uuid4().hex[:6].upper()}"

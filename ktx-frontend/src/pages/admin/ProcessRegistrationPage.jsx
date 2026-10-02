@@ -17,6 +17,7 @@ import {
   matchRoomWithGemini,
   isGenderCompatible,
 } from "../../services/geminiService";
+import { approveStudentRoom } from "../../services/studentAccountService";
 
 export default function ProcessRegistrationPage({
   requestId = "DK-001",
@@ -331,6 +332,18 @@ export default function ProcessRegistrationPage({
         result?.data?.ma_hop_dong ||
         `HD26-${selectedBuilding}${selectedRoom}-G${selectedBed}`;
 
+      // Cập nhật Schema tài khoản sinh viên dùng chung (Global State / localStorage)
+      const bldName = selectedBuilding.startsWith("Tòa") ? selectedBuilding : `Tòa ${selectedBuilding}`;
+      const rNum = String(selectedRoom).replace(/^P/i, "");
+      approveStudentRoom(requestData?.msv || "dtc245180051", {
+        requestId,
+        building: bldName,
+        roomNumber: rNum,
+        roomType: currentRoomObj?.loai_phong || "Phòng tiêu chuẩn",
+        startDate: "01/10/2026",
+        endDate: "30/06/2027",
+      });
+
       showToast(`Duyệt thành công! Đã tạo hợp đồng ${contractCode}`, "success");
 
       setTimeout(() => {
@@ -342,7 +355,11 @@ export default function ProcessRegistrationPage({
       }, 1500);
     } catch (err) {
       console.error("Error approving request:", err);
-      showToast("Phê duyệt yêu cầu thất bại. Vui lòng thử lại!", "error");
+      const errorMsg =
+        err.response?.data?.detail ||
+        err.message ||
+        "Phê duyệt yêu cầu thất bại. Vui lòng thử lại!";
+      showToast(errorMsg, "error");
     } finally {
       setSubmitting(false);
     }
