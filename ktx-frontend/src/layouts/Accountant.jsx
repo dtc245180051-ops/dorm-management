@@ -46,9 +46,17 @@ export default function AccountantLayout({
       <aside className="acc-sidebar">
         {/* Logo iDORM */}
         <div className="acc-brand" onClick={() => handleSelectMenu('billing')}>
-          <div className="acc-logo-text">
-            <span className="acc-logo-i">i</span>
-            <span className="acc-logo-dorm">DORM</span>
+          <div className="acc-logo-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+            </svg>
+          </div>
+          <div className="acc-logo-copy">
+            <div className="acc-logo-text">
+              <span className="acc-logo-i">i</span>
+              <span className="acc-logo-dorm">DORM</span>
+            </div>
+            <div className="acc-logo-subtitle">Hệ thống ký túc xá</div>
           </div>
         </div>
 

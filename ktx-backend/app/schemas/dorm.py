@@ -80,6 +80,7 @@ class RoomAvailableResponse(BaseModel):
     so_tang: Optional[int] = None
     ma_toa: Optional[str] = None
     ten_toa: Optional[str] = None
+    gioi_tinh: Optional[str] = None
     so_giuong_trong: int
     danh_sach_giuong_trong: List[GiuongResponse] = []
 

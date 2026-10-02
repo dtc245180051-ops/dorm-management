@@ -5,13 +5,26 @@ import {
   ChevronDown,
   Loader2,
   CheckCircle2,
+  AlertTriangle,
+  AlertCircle,
+  X,
+  Home,
+  Clock,
+  ArrowRight,
+  ArrowLeftRight,
+  Building,
 } from "lucide-react";
 import StudentLayout from "../../layouts/Student";
 import occupancyService from "../../services/occupancyService";
 import { authService } from "../../services/authService";
+import { isGenderCompatible } from "../../services/geminiService";
 import { VIETNAM_PROVINCES } from "../../data/vietnamAddressData";
+import {
+  resolveStudentStatus,
+  STUDENT_STATUS,
+} from "../../services/studentStatusService";
 
-export const extractStudentCodeFromEmail = (email = "") => {
+const extractStudentCodeFromEmail = (email = "") => {
   if (!email || !email.includes("@")) return "";
   return email.split("@")[0].trim().toUpperCase();
 };
@@ -50,11 +63,28 @@ export default function RoomRegistrationPage({
   onNavigateHistory,
   onNavigateDashboard,
   onSelectTab,
+  onNavigate,
 }) {
   // State chuyển đổi mượt mà giữa Form và Màn hình thành công (không chuyển URL)
   const [isSuccess, setIsSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+
+  // Trạng thái lưu trú / Đăng ký của sinh viên (NOT_REGISTERED | PENDING_APPROVAL | ACTIVE_RESIDENT)
+  const [studentStatusInfo, setStudentStatusInfo] = useState({
+    status: STUDENT_STATUS.NOT_REGISTERED,
+    studentInfo: null,
+    activeRoom: null,
+    latestRequest: null,
+    loading: true,
+  });
+
+  // State cảnh báo không có phòng phù hợp với nguyện vọng
+  const [noRoomWarning, setNoRoomWarning] = useState({
+    show: false,
+    title: "Không tìm thấy phòng phù hợp với nguyện vọng",
+    message: "",
+  });
 
   // State quản lý Địa chỉ thường trú 3 ô (Tỉnh/Thành, Quận/Huyện, Số nhà/đường/xã)
   const [selectedProvince, setSelectedProvince] = useState("");
@@ -140,18 +170,66 @@ export default function RoomRegistrationPage({
         ho_ten: fullName || studentProfile.ho_ten || prev.ho_ten,
         email: email || studentProfile.email || prev.email,
         gioi_tinh:
-          studentProfile.gioi_tinh || userProfile.gioi_tinh || currentUser?.gender || prev.gioi_tinh,
+          studentProfile.gioi_tinh ||
+          userProfile.gioi_tinh ||
+          currentUser?.gender ||
+          prev.gioi_tinh,
         ngay_sinh: toDateInputValue(studentProfile.ngay_sinh) || prev.ngay_sinh,
         cccd: studentProfile.cccd || studentProfile.so_cccd || prev.cccd,
         so_dien_thoai:
-          studentProfile.so_dien_thoai || userProfile.so_dien_thoai || currentUser?.phone || prev.so_dien_thoai,
-        khoa: studentProfile.khoa || userProfile.khoa || currentUser?.department || prev.khoa,
-        lop: studentProfile.lop || userProfile.lop || currentUser?.className || prev.lop,
-        doi_tuong_uu_tien: studentProfile.doi_tuong_uu_tien || prev.doi_tuong_uu_tien,
-        dia_chi: studentProfile.dia_chi || studentProfile.que_quan || prev.dia_chi,
+          studentProfile.so_dien_thoai ||
+          userProfile.so_dien_thoai ||
+          currentUser?.phone ||
+          prev.so_dien_thoai,
+        khoa:
+          studentProfile.khoa ||
+          userProfile.khoa ||
+          currentUser?.department ||
+          prev.khoa,
+        lop:
+          studentProfile.lop ||
+          userProfile.lop ||
+          currentUser?.className ||
+          prev.lop,
+        doi_tuong_uu_tien:
+          studentProfile.doi_tuong_uu_tien || prev.doi_tuong_uu_tien,
+        dia_chi:
+          studentProfile.dia_chi || studentProfile.que_quan || prev.dia_chi,
       }));
-      const savedAddress = studentProfile.dia_chi || studentProfile.que_quan || "";
+      const savedAddress =
+        studentProfile.dia_chi || studentProfile.que_quan || "";
       if (savedAddress) setDetailStreet((previous) => previous || savedAddress);
+
+      const effectiveCode =
+        studentCode ||
+        studentProfile.msv ||
+        storedStudentAccount.msv ||
+        localStorage.getItem("ktx_username") ||
+        "";
+
+      if (effectiveCode) {
+        try {
+          const statusRes = await resolveStudentStatus(effectiveCode);
+          if (isMounted) {
+            setStudentStatusInfo({
+              status: statusRes.status,
+              studentInfo: statusRes.studentInfo,
+              activeRoom: statusRes.activeRoom,
+              latestRequest: statusRes.latestRequest,
+              loading: false,
+            });
+          }
+        } catch (err) {
+          console.warn("Lỗi kiểm tra trạng thái lưu trú:", err);
+          if (isMounted) {
+            setStudentStatusInfo((prev) => ({ ...prev, loading: false }));
+          }
+        }
+      } else {
+        if (isMounted) {
+          setStudentStatusInfo((prev) => ({ ...prev, loading: false }));
+        }
+      }
     };
 
     loadCurrentUser();
@@ -264,6 +342,16 @@ export default function RoomRegistrationPage({
     e.preventDefault();
     if (!confirmed) return;
 
+    if (!formData.gioi_tinh) {
+      setNoRoomWarning({
+        show: true,
+        title: "Chưa chọn giới tính",
+        message:
+          "Vui lòng chọn giới tính của bạn ở phần Thông tin sinh viên để hệ thống kiểm tra phòng phù hợp.",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const wishText = formData.nguyen_vong.trim();
@@ -289,14 +377,25 @@ export default function RoomRegistrationPage({
         xac_nhan: true,
       };
 
-      await occupancyService.registerRoom(payload);
-
-      // Chuyển sang màn hình thành công mượt mà không chuyển đổi URL
-      setIsSuccess(true);
+      const result = await occupancyService.registerRoom(payload);
+      setStudentStatusInfo({
+        status: STUDENT_STATUS.PENDING_APPROVAL,
+        studentInfo: studentStatusInfo.studentInfo,
+        activeRoom: null,
+        latestRequest: result?.data || result,
+        loading: false,
+      });
+      sessionStorage.setItem("just_registered", "true");
+      window.dispatchEvent(new Event("occupancy-updated"));
     } catch (err) {
       console.error("Failed to submit room registration:", err);
-      // Vẫn hỗ trợ chuyển thành công dạng demo nếu có lỗi mạng
-      setIsSuccess(true);
+      setNoRoomWarning({
+        show: true,
+        title: "Không tìm thấy phòng phù hợp",
+        message:
+          err.message ||
+          "Không có phòng phù hợp với nguyện vọng của bạn. Vui lòng kiểm tra lại thông tin và đăng ký lại.",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -304,10 +403,11 @@ export default function RoomRegistrationPage({
 
   // Điều hướng nút Xem lịch sử
   const handleGoToHistory = () => {
+    sessionStorage.setItem("just_registered", "true");
     if (onNavigateHistory) {
       onNavigateHistory();
     } else {
-      window.history.pushState({}, "", "/student/history");
+      window.history.pushState({}, "", "/student/history?tab=registration");
       window.dispatchEvent(new PopStateEvent("popstate"));
     }
   };
@@ -330,480 +430,757 @@ export default function RoomRegistrationPage({
       userRole="Sinh viên"
     >
       {/* Khung nội dung chính nền trắng bo góc lớn */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 lg:p-8 flex-1 flex flex-col justify-between transition-all duration-300">
+      <div className="flex flex-1 flex-col justify-between rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm transition-all duration-300 lg:p-8">
         {!isSuccess ? (
-          /* ========================================================================= */
-          /* FORM ĐIỀN THÔNG TIN ĐĂNG KÝ Ở (ẢNH 1) - FORM TRỐNG KHI MỞ                */
-          /* ========================================================================= */
-          <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-            {/* Tiêu đề trang con */}
-            <div className="flex items-center gap-3 select-none">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0">
-                <FileEdit className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
-                  Đăng ký ở
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                  Kiểm tra thông tin trước khi xác nhận
-                </p>
-              </div>
+          studentStatusInfo.loading ? (
+            <div className="flex min-h-[380px] items-center justify-center gap-3 text-sm font-medium text-slate-500">
+              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+              Đang tải trạng thái đăng ký...
             </div>
-
-            {/* CARD 1: THÔNG TIN SINH VIÊN (Form 2 cột) */}
-            <div className="rounded-2xl border border-sky-100 bg-[#f8fbff] p-5 sm:p-6 shadow-2xs">
-              <div className="text-xs font-bold text-blue-700 tracking-wider uppercase mb-5 flex items-center gap-2">
-                <span>THÔNG TIN SINH VIÊN</span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                {/* Cột 1 */}
-                <div className="space-y-4">
-                  {/* Mã sinh viên */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                      Mã sinh viên
-                    </label>
-                    <input
-                      type="text"
-                      name="msv"
-                      value={formData.msv}
-                      onChange={handleChange}
-                      placeholder="Nhập mã sinh viên"
-                      readOnly
-                      className={`w-full px-4 py-2.5 border rounded-xl text-sm placeholder-slate-400 focus:outline-none transition ${
-                        formData.msv
-                          ? "bg-slate-100 text-slate-700 cursor-not-allowed border-slate-200"
-                          : "bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                      }`}
-                      required
-                    />
-                  </div>
-
-                  {/* Giới tính */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                      Giới tính
-                    </label>
-                    <select
-                      name="gioi_tinh"
-                      value={formData.gioi_tinh}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition cursor-pointer"
-                    >
-                      <option value="">-- Chọn giới tính --</option>
-                      <option value="Nam">Nam</option>
-                      <option value="Nữ">Nữ</option>
-                    </select>
-                  </div>
-
-                  {/* Số CCCD/Định danh */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                      Số CCCD/Định danh
-                    </label>
-                    <input
-                      type="text"
-                      name="cccd"
-                      value={formData.cccd}
-                      onChange={handleChange}
-                      placeholder="Số CCCD/Định danh"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
-                    />
-                  </div>
-
-                  {/* Email */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      placeholder="Email"
-                      readOnly
-                      className={`w-full px-4 py-2.5 border rounded-xl text-sm placeholder-slate-400 focus:outline-none transition ${
-                        formData.email
-                          ? "bg-slate-100 text-slate-700 cursor-not-allowed border-slate-200"
-                          : "bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                      }`}
-                    />
-                  </div>
-
-                  {/* Lớp chuyên ngành */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                      Lớp chuyên ngành
-                    </label>
-                    <input
-                      type="text"
-                      name="lop"
-                      value={formData.lop}
-                      onChange={handleChange}
-                      placeholder="Lớp chuyên ngành"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
-                    />
-                  </div>
+          ) : studentStatusInfo.status === STUDENT_STATUS.ACTIVE_RESIDENT ? (
+            /* ========================================================================= */
+            /* THÔNG TIN PHÒNG HIỆN TẠI (DÀNH CHO ACTIVE_RESIDENT)                       */
+            /* ========================================================================= */
+            <div className="flex flex-col gap-6 animate-in fade-in duration-300">
+              {/* Tiêu đề trang con */}
+              <div className="flex items-center gap-3 select-none">
+                <div className="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shrink-0">
+                  <Home className="w-5 h-5 text-emerald-600" />
                 </div>
-
-                {/* Cột 2 */}
-                <div className="space-y-4">
-                  {/* Họ và tên */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                      Họ và tên
-                    </label>
-                    <input
-                      type="text"
-                      name="ho_ten"
-                      value={formData.ho_ten}
-                      onChange={handleChange}
-                      placeholder="Họ và tên"
-                      readOnly
-                      className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:outline-none cursor-not-allowed"
-                      required
-                    />
-                  </div>
-
-                  {/* Ngày sinh */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                      Ngày sinh
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        name="ngay_sinh"
-                        value={formData.ngay_sinh}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition cursor-pointer"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Số điện thoại */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                      Số điện thoại
-                    </label>
-                    <input
-                      type="text"
-                      name="so_dien_thoai"
-                      value={formData.so_dien_thoai}
-                      onChange={handleChange}
-                      placeholder="Số điện thoại"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
-                    />
-                  </div>
-
-                  {/* Khoa / Viện */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                      Khoa / Viện
-                    </label>
-                    <input
-                      type="text"
-                      name="khoa"
-                      value={formData.khoa}
-                      onChange={handleChange}
-                      placeholder="Khoa / Viện"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
-                    />
-                  </div>
-
-                  {/* YÊU CẦU 2: BỔ SUNG TRƯỜNG ĐỐI TƯỢNG ƯU TIÊN */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                      Đối tượng ưu tiên
-                    </label>
-                    <select
-                      name="doi_tuong_uu_tien"
-                      value={formData.doi_tuong_uu_tien}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition cursor-pointer"
-                    >
-                      <option value="">-- Chọn đối tượng ưu tiên --</option>
-                      <option value="Không thuộc diện ưu tiên">
-                        Không thuộc diện ưu tiên
-                      </option>
-                      <option value="Con liệt sĩ / Con thương binh, bệnh binh">
-                        Con liệt sĩ / Con thương binh, bệnh binh
-                      </option>
-                      <option value="Sinh viên khuyết tật">
-                        Sinh viên khuyết tật
-                      </option>
-                      <option value="Hộ nghèo / Hộ cận nghèo">
-                        Hộ nghèo / Hộ cận nghèo
-                      </option>
-                      <option value="Dân tộc thiểu số vùng sâu vùng xa">
-                        Dân tộc thiểu số vùng sâu vùng xa
-                      </option>
-                      <option value="Mồ côi cả cha lẫn mẹ">
-                        Mồ côi cả cha lẫn mẹ
-                      </option>
-                      <option value="Hoàn cảnh khó khăn đột xuất">
-                        Hoàn cảnh khó khăn đột xuất
-                      </option>
-                      <option value="Khác">Khác</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* YÊU CẦU 1: CHIA ĐỊA CHỈ THƯỜNG TRÚ THÀNH 3 Ô NGANG TRÊN 1 HÀNG */}
-                <div className="col-span-1 md:col-span-2 pt-2">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                    Địa chỉ thường trú
-                  </label>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {/* Ô 1: Chọn Tỉnh / Thành phố */}
-                    <div>
-                      <select
-                        value={selectedProvince}
-                        onChange={(e) => setSelectedProvince(e.target.value)}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition cursor-pointer"
-                        title="Chọn Tỉnh / Thành phố"
-                      >
-                        <option value="">-- Chọn Tỉnh / Thành phố --</option>
-                        {VIETNAM_PROVINCES.map((p) => (
-                          <option key={p.name} value={p.name}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Ô 2: Chọn Quận / Huyện */}
-                    <div>
-                      <select
-                        value={selectedDistrict}
-                        onChange={(e) => setSelectedDistrict(e.target.value)}
-                        disabled={!selectedProvince}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
-                        title="Chọn Quận / Huyện"
-                      >
-                        <option value="">-- Chọn Quận / Huyện --</option>
-                        {availableDistricts.map((d) => (
-                          <option key={d} value={d}>
-                            {d}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Ô 3: Số nhà, tên đường, xã/phường... */}
-                    <div>
-                      <input
-                        type="text"
-                        value={detailStreet}
-                        onChange={(e) => setDetailStreet(e.target.value)}
-                        placeholder="Số nhà, tên đường, xã/phường..."
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* HÀNG DƯỚI GỒM 2 CARD: THÔNG TIN LIÊN HỆ KHẨN CẤP & NGUYỆN VỌNG */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* CARD 2: THÔNG TIN LIÊN HỆ KHẨN CẤP */}
-              <div className="rounded-2xl border border-sky-100 bg-[#f8fbff] p-5 sm:p-6 shadow-2xs flex flex-col justify-between">
                 <div>
-                  <div className="text-xs font-bold text-blue-700 tracking-wider uppercase mb-5">
-                    THÔNG TIN LIÊN HỆ KHẨN CẤP
-                  </div>
-
-                  <div className="space-y-4">
-                    {/* Họ và tên người giám hộ */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                        Họ và tên người giám hộ
-                      </label>
-                      <input
-                        type="text"
-                        name="nguoi_giam_ho"
-                        value={formData.nguoi_giam_ho}
-                        onChange={handleChange}
-                        placeholder="Họ và tên người giám hộ"
-                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
-                      />
-                    </div>
-
-                    {/* Mối liên hệ */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                        Mối liên hệ
-                      </label>
-                      <input
-                        type="text"
-                        name="moi_quan_he"
-                        value={formData.moi_quan_he}
-                        onChange={handleChange}
-                        placeholder="Ví dụ: Bố, Mẹ, Anh/Chị"
-                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
-                      />
-                    </div>
-
-                    {/* Số điện thoại liên hệ */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                        Số điện thoại liên hệ
-                      </label>
-                      <input
-                        type="text"
-                        name="sdt_nguoi_giam_ho"
-                        value={formData.sdt_nguoi_giam_ho}
-                        onChange={handleChange}
-                        placeholder="Số điện thoại liên hệ"
-                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
-                      />
-                    </div>
-                  </div>
+                  <h1 className="text-xl font-bold text-slate-800 leading-tight">
+                    Thông tin phòng lưu trú hiện tại
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                    Bạn đã hoàn tất thủ tục và đang lưu trú chính thức tại Ký
+                    túc xá
+                  </p>
                 </div>
               </div>
 
-              {/* CARD 3: NGUYỆN VỌNG */}
-              <div className="rounded-2xl border border-sky-100 bg-[#f8fbff] p-5 sm:p-6 shadow-2xs flex flex-col justify-between">
-                <div>
-                  <div className="text-xs font-bold text-blue-700 tracking-wider uppercase mb-5 flex items-center justify-between">
-                    <span>NGUYỆN VỌNG</span>
-                    {formData.nguyen_vong_phong && (
-                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/90 px-2.5 py-0.5 rounded-full border border-emerald-300">
-                        Đã chọn phòng: {formData.nguyen_vong_phong}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    {/* Báo hiệu phòng đã chọn trước từ Tra cứu phòng */}
-                    {formData.nguyen_vong_phong && (
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-3 text-xs">
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-blue-600 block">
-                            Phòng đã chọn từ mục Tra cứu:
-                          </span>
-                          <span className="font-extrabold text-slate-800 text-sm">
-                            Phòng {formData.nguyen_vong_phong}{" "}
-                            {formData.ma_toa_mong_muon
-                              ? `- ${formData.ma_toa_mong_muon}`
-                              : ""}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            sessionStorage.removeItem(
-                              "preferred_room_registration",
-                            );
-                            setFormData((prev) => ({
-                              ...prev,
-                              nguyen_vong_phong: "",
-                              ma_toa_mong_muon: "",
-                            }));
-                          }}
-                          className="text-xs text-rose-600 hover:text-rose-800 font-semibold cursor-pointer underline"
-                          title="Bỏ chọn phòng này để chọn tự do"
-                        >
-                          Bỏ chọn
-                        </button>
+              {/* Khối hiển thị thông tin phòng */}
+              <div className="rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50/70 via-teal-50/30 to-white p-6 sm:p-7 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-emerald-100">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                      <Building className="w-6 h-6 stroke-[2]" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-emerald-700 uppercase tracking-wider">
+                        Phòng lưu trú của bạn
                       </div>
-                    )}
+                      <div className="text-2xl font-black text-slate-900 tracking-tight">
+                        {studentStatusInfo.activeRoom?.so_phong
+                          ? `Phòng ${studentStatusInfo.activeRoom.so_phong}`
+                          : "Phòng nội trú chính thức"}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 self-start sm:self-center">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    Đang lưu trú nội trú
+                  </span>
+                </div>
 
-                    {/* Mục 1: Loại phòng (Phòng tiêu chuẩn & Phòng dịch vụ) */}
+                {/* Grid 4 thông số */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-5">
+                  <div className="bg-white/90 rounded-xl p-3.5 border border-emerald-100/80 shadow-2xs">
+                    <div className="text-xs text-slate-500 font-medium">
+                      Tòa nhà
+                    </div>
+                    <div className="text-base font-bold text-slate-800 mt-0.5">
+                      {studentStatusInfo.activeRoom?.toa ||
+                        studentStatusInfo.activeRoom?.ten_toa ||
+                        studentStatusInfo.activeRoom?.ma_toa ||
+                        "—"}
+                    </div>
+                  </div>
+                  <div className="bg-white/90 rounded-xl p-3.5 border border-emerald-100/80 shadow-2xs">
+                    <div className="text-xs text-slate-500 font-medium">
+                      Số phòng / Giường
+                    </div>
+                    <div className="text-base font-bold text-slate-800 mt-0.5">
+                      {studentStatusInfo.activeRoom?.so_phong ||
+                        studentStatusInfo.activeRoom?.ma_phong ||
+                        "---"}
+                    </div>
+                  </div>
+                  <div className="bg-white/90 rounded-xl p-3.5 border border-emerald-100/80 shadow-2xs">
+                    <div className="text-xs text-slate-500 font-medium">
+                      Loại phòng
+                    </div>
+                    <div className="text-base font-bold text-slate-800 mt-0.5">
+                      {studentStatusInfo.activeRoom?.loai_phong || "—"}
+                    </div>
+                  </div>
+                  <div className="bg-white/90 rounded-xl p-3.5 border border-emerald-100/80 shadow-2xs">
+                    <div className="text-xs text-slate-500 font-medium">
+                      Hợp đồng
+                    </div>
+                    <div className="text-base font-bold text-emerald-700 mt-0.5">
+                      Đang hiệu lực
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hộp ghi chú */}
+                <div className="bg-emerald-100/60 rounded-xl p-4 text-xs text-emerald-950 leading-relaxed border border-emerald-200/60">
+                  Bạn hiện đang có phòng lưu trú chính thức tại Ký túc xá. Nếu
+                  có nguyện vọng chuyển phòng sang khu vực khác hoặc làm thủ tục
+                  trả phòng, vui lòng sử dụng mục{" "}
+                  <strong>Chuyển / trả phòng</strong>.
+                </div>
+
+                {/* Nút hành động */}
+                <div className="mt-6 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onNavigate) {
+                        onNavigate("/student/transfer-room");
+                      } else if (onSelectTab) {
+                        onSelectTab("transfer");
+                      } else {
+                        window.history.pushState(
+                          {},
+                          "",
+                          "/student/transfer-room",
+                        );
+                        window.dispatchEvent(new PopStateEvent("popstate"));
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold text-sm transition-all shadow-sm cursor-pointer"
+                  >
+                    <ArrowLeftRight className="w-4 h-4" />
+                    <span>Yêu cầu chuyển / trả phòng</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onNavigate) {
+                        onNavigate("/student/history?tab=stay");
+                      } else if (onSelectTab) {
+                        onSelectTab("history");
+                      } else {
+                        window.history.pushState(
+                          {},
+                          "",
+                          "/student/history?tab=stay",
+                        );
+                        window.dispatchEvent(new PopStateEvent("popstate"));
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white hover:bg-slate-50 active:scale-95 text-slate-700 font-semibold text-sm transition-all border border-slate-200 cursor-pointer"
+                  >
+                    <span>Xem hợp đồng & lịch sử ở</span>
+                    <ArrowRight className="w-4 h-4 text-slate-400" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : studentStatusInfo.status === STUDENT_STATUS.PENDING_APPROVAL ? (
+            /* ========================================================================= */
+            /* TIẾN ĐỘ ĐƠN ĐĂNG KÝ PHÒNG (DÀNH CHO PENDING_APPROVAL)                     */
+            /* ========================================================================= */
+            <div className="flex flex-col gap-6 animate-in fade-in duration-300">
+              {/* Tiêu đề trang con */}
+              <div className="flex items-center gap-3 select-none">
+                <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-slate-800 leading-tight">
+                    Đơn đăng ký đang chờ xét duyệt
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                    Đơn đăng ký lưu trú của bạn đã được gửi thành công và đang
+                    chờ Ban Quản lý phê duyệt.
+                  </p>
+                </div>
+              </div>
+
+              {/* Khối hiển thị thông tin đơn đang chờ duyệt */}
+              <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/70 via-orange-50/30 to-white p-6 sm:p-7 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-amber-200/60">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-sm">
+                      <FileEdit className="w-6 h-6 stroke-[2]" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-amber-700 uppercase tracking-wider">
+                        Mã đơn đăng ký
+                      </div>
+                      <div className="text-2xl font-black text-slate-900 tracking-tight">
+                        {studentStatusInfo.latestRequest?.id ||
+                          studentStatusInfo.latestRequest?.ma_don ||
+                          "Đơn đang xử lý"}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200 self-start sm:self-center">
+                    <Clock className="w-4 h-4 text-amber-600" />
+                    Đang chờ BQL phê duyệt
+                  </span>
+                </div>
+
+                {/* Grid 4 thông số */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-5">
+                  <div className="bg-white/90 rounded-xl p-3.5 border border-amber-100/80 shadow-2xs">
+                    <div className="text-xs text-slate-500 font-medium">
+                      Ngày nộp đơn
+                    </div>
+                    <div className="text-base font-bold text-slate-800 mt-0.5">
+                      {studentStatusInfo.latestRequest?.ngay_dang_ky ||
+                        studentStatusInfo.latestRequest?.ngay_gui ||
+                        "Gần đây"}
+                    </div>
+                  </div>
+                  <div className="bg-white/90 rounded-xl p-3.5 border border-amber-100/80 shadow-2xs">
+                    <div className="text-xs text-slate-500 font-medium">
+                      Nguyện vọng phòng
+                    </div>
+                    <div className="text-base font-bold text-slate-800 mt-0.5">
+                      {studentStatusInfo.latestRequest?.loai_phong ||
+                        "Chưa chọn"}
+                    </div>
+                  </div>
+                  <div className="bg-white/90 rounded-xl p-3.5 border border-amber-100/80 shadow-2xs">
+                    <div className="text-xs text-slate-500 font-medium">
+                      Tòa mong muốn
+                    </div>
+                    <div className="text-base font-bold text-slate-800 mt-0.5">
+                      {studentStatusInfo.latestRequest?.ma_toa_mong_muon ||
+                        "Chưa chọn"}
+                    </div>
+                  </div>
+                  <div className="bg-white/90 rounded-xl p-3.5 border border-amber-100/80 shadow-2xs">
+                    <div className="text-xs text-slate-500 font-medium">
+                      Tiến trình xử lý
+                    </div>
+                    <div className="text-base font-bold text-amber-700 mt-0.5">
+                      Đang thẩm định
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hộp ghi chú */}
+                <div className="bg-amber-100/60 rounded-xl p-4 text-xs text-amber-950 leading-relaxed border border-amber-200/60">
+                  Chi tiết nguyện vọng:{" "}
+                  {studentStatusInfo.latestRequest?.nguyen_vong ||
+                    studentStatusInfo.latestRequest?.nguyen_vong_label ||
+                    "Không có ghi chú thêm."}{" "}
+                  Bạn có thể theo dõi tiến trình xử lý tại mục Lịch sử.
+                </div>
+
+                {/* Nút hành động */}
+                <div className="mt-6 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleGoToHistory}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold text-sm transition-all shadow-sm cursor-pointer"
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>Theo dõi tiến độ đơn tại Lịch sử</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* ========================================================================= */
+            /* FORM ĐIỀN THÔNG TIN ĐĂNG KÝ Ở (ẢNH 1) - FORM TRỐNG KHI MỞ                */
+            /* ========================================================================= */
+            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+              {/* Tiêu đề trang con */}
+              <div className="flex items-center gap-3 select-none">
+                <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0">
+                  <FileEdit className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-slate-800 leading-tight">
+                    Đăng ký ở
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                    Kiểm tra thông tin trước khi xác nhận
+                  </p>
+                </div>
+              </div>
+
+              {/* CARD 1: THÔNG TIN SINH VIÊN (Form 2 cột) */}
+              <div className="rounded-2xl border border-sky-100 bg-[#f8fbff] p-5 sm:p-6 shadow-2xs">
+                <div className="text-xs font-bold text-blue-700 tracking-wider uppercase mb-5 flex items-center gap-2">
+                  <span>THÔNG TIN SINH VIÊN</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                  {/* Cột 1 */}
+                  <div className="space-y-4">
+                    {/* Mã sinh viên */}
                     <div>
                       <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                        Loại phòng
+                        Mã sinh viên
+                      </label>
+                      <input
+                        type="text"
+                        name="msv"
+                        value={formData.msv}
+                        onChange={handleChange}
+                        placeholder="Nhập mã sinh viên"
+                        readOnly
+                        className={`w-full px-4 py-2.5 border rounded-xl text-sm placeholder-slate-400 focus:outline-none transition ${
+                          formData.msv
+                            ? "bg-slate-100 text-slate-700 cursor-not-allowed border-slate-200"
+                            : "bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                        }`}
+                        required
+                      />
+                    </div>
+
+                    {/* Giới tính */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                        Giới tính
+                      </label>
+                      <select
+                        name="gioi_tinh"
+                        value={formData.gioi_tinh}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition cursor-pointer"
+                      >
+                        <option value="">-- Chọn giới tính --</option>
+                        <option value="Nam">Nam</option>
+                        <option value="Nữ">Nữ</option>
+                      </select>
+                    </div>
+
+                    {/* Số CCCD/Định danh */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                        Số CCCD/Định danh
+                      </label>
+                      <input
+                        type="text"
+                        name="cccd"
+                        value={formData.cccd}
+                        onChange={handleChange}
+                        placeholder="Số CCCD/Định danh"
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                      />
+                    </div>
+
+                    {/* Email */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        placeholder="Email"
+                        readOnly
+                        className={`w-full px-4 py-2.5 border rounded-xl text-sm placeholder-slate-400 focus:outline-none transition ${
+                          formData.email
+                            ? "bg-slate-100 text-slate-700 cursor-not-allowed border-slate-200"
+                            : "bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                        }`}
+                      />
+                    </div>
+
+                    {/* Lớp chuyên ngành */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                        Lớp chuyên ngành
+                      </label>
+                      <input
+                        type="text"
+                        name="lop"
+                        value={formData.lop}
+                        onChange={handleChange}
+                        placeholder="Lớp chuyên ngành"
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Cột 2 */}
+                  <div className="space-y-4">
+                    {/* Họ và tên */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                        Họ và tên
+                      </label>
+                      <input
+                        type="text"
+                        name="ho_ten"
+                        value={formData.ho_ten}
+                        onChange={handleChange}
+                        placeholder="Họ và tên"
+                        readOnly
+                        className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:outline-none cursor-not-allowed"
+                        required
+                      />
+                    </div>
+
+                    {/* Ngày sinh */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                        Ngày sinh
                       </label>
                       <div className="relative">
-                        <select
-                          name="loai_phong"
-                          value={formData.loai_phong}
+                        <input
+                          type="date"
+                          name="ngay_sinh"
+                          value={formData.ngay_sinh}
                           onChange={handleChange}
-                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition appearance-none cursor-pointer pr-10 font-medium"
-                        >
-                          <option value="">-- Chọn loại phòng --</option>
-                          <option value="Phòng tiêu chuẩn">
-                            Phòng tiêu chuẩn
-                          </option>
-                          <option value="Phòng dịch vụ">Phòng dịch vụ</option>
-                        </select>
-                        <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
-                          <ChevronDown className="w-4 h-4" />
-                        </div>
+                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition cursor-pointer"
+                        />
                       </div>
                     </div>
 
-                    {/* Chi tiết nguyện vọng */}
+                    {/* Số điện thoại */}
                     <div>
                       <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                        Chi tiết nguyện vọng
+                        Số điện thoại
                       </label>
-                      <textarea
-                        name="nguyen_vong"
-                        value={formData.nguyen_vong}
+                      <input
+                        type="text"
+                        name="so_dien_thoai"
+                        value={formData.so_dien_thoai}
                         onChange={handleChange}
-                        placeholder="Hãy nhập nội dung nguyện vọng của bạn..."
-                        rows={5}
-                        className="w-full resize-y rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        placeholder="Số điện thoại"
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
                       />
+                    </div>
+
+                    {/* Khoa / Viện */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                        Khoa / Viện
+                      </label>
+                      <input
+                        type="text"
+                        name="khoa"
+                        value={formData.khoa}
+                        onChange={handleChange}
+                        placeholder="Khoa / Viện"
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                      />
+                    </div>
+
+                    {/* YÊU CẦU 2: BỔ SUNG TRƯỜNG ĐỐI TƯỢNG ƯU TIÊN */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                        Đối tượng ưu tiên
+                      </label>
+                      <select
+                        name="doi_tuong_uu_tien"
+                        value={formData.doi_tuong_uu_tien}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition cursor-pointer"
+                      >
+                        <option value="">-- Chọn đối tượng ưu tiên --</option>
+                        <option value="Không thuộc diện ưu tiên">
+                          Không thuộc diện ưu tiên
+                        </option>
+                        <option value="Con liệt sĩ / Con thương binh, bệnh binh">
+                          Con liệt sĩ / Con thương binh, bệnh binh
+                        </option>
+                        <option value="Sinh viên khuyết tật">
+                          Sinh viên khuyết tật
+                        </option>
+                        <option value="Hộ nghèo / Hộ cận nghèo">
+                          Hộ nghèo / Hộ cận nghèo
+                        </option>
+                        <option value="Dân tộc thiểu số vùng sâu vùng xa">
+                          Dân tộc thiểu số vùng sâu vùng xa
+                        </option>
+                        <option value="Mồ côi cả cha lẫn mẹ">
+                          Mồ côi cả cha lẫn mẹ
+                        </option>
+                        <option value="Hoàn cảnh khó khăn đột xuất">
+                          Hoàn cảnh khó khăn đột xuất
+                        </option>
+                        <option value="Khác">Khác</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* YÊU CẦU 1: CHIA ĐỊA CHỈ THƯỜNG TRÚ THÀNH 3 Ô NGANG TRÊN 1 HÀNG */}
+                  <div className="col-span-1 md:col-span-2 pt-2">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                      Địa chỉ thường trú
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {/* Ô 1: Chọn Tỉnh / Thành phố */}
+                      <div>
+                        <select
+                          value={selectedProvince}
+                          onChange={(e) => setSelectedProvince(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition cursor-pointer"
+                          title="Chọn Tỉnh / Thành phố"
+                        >
+                          <option value="">-- Chọn Tỉnh / Thành phố --</option>
+                          {VIETNAM_PROVINCES.map((p) => (
+                            <option key={p.name} value={p.name}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Ô 2: Chọn Quận / Huyện */}
+                      <div>
+                        <select
+                          value={selectedDistrict}
+                          onChange={(e) => setSelectedDistrict(e.target.value)}
+                          disabled={!selectedProvince}
+                          className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                          title="Chọn Quận / Huyện"
+                        >
+                          <option value="">-- Chọn Quận / Huyện --</option>
+                          {availableDistricts.map((d) => (
+                            <option key={d} value={d}>
+                              {d}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Ô 3: Số nhà, tên đường, xã/phường... */}
+                      <div>
+                        <input
+                          type="text"
+                          value={detailStreet}
+                          onChange={(e) => setDetailStreet(e.target.value)}
+                          placeholder="Số nhà, tên đường, xã/phường..."
+                          className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* PHẦN DƯỚI CÙNG: CHECKBOX XÁC NHẬN VÀ BỘ 2 NÚT THAO TÁC */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-100 mt-2">
-              {/* Checkbox xác nhận */}
-              <label className="flex items-center gap-3 cursor-pointer select-none group">
-                <input
-                  type="checkbox"
-                  checked={confirmed}
-                  onChange={(e) => setConfirmed(e.target.checked)}
-                  className="w-5 h-5 rounded-md border-2 border-blue-500 text-blue-600 focus:ring-blue-400 focus:ring-offset-0 cursor-pointer accent-blue-600"
-                />
-                <span className="text-sm font-medium text-slate-800 group-hover:text-slate-900 transition">
-                  Tôi xác nhận thông tin đăng ký ở là đúng
-                </span>
-              </label>
+              {/* HÀNG DƯỚI GỒM 2 CARD: THÔNG TIN LIÊN HỆ KHẨN CẤP & NGUYỆN VỌNG */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* CARD 2: THÔNG TIN LIÊN HỆ KHẨN CẤP */}
+                <div className="rounded-2xl border border-sky-100 bg-[#f8fbff] p-5 sm:p-6 shadow-2xs flex flex-col justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-blue-700 tracking-wider uppercase mb-5">
+                      THÔNG TIN LIÊN HỆ KHẨN CẤP
+                    </div>
 
-              {/* Nhóm nút Quay lại và Gửi yêu cầu */}
-              <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-                {/* Nút Quay lại / Reset */}
-                <button
-                  type="button"
-                  onClick={handleGoToDashboard}
-                  className="px-6 py-2.5 rounded-xl border border-sky-400 text-sky-600 hover:bg-sky-50 font-semibold text-sm transition-all duration-150 cursor-pointer shadow-2xs"
+                    <div className="space-y-4">
+                      {/* Họ và tên người giám hộ */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                          Họ và tên người giám hộ
+                        </label>
+                        <input
+                          type="text"
+                          name="nguoi_giam_ho"
+                          value={formData.nguoi_giam_ho}
+                          onChange={handleChange}
+                          placeholder="Họ và tên người giám hộ"
+                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                        />
+                      </div>
+
+                      {/* Mối liên hệ */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                          Mối liên hệ
+                        </label>
+                        <input
+                          type="text"
+                          name="moi_quan_he"
+                          value={formData.moi_quan_he}
+                          onChange={handleChange}
+                          placeholder="Ví dụ: Bố, Mẹ, Anh/Chị"
+                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                        />
+                      </div>
+
+                      {/* Số điện thoại liên hệ */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                          Số điện thoại liên hệ
+                        </label>
+                        <input
+                          type="text"
+                          name="sdt_nguoi_giam_ho"
+                          value={formData.sdt_nguoi_giam_ho}
+                          onChange={handleChange}
+                          placeholder="Số điện thoại liên hệ"
+                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CARD 3: NGUYỆN VỌNG */}
+                <div
+                  id="nguyen-vong-section"
+                  className="rounded-2xl border border-sky-100 bg-[#f8fbff] p-5 sm:p-6 shadow-2xs flex flex-col justify-between transition-all"
                 >
-                  Quay lại
-                </button>
+                  <div>
+                    <div className="text-xs font-bold text-blue-700 tracking-wider uppercase mb-5 flex items-center justify-between">
+                      <span>NGUYỆN VỌNG</span>
+                      {formData.nguyen_vong_phong && (
+                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/90 px-2.5 py-0.5 rounded-full border border-emerald-300">
+                          Đã chọn phòng: {formData.nguyen_vong_phong}
+                        </span>
+                      )}
+                    </div>
 
-                {/* Nút Gửi yêu cầu đăng ký (Màu xanh thương hiệu) */}
-                <button
-                  type="submit"
-                  disabled={!confirmed || isSubmitting}
-                  className={`px-7 py-2.5 rounded-xl font-semibold text-sm text-white transition-all duration-150 flex items-center justify-center gap-2 shadow-sm ${
-                    confirmed && !isSubmitting
-                      ? "bg-[#0080ff] hover:bg-[#006ee0] active:scale-98 cursor-pointer shadow-blue-500/20"
-                      : "bg-slate-300 text-slate-500 cursor-not-allowed opacity-60"
-                  }`}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-white" />
-                      <span>Đang gửi...</span>
-                    </>
-                  ) : (
-                    <span>Gửi yêu cầu đăng ký</span>
-                  )}
-                </button>
+                    <div className="space-y-4">
+                      {/* Báo hiệu phòng đã chọn trước từ Tra cứu phòng */}
+                      {formData.nguyen_vong_phong && (
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-3 text-xs">
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-blue-600 block">
+                              Phòng đã chọn từ mục Tra cứu:
+                            </span>
+                            <span className="font-extrabold text-slate-800 text-sm">
+                              Phòng {formData.nguyen_vong_phong}{" "}
+                              {formData.ma_toa_mong_muon
+                                ? `- ${formData.ma_toa_mong_muon}`
+                                : ""}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sessionStorage.removeItem(
+                                "preferred_room_registration",
+                              );
+                              setFormData((prev) => ({
+                                ...prev,
+                                nguyen_vong_phong: "",
+                                ma_toa_mong_muon: "",
+                              }));
+                            }}
+                            className="text-xs text-rose-600 hover:text-rose-800 font-semibold cursor-pointer underline"
+                            title="Bỏ chọn phòng này để chọn tự do"
+                          >
+                            Bỏ chọn
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Chọn loại phòng mong muốn */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                          Nguyện vọng loại phòng
+                        </label>
+                        <div className="relative">
+                          <select
+                            name="loai_phong"
+                            value={formData.loai_phong}
+                            onChange={handleChange}
+                            required
+                            className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition appearance-none cursor-pointer pr-10 font-medium"
+                          >
+                            <option value="">
+                              -- Chọn phòng tiêu chuẩn hoặc dịch vụ --
+                            </option>
+                            <option value="Phòng tiêu chuẩn">
+                              Phòng tiêu chuẩn
+                            </option>
+                            <option value="Phòng dịch vụ">Phòng dịch vụ</option>
+                          </select>
+                          <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+                            <ChevronDown className="w-4 h-4" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                        Tòa nhà mong muốn (không bắt buộc)
+                      </label>
+                      <input
+                        type="text"
+                        name="ma_toa_mong_muon"
+                        value={formData.ma_toa_mong_muon}
+                        onChange={handleChange}
+                        placeholder="Ví dụ: Tòa A1"
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
+                      />
+                    </div> */}
+
+                      {/* Chi tiết nguyện vọng */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                          Chi tiết nguyện vọng
+                        </label>
+                        <textarea
+                          name="nguyen_vong"
+                          value={formData.nguyen_vong}
+                          onChange={handleChange}
+                          placeholder="Hãy nhập nội dung nguyện vọng của bạn..."
+                          rows={5}
+                          className="w-full resize-y rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </form>
+
+              {/* PHẦN DƯỚI CÙNG: CHECKBOX XÁC NHẬN VÀ BỘ 2 NÚT THAO TÁC */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-100 mt-2">
+                {/* Checkbox xác nhận */}
+                <label className="flex items-center gap-3 cursor-pointer select-none group">
+                  <input
+                    type="checkbox"
+                    checked={confirmed}
+                    onChange={(e) => setConfirmed(e.target.checked)}
+                    className="w-5 h-5 rounded-md border-2 border-blue-500 text-blue-600 focus:ring-blue-400 focus:ring-offset-0 cursor-pointer accent-blue-600"
+                  />
+                  <span className="text-sm font-medium text-slate-800 group-hover:text-slate-900 transition">
+                    Tôi xác nhận thông tin đăng ký ở là đúng
+                  </span>
+                </label>
+
+                {/* Nhóm nút Quay lại và Gửi yêu cầu */}
+                <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                  {/* Nút Quay lại / Reset */}
+                  <button
+                    type="button"
+                    onClick={handleGoToDashboard}
+                    className="px-6 py-2.5 rounded-xl border border-sky-400 text-sky-600 hover:bg-sky-50 font-semibold text-sm transition-all duration-150 cursor-pointer shadow-2xs"
+                  >
+                    Quay lại
+                  </button>
+
+                  {/* Nút Gửi yêu cầu đăng ký (Màu xanh thương hiệu) */}
+                  <button
+                    type="submit"
+                    disabled={!confirmed || isSubmitting}
+                    className={`px-7 py-2.5 rounded-xl font-semibold text-sm text-white transition-all duration-150 flex items-center justify-center gap-2 shadow-sm ${
+                      confirmed && !isSubmitting
+                        ? "bg-[#0080ff] hover:bg-[#006ee0] active:scale-98 cursor-pointer shadow-blue-500/20"
+                        : "bg-slate-300 text-slate-500 cursor-not-allowed opacity-60"
+                    }`}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        <span>Đang gửi...</span>
+                      </>
+                    ) : (
+                      <span>Gửi yêu cầu đăng ký</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          )
         ) : (
           /* ========================================================================= */
           /* MÀN HÌNH GỬI THÀNH CÔNG (ẢNH 2)                                           */
@@ -854,6 +1231,54 @@ export default function RoomRegistrationPage({
           </div>
         )}
       </div>
+
+      {/* POPUP CẢNH BÁO KHÔNG CÓ PHÒNG PHÙ HỢP / YÊU CẦU ĐĂNG KÝ LẠI */}
+      {noRoomWarning.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl border border-rose-100 max-w-lg w-full p-6 sm:p-7 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center shrink-0 text-rose-600 shadow-2xs">
+                <AlertTriangle className="w-6 h-6 text-rose-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                  {noRoomWarning.title}
+                </h3>
+                <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+                  {noRoomWarning.message}
+                </p>
+                <div className="mt-3.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 font-medium">
+                  💡 Bạn vui lòng thay đổi loại phòng hoặc điều chỉnh nguyện
+                  vọng để hệ thống tìm được chỗ ở phù hợp cho bạn.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setNoRoomWarning({ show: false, title: "", message: "" });
+                  const section = document.getElementById(
+                    "nguyen-vong-section",
+                  );
+                  if (section) {
+                    section.scrollIntoView({ behavior: "smooth" });
+                    section.classList.add("ring-2", "ring-rose-400");
+                    setTimeout(
+                      () => section.classList.remove("ring-2", "ring-rose-400"),
+                      2500,
+                    );
+                  }
+                }}
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition shadow-sm cursor-pointer text-center"
+              >
+                Thay đổi nguyện vọng & Đăng ký lại
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </StudentLayout>
   );
 }

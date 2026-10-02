@@ -13,9 +13,12 @@ import {
 } from 'lucide-react';
 import StudentLayout from '../../layouts/Student';
 import feedbackService from '../../services/feedbackService';
+import FeatureLockedNotice from '../../components/FeatureLockedNotice';
+import { resolveStudentStatus, STUDENT_STATUS } from '../../services/studentStatusService';
 
 export default function FeedbackPage({
   userName,
+  onNavigate,
   onNavigateDashboard,
   onNavigateRegister,
   onNavigateHistory,
@@ -24,6 +27,7 @@ export default function FeedbackPage({
   onLogout,
 }) {
   const studentMsv = localStorage.getItem('ktx_username') || 'DTC245180051';
+  const [studentStatus, setStudentStatus] = useState(STUDENT_STATUS.NOT_REGISTERED);
   const studentName =
     userName ||
     localStorage.getItem('ktx_fullname') ||
@@ -63,6 +67,9 @@ export default function FeedbackPage({
 
   useEffect(() => {
     loadHistory();
+    resolveStudentStatus(studentMsv).then((res) => {
+      setStudentStatus(res.status);
+    });
   }, [studentMsv]);
 
   // Xử lý chọn ảnh
@@ -207,10 +214,39 @@ export default function FeedbackPage({
           </div>
         )}
 
-        {/* Khối chính: Card Gửi phản ánh theo chuẩn Figma */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 sm:p-8 flex-1 flex flex-col">
-          {/* Header tiêu đề với Icon bong bóng chat màu xanh */}
-          <div className="flex items-center justify-between pb-6 border-b border-slate-100 mb-6">
+        {/* Tiêu đề trang */}
+        <div className="flex items-center gap-3.5 select-none">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-600">
+            <svg
+              className="w-5 h-5 fill-current"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-800 leading-tight">
+              Gửi phản ánh
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              Tiếp nhận phản ánh về cơ sở vật chất, điện nước và an ninh trật tự tới Ban Quản lý KTX
+            </p>
+          </div>
+        </div>
+
+        {studentStatus !== STUDENT_STATUS.ACTIVE_RESIDENT ? (
+          <FeatureLockedNotice
+            featureName="Gửi phản ánh & Sự cố"
+            status={studentStatus}
+            onNavigate={onNavigate || onNavigateRegister}
+            onSelectTab={onSelectTab}
+          />
+        ) : (
+          /* Khối chính: Card Gửi phản ánh theo chuẩn Figma */
+          <div className="flex flex-1 flex-col rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm sm:p-8">
+            {/* Header tiêu đề với Icon bong bóng chat màu xanh */}
+            <div className="flex items-center justify-between pb-6 border-b border-slate-100 mb-6">
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-[#0080ff] flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
                 {/* SVG Icon bong bóng chat với 3 vạch ngang theo thiết kế Figma */}
@@ -223,9 +259,9 @@ export default function FeedbackPage({
                 </svg>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-[#1e3a8a] tracking-tight leading-none">
+                <h2 className="text-lg font-bold text-slate-800 leading-tight">
                   Gửi phản ánh
-                </h1>
+                </h2>
                 <p className="text-xs text-slate-500 mt-1">
                   Tiếp nhận phản ánh về cơ sở vật chất, điện nước và an ninh trật tự tới Ban Quản lý KTX
                 </p>
@@ -583,6 +619,7 @@ export default function FeedbackPage({
             </div>
           )}
         </div>
+        )}
       </div>
     </StudentLayout>
   );

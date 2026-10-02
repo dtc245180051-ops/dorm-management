@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   ChevronLeft,
   Loader2,
   CheckCircle2,
   AlertTriangle,
   X,
-} from 'lucide-react';
-import AdminLayout from '../../layouts/Admin';
-import occupancyService from '../../services/occupancyService';
+} from "lucide-react";
+import AdminLayout from "../../layouts/Admin";
+import occupancyService from "../../services/occupancyService";
 
 export default function ProcessCheckoutPage({
-  requestId = 'YC-0232',
+  requestId = "YC-0232",
   onBack,
   onProcessed,
 }) {
@@ -19,22 +19,26 @@ export default function ProcessCheckoutPage({
   const [requestData, setRequestData] = useState(null);
 
   // Địa chỉ sau khi trả phòng (3 ô)
-  const [diaChiTinh, setDiaChiTinh] = useState('');
-  const [diaChiHuyen, setDiaChiHuyen] = useState('');
-  const [diaChiSoNha, setDiaChiSoNha] = useState('');
+  const [diaChiTinh, setDiaChiTinh] = useState("");
+  const [diaChiHuyen, setDiaChiHuyen] = useState("");
+  const [diaChiSoNha, setDiaChiSoNha] = useState("");
 
   // Modal từ chối
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
-  const [rejectError, setRejectError] = useState('');
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectError, setRejectError] = useState("");
 
   // Toast thông báo
-  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const [toast, setToast] = useState({
+    show: false,
+    message: "",
+    type: "success",
+  });
 
-  const showToast = (message, type = 'success') => {
+  const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
     setTimeout(() => {
-      setToast({ show: false, message: '', type: 'success' });
+      setToast({ show: false, message: "", type: "success" });
     }, 3000);
   };
 
@@ -47,15 +51,19 @@ export default function ProcessCheckoutPage({
 
         // Trích xuất địa chỉ 3 phần
         if (detail?.dia_chi_chi_tiet) {
-          setDiaChiTinh(detail.dia_chi_chi_tiet.tinh || '');
-          setDiaChiHuyen(detail.dia_chi_chi_tiet.huyen || '');
-          setDiaChiSoNha(detail.dia_chi_chi_tiet.so_nha || detail.dia_chi_chi_tiet.duong || '');
+          setDiaChiTinh(detail.dia_chi_chi_tiet.tinh || "");
+          setDiaChiHuyen(detail.dia_chi_chi_tiet.huyen || "");
+          setDiaChiSoNha(
+            detail.dia_chi_chi_tiet.so_nha ||
+              detail.dia_chi_chi_tiet.duong ||
+              "",
+          );
         } else if (detail?.dia_chi_sau_tra) {
-          const parts = detail.dia_chi_sau_tra.split(',').map((s) => s.trim());
+          const parts = detail.dia_chi_sau_tra.split(",").map((s) => s.trim());
           if (parts.length >= 3) {
             setDiaChiSoNha(parts[0]);
             setDiaChiHuyen(parts[1]);
-            setDiaChiTinh(parts.slice(2).join(', '));
+            setDiaChiTinh(parts.slice(2).join(", "));
           } else if (parts.length === 2) {
             setDiaChiSoNha(parts[0]);
             setDiaChiTinh(parts[1]);
@@ -64,8 +72,8 @@ export default function ProcessCheckoutPage({
           }
         }
       } catch (err) {
-        console.error('Error fetching checkout request detail:', err);
-        showToast('Không thể tải chi tiết đơn trả phòng.', 'error');
+        console.error("Error fetching checkout request detail:", err);
+        showToast("Không thể tải chi tiết đơn trả phòng.", "error");
       } finally {
         setLoading(false);
       }
@@ -79,23 +87,27 @@ export default function ProcessCheckoutPage({
     setSubmitting(true);
     try {
       const payload = {
-        ngay_tra: requestData?.ngay_tra || new Date().toISOString().split('T')[0],
-        ghi_chu: 'Phê duyệt trả phòng bởi Quản lý',
+        ngay_tra:
+          requestData?.ngay_tra || new Date().toISOString().split("T")[0],
+        ghi_chu: "Phê duyệt trả phòng bởi Quản lý",
       };
 
-      const result = await occupancyService.approveCheckoutRequest(requestId, payload);
-      showToast(result.message || 'Phê duyệt trả phòng thành công!', 'success');
+      const result = await occupancyService.approveCheckoutRequest(
+        requestId,
+        payload,
+      );
+      showToast(result.message || "Phê duyệt trả phòng thành công!", "success");
 
       setTimeout(() => {
         if (onProcessed) {
-          onProcessed('approved', result);
+          onProcessed("approved", result);
         } else if (onBack) {
           onBack();
         }
       }, 1500);
     } catch (err) {
-      console.error('Error approving checkout request:', err);
-      showToast('Có lỗi xảy ra khi phê duyệt. Vui lòng thử lại!', 'error');
+      console.error("Error approving checkout request:", err);
+      showToast("Có lỗi xảy ra khi phê duyệt. Vui lòng thử lại!", "error");
     } finally {
       setSubmitting(false);
     }
@@ -104,7 +116,7 @@ export default function ProcessCheckoutPage({
   // Xử lý Từ chối yêu cầu
   const handleConfirmReject = async () => {
     if (!rejectReason.trim()) {
-      setRejectError('Vui lòng nhập lý do từ chối yêu cầu trả phòng.');
+      setRejectError("Vui lòng nhập lý do từ chối yêu cầu trả phòng.");
       return;
     }
 
@@ -114,18 +126,18 @@ export default function ProcessCheckoutPage({
       await occupancyService.rejectCheckoutRequest(requestId, payload);
 
       setIsRejectModalOpen(false);
-      showToast('Đã từ chối yêu cầu trả phòng thành công.', 'success');
+      showToast("Đã từ chối yêu cầu trả phòng thành công.", "success");
 
       setTimeout(() => {
         if (onProcessed) {
-          onProcessed('rejected');
+          onProcessed("rejected");
         } else if (onBack) {
           onBack();
         }
       }, 1500);
     } catch (err) {
-      console.error('Error rejecting checkout request:', err);
-      setRejectError('Không thể từ chối yêu cầu. Vui lòng thử lại!');
+      console.error("Error rejecting checkout request:", err);
+      setRejectError("Không thể từ chối yêu cầu. Vui lòng thử lại!");
     } finally {
       setSubmitting(false);
     }
@@ -136,7 +148,7 @@ export default function ProcessCheckoutPage({
       {/* Toast thông báo */}
       {toast.show && (
         <div className="fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl border bg-white text-slate-800 animate-in fade-in slide-in-from-top-4 duration-200">
-          {toast.type === 'success' ? (
+          {toast.type === "success" ? (
             <CheckCircle2 className="w-5 h-5 text-emerald-500" />
           ) : (
             <AlertTriangle className="w-5 h-5 text-rose-500" />
@@ -146,11 +158,13 @@ export default function ProcessCheckoutPage({
       )}
 
       {/* Khung Card chính màu trắng bo góc */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-xs flex-1 flex flex-col justify-between">
+      <div className="bg-[#f4f5f7] rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-xs flex-1 flex flex-col justify-between">
         {loading ? (
           <div className="py-24 flex flex-col items-center justify-center gap-3 text-slate-400">
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-            <span className="text-sm">Đang tải thông tin yêu cầu trả phòng...</span>
+            <span className="text-sm">
+              Đang tải thông tin yêu cầu trả phòng...
+            </span>
           </div>
         ) : (
           <div>
@@ -179,21 +193,27 @@ export default function ProcessCheckoutPage({
                 {/* Cột trái */}
                 <div className="space-y-1">
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
-                    <span className="text-slate-600 font-medium">Mã sinh viên</span>
+                    <span className="text-slate-600 font-medium">
+                      Mã sinh viên
+                    </span>
                     <span className="font-semibold text-slate-900">
-                      {requestData?.msv || 'DTC245180051'}
+                      {requestData?.msv || "DTC245180051"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
-                    <span className="text-slate-600 font-medium">Họ và tên</span>
+                    <span className="text-slate-600 font-medium">
+                      Họ và tên
+                    </span>
                     <span className="font-bold text-slate-900">
-                      {requestData?.ho_ten || 'Nguyễn Quốc Huy'}
+                      {requestData?.ho_ten || "Nguyễn Quốc Huy"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
-                    <span className="text-slate-600 font-medium">Giới tính</span>
+                    <span className="text-slate-600 font-medium">
+                      Giới tính
+                    </span>
                     <span className="text-slate-900 font-medium">
-                      {requestData?.gioi_tinh || 'Nam'}
+                      {requestData?.gioi_tinh || "Nam"}
                     </span>
                   </div>
                 </div>
@@ -201,15 +221,18 @@ export default function ProcessCheckoutPage({
                 {/* Cột phải */}
                 <div className="space-y-1">
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
-                    <span className="text-slate-600 font-medium">Vị trí hiện tại</span>
+                    <span className="text-slate-600 font-medium">
+                      Vị trí hiện tại
+                    </span>
                     <span className="font-semibold text-slate-900">
-                      {requestData?.vi_tri_hien_tai || 'Phòng A102 - Giường G01'}
+                      {requestData?.vi_tri_hien_tai ||
+                        "Phòng A102 - Giường G01"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
                     <span className="text-slate-600 font-medium">Công nợ</span>
                     <span className="font-bold text-emerald-600">
-                      {requestData?.cong_no || 'Đã hoàn thành toàn bộ phí'}
+                      {requestData?.cong_no || "Đã hoàn thành toàn bộ phí"}
                     </span>
                   </div>
                 </div>
@@ -222,7 +245,11 @@ export default function ProcessCheckoutPage({
                 Lý do trả phòng
               </h3>
               <div className="border border-slate-200 rounded-lg p-4 text-sm text-slate-800 bg-white shadow-2xs leading-relaxed">
-                "{requestData?.mo_ta || requestData?.ly_do || 'Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học...'}"
+                "
+                {requestData?.mo_ta ||
+                  requestData?.ly_do ||
+                  "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học..."}
+                "
               </div>
             </div>
 
@@ -235,21 +262,21 @@ export default function ProcessCheckoutPage({
                 <input
                   type="text"
                   readOnly
-                  value={diaChiTinh || ''}
+                  value={diaChiTinh || ""}
                   placeholder="Tỉnh / Thành phố"
                   className="bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-800 shadow-2xs focus:outline-none"
                 />
                 <input
                   type="text"
                   readOnly
-                  value={diaChiHuyen || ''}
+                  value={diaChiHuyen || ""}
                   placeholder="Quận / Huyện / Thị xã"
                   className="bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-800 shadow-2xs focus:outline-none"
                 />
                 <input
                   type="text"
                   readOnly
-                  value={diaChiSoNha || ''}
+                  value={diaChiSoNha || ""}
                   placeholder="Số nhà, tên đường / Xã, phường"
                   className="bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-800 shadow-2xs focus:outline-none"
                 />
@@ -261,8 +288,8 @@ export default function ProcessCheckoutPage({
               <button
                 type="button"
                 onClick={() => {
-                  setRejectReason('');
-                  setRejectError('');
+                  setRejectReason("");
+                  setRejectError("");
                   setIsRejectModalOpen(true);
                 }}
                 className="py-3 px-6 rounded-lg bg-rose-200 hover:bg-rose-300 text-rose-700 font-semibold text-center transition cursor-pointer"
@@ -309,14 +336,16 @@ export default function ProcessCheckoutPage({
               value={rejectReason}
               onChange={(e) => {
                 setRejectReason(e.target.value);
-                setRejectError('');
+                setRejectError("");
               }}
               placeholder="VD: Sinh viên chưa hoàn thành bàn giao cơ sở vật chất phòng ở..."
               className="w-full p-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-200 focus:border-rose-400 mb-2"
             ></textarea>
 
             {rejectError && (
-              <p className="text-xs text-rose-600 font-medium mb-4">{rejectError}</p>
+              <p className="text-xs text-rose-600 font-medium mb-4">
+                {rejectError}
+              </p>
             )}
 
             <div className="flex justify-end gap-3 mt-4">

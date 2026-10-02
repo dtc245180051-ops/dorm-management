@@ -13,7 +13,10 @@ import {
 } from "lucide-react";
 import AdminLayout from "../../layouts/Admin";
 import occupancyService from "../../services/occupancyService";
-import { matchRoomWithGemini } from "../../services/geminiService";
+import {
+  matchRoomWithGemini,
+  isGenderCompatible,
+} from "../../services/geminiService";
 
 export default function ProcessRegistrationPage({
   requestId = "DK-001",
@@ -69,7 +72,7 @@ export default function ProcessRegistrationPage({
 
         // Khớp Tòa, Phòng, Giường với cây dữ liệu thực tế
         if (tree.length > 0) {
-          // 1. Tìm tòa khớp với gợi ý hoặc lấy tòa đầu tiên
+          // 1. Tìm tòa khớp với gợi ý hoặc tòa phù hợp giới tính sinh viên
           const targetBuilding =
             tree.find((b) => b.ma_toa === detail?.goi_y?.ma_toa) ||
             tree.find(
@@ -78,6 +81,7 @@ export default function ProcessRegistrationPage({
                 (b.ma_toa.startsWith(detail.goi_y.ma_toa) ||
                   detail.goi_y.ma_toa.startsWith(b.ma_toa)),
             ) ||
+            tree.find((b) => isGenderCompatible(detail?.gioi_tinh, b.gioi_tinh)) ||
             tree[0];
 
           setSelectedBuilding(targetBuilding.ma_toa);
@@ -124,14 +128,13 @@ export default function ProcessRegistrationPage({
           const beds = room.beds || [];
           const occupied = Number(room.thanh_vien_hien_tai || 0);
           const roomGender = String(room.gioi_tinh || building.gioi_tinh || "");
-          const isCoed =
-            roomGender.toLowerCase().includes("nam") &&
-            roomGender.toLowerCase().includes("nữ");
           return {
             ...room,
             ten_phong: `Phòng ${room.so_phong || room.ma_phong}`,
             toa: building.ten_toa || `Tòa ${building.ma_toa}`,
-            gioi_tinh: isCoed ? requestData.gioi_tinh : roomGender,
+            gioi_tinh: roomGender,
+            loai_phong: room.loai_phong || "Phòng tiêu chuẩn",
+            so_tang: room.so_tang || 1,
             thanh_vien_hien_tai: occupied,
             suc_chua: Number(room.suc_chua || occupied + beds.length),
             danh_sach_giuong: beds.map((bed) => ({
@@ -150,37 +153,67 @@ export default function ProcessRegistrationPage({
         setAiRecommendation(recommendation);
         if (!recommendation?.best_room_id) return;
 
-        const matchedBuilding = buildingTree.find(
-          (building) =>
-            recommendation.toa === building.ten_toa ||
-            recommendation.toa?.includes(building.ma_toa),
-        );
-        if (!matchedBuilding) return;
-        const roomToken = String(recommendation.best_room_id || "").replace(
-          /^Phòng\s*/i,
-          "",
-        );
-        const matchedRoom = (matchedBuilding.rooms || []).find(
-          (room) =>
-            room.ma_phong === recommendation.best_room_id ||
-            room.so_phong === roomToken ||
-            room.ma_phong?.includes(roomToken),
-        );
-        const bedToken = String(recommendation.giuong || "").replace(
-          /^Giường\s*/i,
-          "",
-        );
-        const matchedBed = (matchedRoom?.beds || []).find(
-          (bed) =>
-            bed.ma_giuong === recommendation.giuong ||
-            bed.label === recommendation.giuong ||
-            bed.label?.endsWith(bedToken) ||
-            bed.ma_giuong?.endsWith(bedToken),
-        );
+        // 1. Tự động tìm Tòa phù hợp từ kết quả gợi ý
+        const recToa = String(recommendation.toa || "").trim().toLowerCase();
+        const matchedBuilding =
+          buildingTree.find((building) => {
+            const bMa = String(building.ma_toa || "").toLowerCase();
+            const bTen = String(building.ten_toa || "").toLowerCase();
+            return (
+              recToa === bMa ||
+              recToa === bTen ||
+              recToa.includes(bMa) ||
+              bTen.includes(recToa)
+            );
+          }) ||
+          buildingTree.find((b) =>
+            isGenderCompatible(requestData.gioi_tinh, b.gioi_tinh),
+          ) ||
+          buildingTree[0];
 
-        if (matchedBuilding) setSelectedBuilding(matchedBuilding.ma_toa);
-        if (matchedRoom) setSelectedRoom(matchedRoom.ma_phong);
-        if (matchedBed) setSelectedBed(matchedBed.ma_giuong);
+        if (!matchedBuilding) return;
+
+        // 2. Tự động tìm Phòng phù hợp từ kết quả gợi ý
+        const recRoom = String(recommendation.best_room_id || "").trim();
+        const roomToken = recRoom.replace(/^Phòng\s*/i, "").trim().toLowerCase();
+        const bldRooms = matchedBuilding.rooms || [];
+        const matchedRoom =
+          bldRooms.find((room) => {
+            const rMa = String(room.ma_phong || "").toLowerCase();
+            const rSo = String(room.so_phong || "").toLowerCase();
+            return (
+              rMa === recRoom.toLowerCase() ||
+              rSo === roomToken ||
+              rMa.includes(roomToken) ||
+              recRoom.toLowerCase().includes(rSo)
+            );
+          }) || bldRooms[0];
+
+        if (!matchedRoom) return;
+
+        // 3. Tự động tìm Giường trống phù hợp từ kết quả gợi ý
+        const recBed = String(recommendation.giuong || "").trim();
+        const bedToken = recBed.replace(/^Giường\s*/i, "").trim().toLowerCase();
+        const roomBeds = matchedRoom.beds || [];
+        const matchedBed =
+          roomBeds.find((bed) => {
+            const bMa = String(bed.ma_giuong || "").toLowerCase();
+            const bLabel = String(bed.label || "").toLowerCase();
+            return (
+              bMa === recBed.toLowerCase() ||
+              bLabel === recBed.toLowerCase() ||
+              bMa.endsWith(bedToken) ||
+              bLabel.endsWith(bedToken) ||
+              bMa.includes(bedToken)
+            );
+          }) || roomBeds[0];
+
+        // TỰ ĐỘNG NHẢY CẢ 3 MỤC: TÒA, PHÒNG, GIƯỜNG THEO GỢI Ý CỦA HỆ THỐNG
+        setSelectedBuilding(matchedBuilding.ma_toa);
+        setSelectedRoom(matchedRoom.ma_phong);
+        if (matchedBed) {
+          setSelectedBed(matchedBed.ma_giuong);
+        }
       } catch (err) {
         console.error("Error matching room with Gemini:", err);
       } finally {
@@ -548,43 +581,37 @@ export default function ProcessRegistrationPage({
               <h2 className="text-base font-bold text-slate-900 mb-3">
                 Nguyện vọng
               </h2>
-              <div className="w-full px-4 py-3 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 shadow-2xs">
-                {requestData?.loai_phong ||
-                requestData?.tang_mong_muon ||
-                requestData?.muc_gia_mong_muon ? (
+              <div className="w-full px-4 py-3 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 shadow-2xs space-y-3">
+                {(requestData?.loai_phong ||
+                  requestData?.tang_mong_muon ||
+                  requestData?.muc_gia_mong_muon) && (
                   <div className="flex flex-wrap items-center gap-2.5">
                     {requestData?.loai_phong && (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 text-blue-700 font-semibold border border-blue-200 text-xs">
-                        <span className="text-slate-500 font-normal">
-                          Loại phòng:
-                        </span>{" "}
+                        <span className="text-slate-500 font-normal">Loại phòng:</span>
                         {requestData.loai_phong}
                       </span>
                     )}
                     {requestData?.tang_mong_muon && (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200 text-xs">
-                        <span className="text-slate-500 font-normal">
-                          Tầng mong muốn:
-                        </span>{" "}
+                        <span className="text-slate-500 font-normal">Tầng mong muốn:</span>
                         {requestData.tang_mong_muon}
                       </span>
                     )}
                     {requestData?.muc_gia_mong_muon && (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200 text-xs">
-                        <span className="text-slate-500 font-normal">
-                          Ngân sách:
-                        </span>{" "}
+                        <span className="text-slate-500 font-normal">Ngân sách:</span>
                         {requestData.muc_gia_mong_muon}
                       </span>
                     )}
                   </div>
-                ) : (
-                  <div>
-                    {requestData?.nguyen_vong ||
-                      requestData?.nguyen_vong_label ||
-                      "“Xin hãy xếp cho em 1 phòng nào đó ở tòa A với ạ 🥹”"}
-                  </div>
                 )}
+                <p className="whitespace-pre-wrap leading-relaxed">
+                  {requestData?.nguyen_vong ||
+                    requestData?.noi_dung_nguyen_vong ||
+                    requestData?.nguyen_vong_label ||
+                    "Chưa có nội dung nguyện vọng chi tiết."}
+                </p>
               </div>
             </div>
 

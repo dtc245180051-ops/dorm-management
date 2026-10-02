@@ -3,59 +3,20 @@ import api, { dormService } from "./api";
 const STORAGE_KEY = "dorm_registration_requests";
 
 // Dữ liệu mẫu ban đầu để luôn có sẵn dữ liệu chuẩn bị kiểm thử
-const DEFAULT_REQUESTS = [
-  {
-    id: "DK2026-0148",
-    ma_yeu_cau: "#DK2026-0148",
-    msv: "DTCxxxxxxxx",
-    ho_ten: "Nguyễn Văn A",
-    gioi_tinh: "Nữ",
-    ngay_sinh: "21/01/2006",
-    cccd: "01xxxxxxxxxx",
-    so_dien_thoai: "09xxxxxxxx",
-    email: "DTCxxxxxxxx",
-    khoa: "CNTT",
-    lop: "CNTT K23A",
-    dia_chi: "Xã A - Tỉnh Hải Dương",
-    doi_tuong_uu_tien: "Không thuộc diện ưu tiên",
-    nguoi_giam_ho: "Nguyễn Văn B",
-    moi_quan_he: "Bố",
-    sdt_nguoi_giam_ho: "09xxxxxxxx",
-    nguyen_vong: "Em có nguyện vọng ở tòa A2, em xin cảm ơn",
-    nguyen_vong_phong: "P36",
-    nguyen_vong_label: "P36 - Tầng 3 - Tòa A2",
-    loai_phong: "Phòng tiêu chuẩn",
-    tang_mong_muon: "Tầng 3",
-    muc_gia_mong_muon: "12.000.000 đ/năm",
-    nam_hoc: "2026-2027",
-    ngay_dang_ky: "25/08/2026",
-    ngay_gui: "25/08/2026 09:12",
-    ngay_tiep_nhan: "26/08/2026 14:30",
-    ngay_du_kien: "05/09/2026",
-    trang_thai: "CHO_DUYET",
-    trang_thai_label: "Đang xét duyệt",
-    goi_y: {
-      ma_toa: "A2",
-      ma_phong: "P36",
-      ma_giuong: "G07",
-    },
-  },
-];
+const DEFAULT_REQUESTS = [];
 
 // Helper lấy danh sách đơn từ LocalStorage
 function getLocalRequests() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_REQUESTS));
-      return DEFAULT_REQUESTS;
-    }
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0
-      ? parsed
-      : DEFAULT_REQUESTS;
+    const requests = Array.isArray(parsed) ? parsed : [];
+    const cleaned = requests.filter((request) => request?.id !== "DK2026-0148");
+    if (cleaned.length !== requests.length) saveLocalRequests(cleaned);
+    return cleaned;
   } catch (e) {
-    return DEFAULT_REQUESTS;
+    return [];
   }
 }
 
@@ -89,36 +50,9 @@ const DEFAULT_STUDENT_PROFILE = {
   avatar_url: "/avatar.png",
 };
 
-const DEFAULT_CURRENT_ROOM_INFO = {
-  phong_hien_tai: "P36 – Tòa A2 – Tầng 3",
-  thanh_vien: "6/8 người",
-  thoi_gian_luu_tru: "09/2025 – Nay",
-  so_phong: "36",
-  toa: "A2",
-  tang: "3",
-  giuong: "4",
-  ngay_nhan_phong: "01/09/2024",
-  so_thanh_vien: 6,
-  suc_chua: 8,
-  vi_tri_hien_tai: "Phòng 36 - Giường 4",
-  cong_no: "Đã hoàn thành toàn bộ phí",
-  trang_thai: "DANG_O",
-};
+const DEFAULT_CURRENT_ROOM_INFO = null;
 
-const DEFAULT_STAY_CONTRACTS = [
-  {
-    id: "HD26-A2P36-G07",
-    ma_hop_dong: "HD26-A2P36-G07",
-    phong: "P36",
-    toa: "A2",
-    tang: "3",
-    giuong: "G7",
-    thoi_gian_o: "2026-2027",
-    nam_hoc: "2026-2027",
-    trang_thai: "DANG_O",
-    trang_thai_label: "Đang ở",
-  },
-];
+const DEFAULT_STAY_CONTRACTS = [];
 
 const DEFAULT_TRANSFER_CHECKOUT_REQUESTS = [
   {
@@ -204,16 +138,9 @@ function saveLocalTransferCheckoutRequests(reqs) {
 function getLocalCurrentRoomInfo() {
   try {
     const raw = localStorage.getItem(CURRENT_ROOM_STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(
-        CURRENT_ROOM_STORAGE_KEY,
-        JSON.stringify(DEFAULT_CURRENT_ROOM_INFO),
-      );
-      return DEFAULT_CURRENT_ROOM_INFO;
-    }
-    return JSON.parse(raw);
+    return raw ? JSON.parse(raw) : null;
   } catch (e) {
-    return DEFAULT_CURRENT_ROOM_INFO;
+    return null;
   }
 }
 
@@ -306,18 +233,13 @@ function getLocalStayContracts() {
   try {
     const raw = localStorage.getItem(STAY_CONTRACTS_STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(
-        STAY_CONTRACTS_STORAGE_KEY,
-        JSON.stringify(DEFAULT_STAY_CONTRACTS),
-      );
-      return DEFAULT_STAY_CONTRACTS;
+      return [];
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0
-      ? parsed
-      : DEFAULT_STAY_CONTRACTS;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((c) => c && c.id !== "HD26-A2P36-G07");
   } catch (e) {
-    return DEFAULT_STAY_CONTRACTS;
+    return [];
   }
 }
 
@@ -333,9 +255,9 @@ export const occupancyService = {
   /**
    * Lấy danh sách các lựa chọn phòng/giường trống cho sinh viên đăng ký
    */
-  getAvailableOptions: async () => {
+  getAvailableOptions: async (params = {}) => {
     try {
-      const res = await api.get("/student/requests/available-options");
+      const res = await api.get("/student/requests/available-options", { params });
       if (Array.isArray(res.data) && res.data.length > 0) {
         return res.data;
       }
@@ -352,11 +274,14 @@ export const occupancyService = {
               (g) => g.trang_thai === "TRONG",
             ).length;
             const bldName = r.ten_toa || (r.ma_toa ? `Tòa ${r.ma_toa}` : "KTX");
+            const isFemale = (r.ma_toa?.includes("A3") || r.ma_toa?.includes("A4") || (r.gioi_tinh && r.gioi_tinh.toLowerCase().includes("nữ")));
             return {
               ma_phong: r.ma_phong,
               so_phong: r.so_phong,
+              loai_phong: r.loai_phong || "Phòng tiêu chuẩn",
+              gioi_tinh: isFemale ? "Nữ" : (r.gioi_tinh || "Nam"),
               ma_tang: r.ma_tang,
-              so_tang: r.so_tang,
+              so_tang: r.so_tang || 1,
               ma_toa: r.ma_toa,
               ten_toa: bldName,
               label: `P${r.so_phong} - Tầng ${r.so_tang || 1} - ${bldName} (${emptyBeds || r.so_giuong_trong || 0} chỗ trống)`,
@@ -369,71 +294,7 @@ export const occupancyService = {
       }
     }
 
-    return [
-      {
-        ma_phong: "A1_P101",
-        so_phong: "101",
-        so_tang: 1,
-        ma_toa: "A1",
-        ten_toa: "Tòa A1",
-        label: "P101 - Tầng 1 - Tòa A1 (4 chỗ trống)",
-        so_cho_trong: 4,
-      },
-      {
-        ma_phong: "A1_P102",
-        so_phong: "102",
-        so_tang: 1,
-        ma_toa: "A1",
-        ten_toa: "Tòa A1",
-        label: "P102 - Tầng 1 - Tòa A1 (1 chỗ trống)",
-        so_cho_trong: 1,
-      },
-      {
-        ma_phong: "A1_P103",
-        so_phong: "103",
-        so_tang: 1,
-        ma_toa: "A1",
-        ten_toa: "Tòa A1",
-        label: "P103 - Tầng 1 - Tòa A1 (2 chỗ trống)",
-        so_cho_trong: 2,
-      },
-      {
-        ma_phong: "A1_T1_P104",
-        so_phong: "104",
-        so_tang: 1,
-        ma_toa: "A1",
-        ten_toa: "Tòa A1",
-        label: "P104 - Tầng 1 - Tòa A1 (4 chỗ trống)",
-        so_cho_trong: 4,
-      },
-      {
-        ma_phong: "A1_T2_P201",
-        so_phong: "201",
-        so_tang: 2,
-        ma_toa: "A1",
-        ten_toa: "Tòa A1",
-        label: "P201 - Tầng 2 - Tòa A1 (4 chỗ trống)",
-        so_cho_trong: 4,
-      },
-      {
-        ma_phong: "A2_T1_P101",
-        so_phong: "101",
-        so_tang: 1,
-        ma_toa: "A2",
-        ten_toa: "Tòa A2",
-        label: "P101 - Tầng 1 - Tòa A2 (3 chỗ trống)",
-        so_cho_trong: 3,
-      },
-      {
-        ma_phong: "B1_T1_P101",
-        so_phong: "101",
-        so_tang: 1,
-        ma_toa: "B1",
-        ten_toa: "Tòa B1",
-        label: "P101 - Tầng 1 - Tòa B1 (2 chỗ trống)",
-        so_cho_trong: 2,
-      },
-    ];
+    return [];
   },
 
   /**
@@ -1476,12 +1337,6 @@ export const occupancyService = {
   registerRoom: async (registrationData) => {
     const newId = `DK-${Date.now().toString().slice(-4)}`;
 
-    // Xác định gợi ý phòng/giường chuẩn theo nguyện vọng phòng từ CSDL
-    const buildingKey =
-      registrationData.ma_toa ||
-      (registrationData.nguyen_vong_phong?.startsWith("B") ? "B1" : "A1");
-    const roomKey = registrationData.nguyen_vong_phong || "A1_P101";
-
     // Chuẩn bị nguyện vọng hiển thị
     const wishParts = [
       registrationData.loai_phong,
@@ -1491,21 +1346,24 @@ export const occupancyService = {
 
     const wishSummary =
       registrationData.nguyen_vong ||
-      (wishParts.length > 0 ? wishParts.join(" - ") : "Phòng tiêu chuẩn");
+      registrationData.nguyen_vong_label ||
+      (wishParts.length > 0 ? wishParts.join(" - ") : "");
+
+    const today = new Date();
+    const dateFormatted = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
+    const timeFormatted = `${String(today.getHours()).padStart(2, "0")}:${String(today.getMinutes()).padStart(2, "0")}`;
 
     // Chuẩn bị bản ghi đơn hoàn chỉnh
     const newRequest = {
       id: newId,
       ma_yeu_cau: newId,
-      msv: registrationData.msv || "B21DCCN001",
-      ho_ten: registrationData.ho_ten || "Sinh viên",
-      gioi_tinh: registrationData.gioi_tinh || "Nam",
+      msv: (registrationData.msv || "").trim().toUpperCase(),
+      ho_ten: (registrationData.ho_ten || "Sinh viên").trim(),
+      gioi_tinh: registrationData.gioi_tinh || "",
       ngay_sinh: registrationData.ngay_sinh || "",
       cccd: registrationData.cccd || "",
       so_dien_thoai: registrationData.so_dien_thoai || "",
-      email:
-        registrationData.email ||
-        `${(registrationData.msv || "sv").toLowerCase()}@ictu.edu.vn`,
+      email: registrationData.email || "",
       khoa: registrationData.khoa || "",
       lop: registrationData.lop || "",
       dia_chi: registrationData.dia_chi || "",
@@ -1520,58 +1378,69 @@ export const occupancyService = {
       nguyen_vong: wishSummary,
       nguyen_vong_label: wishSummary,
       nguyen_vong_phong: registrationData.nguyen_vong_phong || "",
-      ngay_gui: new Date().toISOString(),
-      trang_thai: "CHO_DUYET",
-      goi_y: {
-        ma_toa: buildingKey,
-        ma_phong: roomKey,
-        ma_giuong: "G01",
-      },
+      ma_toa_mong_muon: registrationData.ma_toa_mong_muon || "",
+      ngay_dang_ky: dateFormatted,
+      ngay_gui: `${dateFormatted} ${timeFormatted}`,
+      ngay_gui_time: `${dateFormatted} ${timeFormatted}`,
+      nam_hoc: "2026-2027",
+      trang_thai: "PENDING",
+      trang_thai_label: "Đang xét duyệt",
+      loai_don: "DANG_KY",
+      loai_yeu_cau: "Đăng ký phòng",
     };
 
-    // 1. Lưu ngay vào LocalStorage (Đưa lên đầu danh sách để Quản lý thấy ngay lập tức)
-    const currentList = getLocalRequests();
-    const updatedList = [
-      newRequest,
-      ...currentList.filter((r) => r.id !== newId && r.msv !== newRequest.msv),
-    ];
-    saveLocalRequests(updatedList);
-
-    const currentProfile = getLocalStudentProfile();
-    const profileUpdates = {
-      ...(newRequest.msv && { msv: newRequest.msv }),
-      ...(newRequest.ho_ten && { ho_ten: newRequest.ho_ten }),
-      ...(newRequest.gioi_tinh && { gioi_tinh: newRequest.gioi_tinh }),
-      ...(newRequest.ngay_sinh && { ngay_sinh: newRequest.ngay_sinh }),
-      ...(newRequest.so_dien_thoai && {
-        so_dien_thoai: newRequest.so_dien_thoai,
-      }),
-      ...(newRequest.email && { email: newRequest.email }),
-      ...(newRequest.khoa && { khoa: newRequest.khoa }),
-      ...(newRequest.lop && { lop: newRequest.lop }),
-      ...(newRequest.dia_chi && { que_quan: newRequest.dia_chi }),
-    };
-    saveLocalStudentProfile({ ...currentProfile, ...profileUpdates });
-    if (newRequest.ho_ten)
-      localStorage.setItem("ktx_fullname", newRequest.ho_ten);
-    if (newRequest.email) localStorage.setItem("ktx_email", newRequest.email);
-    window.dispatchEvent(new Event("student-profile-updated"));
-
-    // 2. Gửi lên backend API nếu backend đang online
+    // 1. Gửi lên backend API trước để kiểm tra tính hợp lệ
     try {
       const res = await api.post("/student/requests/register", {
         ...newRequest,
         xac_nhan: true,
       });
       if (res.data?.data) {
-        return res.data;
+        const savedReq = {
+          ...newRequest,
+          ...res.data.data,
+          ngay_dang_ky: res.data.data.ngay_dang_ky || dateFormatted,
+          nam_hoc: res.data.data.nam_hoc || "2026-2027",
+          trang_thai: res.data.data.trang_thai || "PENDING",
+          trang_thai_label: res.data.data.trang_thai_label || "Chờ duyệt",
+        };
+        const currentList = getLocalRequests();
+        const updatedList = [
+          savedReq,
+          ...currentList.filter(
+            (r) =>
+              r.id !== savedReq.id &&
+              r.ma_yeu_cau !== savedReq.ma_yeu_cau,
+          ),
+        ];
+        saveLocalRequests(updatedList);
+        return {
+          ...res.data,
+          data: savedReq,
+        };
       }
     } catch (err) {
+      if (err.response?.status === 400) {
+        throw new Error(err.response?.data?.detail || "Không có phòng phù hợp với nguyện vọng.");
+      }
+      if (err.response) {
+        throw new Error(err.response.data?.detail || "Không thể gửi đơn đăng ký phòng.");
+      }
       console.warn(
         "Backend POST /student/requests/register offline, using local response:",
         err,
       );
     }
+
+    // 2. Lưu vào LocalStorage khi chạy demo offline
+    const currentList = getLocalRequests();
+    const updatedList = [
+      newRequest,
+      ...currentList.filter(
+        (r) => r.id !== newId && r.ma_yeu_cau !== newId,
+      ),
+    ];
+    saveLocalRequests(updatedList);
 
     return {
       status: "success",
@@ -1655,34 +1524,40 @@ export const occupancyService = {
     // 1. Đưa đơn từ API vào trước
     apiRequests.forEach((req) => {
       const key = req.id || req.ma_yeu_cau || req.msv;
-      combinedMap.set(key, req);
+      combinedMap.set(key, {
+        loai_don: "DANG_KY",
+        loai_yeu_cau: "Đăng ký phòng",
+        ...req,
+      });
     });
 
     // 2. Đưa đơn đăng ký từ LocalStorage vào
     localRegistration.forEach((req) => {
       const key = req.id || req.ma_yeu_cau || req.msv;
-      combinedMap.set(key, {
-        loai_don: "DANG_KY",
-        loai_yeu_cau: "Đăng ký phòng",
-        ...(combinedMap.get(key) || {}),
-        ...req,
-      });
+      if (!combinedMap.has(key)) {
+        combinedMap.set(key, {
+          loai_don: "DANG_KY",
+          loai_yeu_cau: "Đăng ký phòng",
+          ...req,
+        });
+      }
     });
 
     // 3. Đưa đơn chuyển phòng và trả phòng từ LocalStorage vào
     localTransferCheckout.forEach((req) => {
       const key = req.id || req.ma_yeu_cau;
-      combinedMap.set(key, {
-        loai_don:
-          req.loai_don ||
-          (req.loai_yeu_cau === "Trả phòng" ? "TRA_PHONG" : "CHUYEN_PHONG"),
-        ...(combinedMap.get(key) || {}),
-        ...req,
-      });
+      if (!combinedMap.has(key)) {
+        combinedMap.set(key, {
+          loai_don:
+            req.loai_don ||
+            (req.loai_yeu_cau === "Trả phòng" ? "TRA_PHONG" : "CHUYEN_PHONG"),
+          ...req,
+        });
+      }
     });
 
     const results = Array.from(combinedMap.values());
-    return results.length > 0 ? results : DEFAULT_REQUESTS;
+    return results;
   },
 
   /**
@@ -1732,36 +1607,7 @@ export const occupancyService = {
       return foundReg;
     }
 
-    // 4. Fallback dữ liệu chuẩn theo thiết kế Figma
-    return {
-      id: cleanId,
-      ma_yeu_cau: cleanId.startsWith("#") ? cleanId : `#${cleanId}`,
-      msv: "DTC245180051",
-      ho_ten: "Nguyễn Quốc Huy",
-      gioi_tinh: "Nam",
-      khoa: "Công nghệ thông tin",
-      lop: "DTC-K20",
-      vi_tri_hien_tai: "Phòng A102 - Giường G01",
-      cong_no: "Đã hoàn thành toàn bộ phí",
-      ly_do:
-        "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học...",
-      mo_ta:
-        "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học...",
-      phong_mong_muon: "P203 - Tòa A - Tầng 2",
-      dia_chi_sau_tra: "Số 123 Đường Cầu Giấy, Quận Cầu Giấy, Hà Nội",
-      dia_chi_chi_tiet: {
-        tinh: "Hà Nội",
-        huyen: "Quận Cầu Giấy",
-        so_nha: "Số 123 Đường Cầu Giấy",
-      },
-      trang_thai: "CHO_DUYET",
-      trang_thai_label: "Chờ duyệt",
-      goi_y: {
-        ma_toa: "A",
-        ma_phong: "A203",
-        ma_giuong: "G04",
-      },
-    };
+    throw new Error("Kh?ng t?m th?y ??n y?u c?u");
   },
 
   /**
@@ -1780,147 +1626,103 @@ export const occupancyService = {
       );
     }
 
-    return [
-      {
-        ma_toa: "A1",
-        ten_toa: "Tòa A1",
-        gioi_tinh: "Nam & Nữ",
-        rooms: [
-          {
-            ma_phong: "A1_P101",
-            so_phong: "101",
-            label: "Phòng 101 (4 chỗ trống)",
-            beds: [
-              { ma_giuong: "A1_P101_G01", label: "Giường 01" },
-              { ma_giuong: "A1_P101_G02", label: "Giường 02" },
-              { ma_giuong: "A1_P101_G03", label: "Giường 03" },
-              { ma_giuong: "A1_P101_G04", label: "Giường 04" },
-            ],
-          },
-          {
-            ma_phong: "A1_P102",
-            so_phong: "102",
-            label: "Phòng 102 (1 chỗ trống)",
-            beds: [{ ma_giuong: "A1_P102_G04", label: "Giường 04" }],
-          },
-          {
-            ma_phong: "A1_P103",
-            so_phong: "103",
-            label: "Phòng 103 (2 chỗ trống)",
-            beds: [
-              { ma_giuong: "A1_P103_G01", label: "Giường 01" },
-              { ma_giuong: "A1_P103_G02", label: "Giường 02" },
-            ],
-          },
-          {
-            ma_phong: "A1_T1_P104",
-            so_phong: "104",
-            label: "Phòng 104 (4 chỗ trống)",
-            beds: [
-              { ma_giuong: "A1_T1_P104_G01", label: "Giường 01" },
-              { ma_giuong: "A1_T1_P104_G02", label: "Giường 02" },
-            ],
-          },
-          {
-            ma_phong: "A1_T2_P201",
-            so_phong: "201",
-            label: "Phòng 201 (4 chỗ trống)",
-            beds: [
-              { ma_giuong: "A1_T2_P201_G01", label: "Giường 01" },
-              { ma_giuong: "A1_T2_P201_G02", label: "Giường 02" },
-            ],
-          },
-        ],
-      },
-      {
-        ma_toa: "A2",
-        ten_toa: "Tòa A2",
-        gioi_tinh: "Nam & Nữ",
-        rooms: [
-          {
-            ma_phong: "A2_T1_P101",
-            so_phong: "101",
-            label: "Phòng 101 (3 chỗ trống)",
-            beds: [
-              { ma_giuong: "A2_T1_P101_G01", label: "Giường 01" },
-              { ma_giuong: "A2_T1_P101_G02", label: "Giường 02" },
-            ],
-          },
-        ],
-      },
-      {
-        ma_toa: "B1",
-        ten_toa: "Tòa B1",
-        gioi_tinh: "Nam & Nữ",
-        rooms: [
-          {
-            ma_phong: "B1_T1_P101",
-            so_phong: "101",
-            label: "Phòng 101 (2 chỗ trống)",
-            beds: [
-              { ma_giuong: "B1_T1_P101_G01", label: "Giường 01" },
-              { ma_giuong: "B1_T1_P101_G02", label: "Giường 02" },
-            ],
-          },
-        ],
-      },
-    ];
+    return [];
   },
 
   /**
    * Quản lý phê duyệt đơn đăng ký & xếp phòng
    */
   approveRequest: async (id, payload) => {
-    const yy = new Date().getFullYear().toString().slice(-2);
-    const toa = payload.ma_toa || "A";
-    const phong = (payload.phong_id || "A203")
-      .replace("Phòng ", "")
-      .replace("P", "");
-    const giuong = (payload.giuong_id || "G04").replace("Giường ", "");
-    const contractCode = `HD${yy}-${toa}${phong}-G${giuong}`;
-
-    // Cập nhật trạng thái trong LocalStorage
-    const all = getLocalRequests();
-    const updated = all.map((r) => {
-      if (r.id === id || r.ma_yeu_cau === id || r.msv === id) {
-        return {
-          ...r,
-          trang_thai: "DA_DUYET",
-          ma_hop_dong: contractCode,
-          xep_phong: {
-            ma_toa: toa,
-            ma_phong: payload.phong_id,
-            ma_giuong: payload.giuong_id,
-          },
-        };
-      }
-      return r;
-    });
-    saveLocalRequests(updated);
-
-    // Gửi lên backend
+    if (!payload.ma_toa || !payload.phong_id || !payload.giuong_id) {
+      throw new Error("Vui lòng chọn tòa, phòng và giường trước khi duyệt.");
+    }
+    let result;
+    let isOffline = false;
     try {
-      const res = await api.put(
+      result = await api.put(
         `/admin/occupancy/requests/${encodeURIComponent(id)}/approve`,
         payload,
       );
-      if (res.data) return res.data;
     } catch (err) {
+      if (err.response) {
+        throw new Error(err.response.data?.detail || "Không thể duyệt đơn đăng ký.");
+      }
+      isOffline = true;
       console.warn(
         "Backend PUT approve offline, using local updated response:",
         err,
       );
     }
 
-    return {
+    const yy = new Date().getFullYear().toString().slice(-2);
+    const responseData = result?.data?.data || {};
+    const toa = responseData.ma_toa || payload.ma_toa;
+    const roomNumber = responseData.so_phong || payload.so_phong || payload.phong_id;
+    const bedNumber = responseData.so_giuong || payload.so_giuong || payload.giuong_id;
+    const contractCode =
+      responseData.ma_hop_dong ||
+      `HD${yy}-${toa}${payload.phong_id}-G${payload.giuong_id}`;
+    const roomAssignment = {
+      ma_toa: toa,
+      toa_nha: responseData.toa_nha || payload.ten_toa || toa,
+      ma_phong: responseData.ma_phong || payload.phong_id,
+      so_phong: roomNumber,
+      loai_phong: responseData.loai_phong || payload.loai_phong || "",
+      ma_giuong: responseData.ma_giuong || payload.giuong_id,
+      so_giuong: bedNumber,
+    };
+
+    const all = getLocalRequests();
+    const cleanId = String(id).replace(/^#/, "").trim().toLowerCase();
+    const updated = all.map((request) => {
+      const requestIds = [request.id, request.ma_yeu_cau]
+        .filter(Boolean)
+        .map((value) => String(value).replace(/^#/, "").trim().toLowerCase());
+      if (!requestIds.includes(cleanId)) return request;
+
+      const newContract = {
+        id: contractCode,
+        ma_hop_dong: contractCode,
+        msv: request.msv,
+        ho_ten: request.ho_ten,
+        ...roomAssignment,
+        phong: roomNumber,
+        toa: roomAssignment.toa_nha,
+        tang: responseData.so_tang || payload.so_tang || "",
+        giuong: bedNumber,
+        thoi_gian_o: "2026-2027",
+        nam_hoc: "2026-2027",
+        trang_thai: "DANG_O",
+        trang_thai_label: "Đang ở",
+      };
+      const currentContracts = getLocalStayContracts();
+      saveLocalStayContracts([
+        newContract,
+        ...currentContracts.filter((contract) => contract.id !== contractCode),
+      ]);
+
+      return {
+        ...request,
+        ...roomAssignment,
+        trang_thai: "APPROVED",
+        trang_thai_label: "Đã duyệt",
+        ma_hop_dong: contractCode,
+        xep_phong: roomAssignment,
+      };
+    });
+    saveLocalRequests(updated);
+    window.dispatchEvent(new Event("occupancy-updated"));
+
+    return result?.data || {
       status: "success",
       message: "Phê duyệt và xếp phòng thành công",
       data: {
         ma_hop_dong: contractCode,
         request_id: id,
-        trang_thai: "DA_DUYET",
-        ...payload,
+        trang_thai: "APPROVED",
+        ...roomAssignment,
       },
+      offline: isOffline,
     };
   },
 
@@ -1928,35 +1730,41 @@ export const occupancyService = {
    * Quản lý từ chối đơn đăng ký
    */
   rejectRequest: async (id, payload) => {
-    // Cập nhật trạng thái trong LocalStorage
-    const all = getLocalRequests();
-    const updated = all.map((r) => {
-      if (r.id === id || r.ma_yeu_cau === id || r.msv === id) {
-        return {
-          ...r,
-          trang_thai: "TU_CHOI",
-          ly_do_tu_choi: payload.ly_do_tu_choi,
-        };
-      }
-      return r;
-    });
-    saveLocalRequests(updated);
-
-    // Gửi lên backend
+    let result;
+    let isOffline = false;
     try {
-      const res = await api.put(
+      result = await api.put(
         `/admin/occupancy/requests/${encodeURIComponent(id)}/reject`,
         payload,
       );
-      if (res.data) return res.data;
     } catch (err) {
+      if (err.response) {
+        throw new Error(err.response.data?.detail || "Không thể từ chối đơn đăng ký.");
+      }
+      isOffline = true;
       console.warn(
         "Backend PUT reject offline, using local updated response:",
         err,
       );
     }
 
-    return {
+    const cleanId = String(id).replace(/^#/, "").trim().toLowerCase();
+    const updated = getLocalRequests().map((request) => {
+      const requestIds = [request.id, request.ma_yeu_cau]
+        .filter(Boolean)
+        .map((value) => String(value).replace(/^#/, "").trim().toLowerCase());
+      if (!requestIds.includes(cleanId)) return request;
+      return {
+        ...request,
+        trang_thai: "TU_CHOI",
+        trang_thai_label: "Từ chối",
+        ly_do_tu_choi: payload.ly_do_tu_choi,
+      };
+    });
+    saveLocalRequests(updated);
+    window.dispatchEvent(new Event("occupancy-updated"));
+
+    return result?.data || {
       status: "success",
       message: "Đã từ chối đơn đăng ký thành công",
       data: {
@@ -1964,6 +1772,7 @@ export const occupancyService = {
         trang_thai: "TU_CHOI",
         ...payload,
       },
+      offline: isOffline,
     };
   },
 
@@ -2159,12 +1968,61 @@ export const occupancyService = {
     return getLocalTransferCheckoutRequests();
   },
 
-  getMyRequests: async () => {
-    return getLocalRequests();
+  getMyRequests: async (msv) => {
+    const local = getLocalRequests();
+    try {
+      const res = await api.get("/student/requests/my-requests", {
+        params: msv ? { msv } : {},
+      });
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        const combinedMap = new Map();
+        res.data.forEach((r) => combinedMap.set(r.id || r.ma_yeu_cau, r));
+        local.forEach((r) => {
+          const key = r.id || r.ma_yeu_cau;
+          if (!combinedMap.has(key)) combinedMap.set(key, r);
+        });
+        const merged = Array.from(combinedMap.values());
+        saveLocalRequests(merged);
+        return merged;
+      }
+    } catch (e) {
+      if (e.response) throw e;
+      console.warn("Backend GET /student/requests/my-requests offline, using local store:", e);
+    }
+    return local;
   },
 
-  getMyContracts: async () => {
-    return getLocalStayContracts();
+  getMyContracts: async (studentMsv) => {
+    const currentCode = (
+      studentMsv ||
+      localStorage.getItem("ktx_username") ||
+      localStorage.getItem("ktx_email")?.split("@")[0] ||
+      ""
+    ).trim().toUpperCase();
+
+    // 1. Thử gọi backend API nếu có mã sinh viên
+    if (currentCode) {
+      try {
+        const res = await api.get("/student/requests/my-contracts", {
+          params: { msv: currentCode },
+        });
+        if (Array.isArray(res.data)) {
+          return res.data;
+        }
+      } catch (err) {
+        if (err.response) throw err;
+        console.warn("Backend GET /student/requests/my-contracts offline:", err);
+      }
+    }
+
+    // 2. Fallback sang LocalStorage (chỉ lấy hợp đồng thuộc về mã sinh viên hiện tại)
+    const local = getLocalStayContracts();
+    if (!currentCode) return [];
+
+    return local.filter((c) => {
+      const cMsv = (c.msv || "").trim().toUpperCase();
+      return cMsv && cMsv === currentCode;
+    });
   },
 
   getCurrentRoomInfo: async () => {

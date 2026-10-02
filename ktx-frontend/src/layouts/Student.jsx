@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Home,
   FileEdit,
@@ -17,8 +17,21 @@ import {
   Menu,
 } from "lucide-react";
 import { askGeminiChatbot } from "../services/geminiService";
+import AppFooter from "../components/AppFooter";
 
 const STUDENT_AVATAR_STORAGE_KEY = "ktx_student_avatar";
+const STUDENT_ANNOUNCEMENTS_KEY = "ktx_announcements";
+
+const getAnnouncements = () => {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem(STUDENT_ANNOUNCEMENTS_KEY) || "[]",
+    );
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+};
 
 export default function StudentLayout({
   children,
@@ -35,7 +48,10 @@ export default function StudentLayout({
     localStorage.getItem("ktx_username") ||
     "Sinh viên";
   const [showChatbotModal, setShowChatbotModal] = useState(false);
+  const chatEndRef = useRef(null);
   const [showMobileNav, setShowMobileNav] = useState(false);
+  const [showAnnouncements, setShowAnnouncements] = useState(false);
+  const [announcements, setAnnouncements] = useState(getAnnouncements);
   const [avatarUrl, setAvatarUrl] = useState(
     () => localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY) || "",
   );
@@ -49,11 +65,15 @@ export default function StudentLayout({
   const [isChatbotResponding, setIsChatbotResponding] = useState(false);
 
   useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [chatMessages, isChatbotResponding]);
+
+  useEffect(() => {
     const syncAvatar = (event) => {
       setAvatarUrl(
         event.detail?.avatarUrl ||
-          localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY) ||
-          "",
+        localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY) ||
+        "",
       );
     };
     window.addEventListener("student-avatar-updated", syncAvatar);
@@ -61,6 +81,19 @@ export default function StudentLayout({
     return () => {
       window.removeEventListener("student-avatar-updated", syncAvatar);
       window.removeEventListener("storage", syncAvatar);
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncAnnouncements = () => setAnnouncements(getAnnouncements());
+    window.addEventListener("storage", syncAnnouncements);
+    window.addEventListener("ktx-announcements-updated", syncAnnouncements);
+    return () => {
+      window.removeEventListener("storage", syncAnnouncements);
+      window.removeEventListener(
+        "ktx-announcements-updated",
+        syncAnnouncements,
+      );
     };
   }, []);
 
@@ -90,6 +123,15 @@ export default function StudentLayout({
     try {
       const reply = await askGeminiChatbot(userText, conversationHistory);
       setChatMessages((prev) => [...prev, { sender: "bot", text: reply }]);
+    } catch (error) {
+      console.error("Lỗi chatbot sinh viên:", error);
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          sender: "bot",
+          text: "Mình chưa thể trả lời lúc này. Bạn thử lại sau ít phút nhé.",
+        },
+      ]);
     } finally {
       setIsChatbotResponding(false);
     }
@@ -185,7 +227,7 @@ export default function StudentLayout({
           )}
         </button>
 
-        {/* Logo KTX */}
+        {/* Logo iDORM */}
         <div
           onClick={() => handleTabClick("dashboard")}
           className="flex items-center gap-3 cursor-pointer select-none group shrink-0"
@@ -202,7 +244,7 @@ export default function StudentLayout({
           </div>
           <div className="flex flex-col">
             <span className="text-2xl font-black tracking-tight text-slate-900 leading-none">
-              KTX
+              <span className="text-blue-600">i</span>DORM
             </span>
             <span className="hidden sm:block text-[11px] font-medium text-slate-500 mt-1">
               Hệ thống ký túc xá
@@ -229,14 +271,57 @@ export default function StudentLayout({
         {/* Khối cá nhân & Thông báo bên phải */}
         <div className="flex items-center gap-3 sm:gap-5 shrink-0">
           {/* Nút chuông thông báo kèm chấm đỏ */}
-          <button
-            type="button"
-            className="relative p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-full transition cursor-pointer"
-            title="Thông báo"
-          >
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white"></span>
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowAnnouncements((open) => !open)}
+              className="relative p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-full transition cursor-pointer"
+              title="Thông báo"
+              aria-expanded={showAnnouncements}
+            >
+              <Bell className="w-5 h-5" />
+              {announcements.length > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white"></span>
+              )}
+            </button>
+            {showAnnouncements && (
+              <div className="absolute right-0 top-12 z-50 w-[min(90vw,22rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Thông báo KTX
+                  </h2>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {announcements.length ? (
+                    announcements.slice(0, 10).map((announcement) => (
+                      <article
+                        key={announcement.id}
+                        className="border-b border-slate-100 px-4 py-3 last:border-0"
+                      >
+                        <h3 className="text-sm font-semibold text-slate-800">
+                          {announcement.title}
+                        </h3>
+                        <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-600">
+                          {announcement.body}
+                        </p>
+                        <time className="mt-2 block text-[10px] text-slate-400">
+                          {announcement.createdAt
+                            ? new Date(announcement.createdAt).toLocaleString(
+                              "vi-VN",
+                            )
+                            : ""}
+                        </time>
+                      </article>
+                    ))
+                  ) : (
+                    <p className="px-4 py-6 text-center text-xs text-slate-500">
+                      Chưa có thông báo mới.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* User profile */}
           <div
@@ -272,7 +357,7 @@ export default function StudentLayout({
       </header>
 
       {/* 2. Phần thân gồm Sidebar bên trái và Content bên phải */}
-      <div className="relative flex-1 flex gap-5 p-3 sm:p-5 max-w-[1600px] w-full mx-auto box-border min-w-0">
+      <div className="relative flex-1 flex items-stretch gap-5 p-3 sm:p-5 max-w-[1600px] w-full mx-auto box-border min-w-0">
         {showMobileNav && (
           <button
             type="button"
@@ -284,11 +369,10 @@ export default function StudentLayout({
 
         {/* Sidebar Sinh Viên */}
         <aside
-          className={`${
-            showMobileNav
-              ? "fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] overflow-y-auto shadow-xl"
-              : "hidden"
-          } lg:static lg:z-auto lg:flex lg:w-64 lg:max-w-none lg:overflow-visible bg-white rounded-2xl border border-slate-200/80 p-4 shrink-0 flex-col justify-between shadow-sm select-none`}
+          className={`${showMobileNav
+            ? "fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] overflow-y-auto shadow-xl"
+            : "hidden"
+            } lg:static lg:z-auto lg:flex lg:w-64 lg:max-w-none lg:overflow-visible bg-white rounded-2xl border border-slate-200/80 p-4 shrink-0 self-stretch flex-col justify-between shadow-sm select-none`}
         >
           <div className="flex justify-end lg:hidden">
             <button
@@ -306,11 +390,10 @@ export default function StudentLayout({
               <button
                 type="button"
                 onClick={() => handleTabClick("dashboard")}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
-                  activeTab === "dashboard"
-                    ? "bg-blue-50 text-blue-600 font-semibold"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                }`}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${activeTab === "dashboard"
+                  ? "bg-blue-50 text-blue-600 font-semibold"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  }`}
               >
                 <Home className="w-4 h-4 shrink-0 text-slate-500" />
                 <span>Trang chủ</span>
@@ -333,16 +416,14 @@ export default function StudentLayout({
                         key={item.id}
                         type="button"
                         onClick={() => handleTabClick(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${
-                          isActive
-                            ? "bg-[#e0f2fe] text-[#0284c7] font-bold shadow-sm"
-                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
-                        }`}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
+                          ? "bg-[#e0f2fe] text-[#0284c7] font-bold shadow-sm"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
+                          }`}
                       >
                         <Icon
-                          className={`w-4 h-4 shrink-0 ${
-                            isActive ? "text-[#0284c7]" : "text-slate-400"
-                          }`}
+                          className={`w-4 h-4 shrink-0 ${isActive ? "text-[#0284c7]" : "text-slate-400"
+                            }`}
                         />
                         <span>{item.label}</span>
                       </button>
@@ -367,11 +448,10 @@ export default function StudentLayout({
                         key={item.id}
                         type="button"
                         onClick={() => handleTabClick(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${
-                          isActive
-                            ? "bg-[#e0f2fe] text-[#0284c7] font-bold"
-                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
-                        }`}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
+                          ? "bg-[#e0f2fe] text-[#0284c7] font-bold"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
+                          }`}
                       >
                         <Icon className="w-4 h-4 shrink-0 text-slate-400" />
                         <span>{item.label}</span>
@@ -397,11 +477,10 @@ export default function StudentLayout({
                         key={item.id}
                         type="button"
                         onClick={() => handleTabClick(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${
-                          isActive
-                            ? "bg-[#e0f2fe] text-[#0284c7] font-bold"
-                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
-                        }`}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
+                          ? "bg-[#e0f2fe] text-[#0284c7] font-bold"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
+                          }`}
                       >
                         <Icon className="w-4 h-4 shrink-0 text-slate-400" />
                         <span>{item.label}</span>
@@ -427,11 +506,10 @@ export default function StudentLayout({
                         key={item.id}
                         type="button"
                         onClick={() => handleTabClick(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${
-                          isActive
-                            ? "bg-[#e0f2fe] text-[#0284c7] font-bold"
-                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
-                        }`}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
+                          ? "bg-[#e0f2fe] text-[#0284c7] font-bold"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
+                          }`}
                       >
                         <Icon className="w-4 h-4 shrink-0 text-slate-400" />
                         <span>{item.label}</span>
@@ -461,8 +539,10 @@ export default function StudentLayout({
         </aside>
 
         {/* Khung nội dung chính */}
-        <main className="flex-1 min-w-0 flex flex-col">{children}</main>
+        <main className="flex-1 self-stretch min-w-0 flex flex-col">{children}</main>
       </div>
+
+      <AppFooter onAction={handleTabClick} />
 
       {/* 3. Nút nổi Chatbot AI ở góc dưới bên phải theo đúng thiết kế Ảnh 2 */}
       <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-8 z-40">
@@ -496,10 +576,10 @@ export default function StudentLayout({
                 </div>
                 <div>
                   <h4 className="text-sm font-bold leading-tight">
-                    Trợ lý AI KTX
+                    Trợ lý AI iDORM
                   </h4>
                   <p className="text-[11px] text-blue-100">
-                    Luôn sẵn sàng hỗ trợ 24/7
+                    Tư vấn quy định, giờ giới nghiêm & nếp sống nội trú
                   </p>
                 </div>
               </div>
@@ -513,23 +593,42 @@ export default function StudentLayout({
             </div>
 
             {/* Chat Messages Body */}
-            <div className="p-4 space-y-3 max-h-80 overflow-y-auto bg-slate-50 text-xs">
+            <div
+              className="p-4 space-y-3 max-h-80 overflow-y-auto bg-slate-50 text-xs scroll-smooth"
+              aria-live="polite"
+            >
               {chatMessages.map((msg, idx) => (
                 <div
                   key={idx}
                   className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl leading-relaxed ${
-                      msg.sender === "user"
-                        ? "bg-blue-600 text-white rounded-br-sm"
-                        : "bg-white text-slate-800 border border-slate-200/80 shadow-sm rounded-bl-sm"
-                    }`}
+                    className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl leading-relaxed ${msg.sender === "user"
+                      ? "bg-blue-600 text-white rounded-br-sm"
+                      : "bg-white text-slate-800 border border-slate-200/80 shadow-sm rounded-bl-sm"
+                      }`}
                   >
                     {msg.text}
                   </div>
                 </div>
               ))}
+              {isChatbotResponding && (
+                <div
+                  className="flex justify-start"
+                  role="status"
+                  aria-label="AI đang trả lời"
+                >
+                  <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-sm border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.2s]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.1s]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce" />
+                    <span className="ml-1 text-slate-500">
+                      AI đang trả lời...
+                    </span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
             </div>
 
             {/* Input Form */}

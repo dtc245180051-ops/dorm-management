@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import StudentLayout from "../../layouts/Student";
+import FeatureLockedNotice from "../../components/FeatureLockedNotice";
+import { resolveStudentStatus, STUDENT_STATUS } from "../../services/studentStatusService";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -280,6 +282,7 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
   );
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [studentStatus, setStudentStatus] = useState(STUDENT_STATUS.NOT_REGISTERED);
 
   const studentName =
     localStorage.getItem("ktx_fullname") ||
@@ -304,6 +307,12 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
       window.removeEventListener("ktx-payment-updated", syncPaymentStatus);
     };
   }, []);
+
+  useEffect(() => {
+    resolveStudentStatus(studentId).then((res) => {
+      setStudentStatus(res.status);
+    });
+  }, [studentId]);
 
   const rows = invoiceRows.map((invoice, index) =>
     index === 0 && paymentStatus === "pending"
@@ -332,18 +341,32 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
     >
       <div className="flex-1 space-y-6">
         <header className="flex items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
-            <CheckCircle2 className="h-7 w-7" strokeWidth={2.2} />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600">
+            <CheckCircle2 className="h-5 w-5" strokeWidth={2.2} />
           </div>
-          <h1 className="text-2xl font-bold text-[#0f3b79] sm:text-3xl">
-            Lịch sử thanh toán
-          </h1>
+          <div>
+            <h1 className="text-xl font-bold text-slate-800">
+              Lịch sử thanh toán
+            </h1>
+            <p className="text-sm text-slate-500">
+              Theo dõi các khoản phí và giao dịch thanh toán KTX.
+            </p>
+          </div>
         </header>
 
-        <section
-          aria-label="Thống kê thanh toán"
-          className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5"
-        >
+        {studentStatus !== STUDENT_STATUS.ACTIVE_RESIDENT ? (
+          <FeatureLockedNotice
+            featureName="Lịch sử thanh toán"
+            status={studentStatus}
+            onNavigate={onNavigate}
+            onSelectTab={onSelectTab}
+          />
+        ) : (
+          <>
+            <section
+              aria-label="Thống kê thanh toán"
+              className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5"
+            >
           <StatCard
             icon={CheckCircle2}
             label="Đã thanh toán (2026)"
@@ -473,6 +496,8 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
             </button>
           </div>
         </section>
+          </>
+        )}
       </div>
 
       {selectedInvoice && (

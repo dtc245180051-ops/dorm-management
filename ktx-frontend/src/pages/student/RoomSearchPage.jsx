@@ -171,24 +171,29 @@ export default function RoomSearchPage({
       userRole="Sinh viên"
     >
       {/* Khung nội dung chính bo góc mềm mại */}
-      <div className="flex-1 flex flex-col justify-between">
-        <div className="space-y-6">
+      <div className="flex flex-1 flex-col justify-between self-stretch">
+      <div className="space-y-6">
           {/* ========================================================================= */}
           {/* 1. TIÊU ĐỀ TRANG: ICON Ô VUÔNG CÂY BÚT + CHỮ TRA CỨU PHÒNG               */}
           {/* ========================================================================= */}
           <div className="flex items-center gap-3 select-none">
-            <div className="text-blue-600">
-              <SquarePen className="w-8 h-8 stroke-[2.2]" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-600">
+              <SquarePen className="h-5 w-5" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0f3b79] tracking-tight">
-              Tra cứu phòng
-            </h1>
+            <div>
+              <h1 className="text-xl font-bold text-slate-800">
+                Tra cứu phòng
+              </h1>
+              <p className="text-sm text-slate-500">
+                Tìm phòng trống theo tòa nhà, tầng và loại phòng.
+              </p>
+            </div>
           </div>
 
           {/* ========================================================================= */}
           {/* 2. THANH BỘ LỌC TÌM KIẾM PHÒNG (TOP FILTER CARD)                          */}
           {/* ========================================================================= */}
-          <div className="bg-[#edf5fe] border border-blue-100/70 rounded-3xl p-5 sm:p-6 shadow-2xs">
+          <div className="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
               {/* Dropdown 1: Tòa nhà */}
               <div>

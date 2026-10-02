@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import StudentLayout from "../../layouts/Student";
+import FeatureLockedNotice from "../../components/FeatureLockedNotice";
+import { resolveStudentStatus, STUDENT_STATUS } from "../../services/studentStatusService";
 import {
   CreditCard,
   Home,
@@ -41,6 +43,7 @@ const formatText = (str) =>
 
 export default function PaymentPage({ onSelectTab, onNavigate }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [studentStatus, setStudentStatus] = useState(STUDENT_STATUS.NOT_REGISTERED);
   const [paymentStatus, setPaymentStatus] = useState(() =>
     localStorage.getItem(PAYMENT_STATUS_STORAGE_KEY) === "pending"
       ? "pending"
@@ -137,6 +140,12 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
     }
   }, [toastMessage]);
 
+  useEffect(() => {
+    resolveStudentStatus(maSV).then((res) => {
+      setStudentStatus(res.status);
+    });
+  }, [maSV]);
+
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
   const formattedTime = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
@@ -188,17 +197,26 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
           {/* 1. HEADER TRANG: Icon thẻ ngân hàng CreditCard xanh cyan + Tiêu đề        */}
           {/* ========================================================================= */}
           <div className="flex items-center gap-3 select-none">
-            <div className="w-10 h-10 rounded-2xl bg-cyan-50 border border-cyan-200 flex items-center justify-center text-cyan-500 shadow-sm">
-              <CreditCard className="w-6 h-6 stroke-[2.2]" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cyan-200 bg-cyan-50 text-cyan-600">
+              <CreditCard className="h-5 w-5" />
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-xl font-bold text-slate-800">
               Thanh toán phí KTX
             </h1>
           </div>
 
-          {/* ========================================================================= */}
-          {/* 2. 3 CARD TÓM TẮT TRÊN CÙNG (Grid 3 cột)                                  */}
-          {/* ========================================================================= */}
+          {studentStatus !== STUDENT_STATUS.ACTIVE_RESIDENT ? (
+            <FeatureLockedNotice
+              featureName="Thanh toán phí KTX"
+              status={studentStatus}
+              onNavigate={onNavigate}
+              onSelectTab={onSelectTab}
+            />
+          ) : (
+            <>
+              {/* ========================================================================= */}
+              {/* 2. 3 CARD TÓM TẮT TRÊN CÙNG (Grid 3 cột)                                  */}
+              {/* ========================================================================= */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* Card 1: Phòng hiện tại */}
             <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm flex items-center gap-4 transition hover:shadow-sm">
@@ -349,6 +367,8 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
               </div>
             )}
           </div>
+        </>
+      )}
         </div>
       </div>
 

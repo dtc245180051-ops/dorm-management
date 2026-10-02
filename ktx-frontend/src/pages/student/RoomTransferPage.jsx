@@ -12,13 +12,17 @@ import {
 import StudentLayout from "../../layouts/Student";
 import occupancyService from "../../services/occupancyService";
 import { VIETNAM_PROVINCES } from "../../data/vietnamAddressData";
+import FeatureLockedNotice from "../../components/FeatureLockedNotice";
+import { resolveStudentStatus, STUDENT_STATUS } from "../../services/studentStatusService";
 
-export default function RoomTransferPage({ onSelectTab }) {
+export default function RoomTransferPage({ onSelectTab, onNavigate }) {
   // 1. Quản lý tab: 'transfer' (Chuyển phòng) hoặc 'checkout' (Trả phòng)
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("tab") === "checkout" ? "checkout" : "transfer";
   });
+  const [hasActiveStay, setHasActiveStay] = useState(true);
+  const [studentStatus, setStudentStatus] = useState(STUDENT_STATUS.NOT_REGISTERED);
 
   useEffect(() => {
     const checkTabParam = () => {
@@ -130,40 +134,50 @@ export default function RoomTransferPage({ onSelectTab }) {
   const loadData = async () => {
     setIsLoadingHistory(true);
     try {
-      const [roomData, historyData, availableOpts] = await Promise.all([
+      const studentMsv =
+        localStorage.getItem("ktx_username") ||
+        localStorage.getItem("ktx_email")?.split("@")[0] ||
+        "";
+
+      const [roomData, historyData, availableOpts, statusRes] = await Promise.all([
         occupancyService.getCurrentRoomInfo?.(),
         occupancyService.getTransferCheckoutRequests?.(),
         occupancyService.getAvailableOptions?.(),
+        resolveStudentStatus(studentMsv),
       ]);
 
-      if (roomData) {
-        setCurrentRoomInfo((prev) => ({ ...prev, ...roomData }));
+      const isResident = statusRes.status === STUDENT_STATUS.ACTIVE_RESIDENT;
+      setStudentStatus(statusRes.status);
+      setHasActiveStay(isResident);
+
+      if (isResident) {
+        const assignedRoom = statusRes.activeRoom || roomData;
+        if (assignedRoom) {
+          const roomLabel = assignedRoom.phong || assignedRoom.so_phong || assignedRoom.ma_phong || "";
+          setCurrentRoomInfo({
+            ...assignedRoom,
+            phong_hien_tai: [roomLabel, assignedRoom.toa || assignedRoom.ten_toa || assignedRoom.ma_toa]
+              .filter(Boolean)
+              .join(" - "),
+            so_phong: roomLabel,
+          });
+        }
+      } else {
+        setCurrentRoomInfo({
+          phong_hien_tai: "Chưa có phòng nội trú",
+          thanh_vien: "—",
+          thoi_gian_luu_tru: "Chưa ở",
+          so_phong: "",
+        });
       }
 
       if (historyData && Array.isArray(historyData) && historyData.length > 0) {
-        setHistoryList(historyData);
+        const myRequests = historyData.filter(
+          (req) => !studentMsv || !req.msv || req.msv === studentMsv,
+        );
+        setHistoryList(isResident ? myRequests : []);
       } else {
-        // Mockup chuẩn theo Figma
-        setHistoryList([
-          {
-            id: "YC-0231",
-            ma_yeu_cau: "#YC-0231",
-            loai_yeu_cau: "Chuyển phòng",
-            ngay_gui: "25/11/2025",
-            phong_lien_quan: "P12 → P36",
-            trang_thai: "DA_DUYET",
-            trang_thai_label: "Đã duyệt",
-          },
-          {
-            id: "YC-0232",
-            ma_yeu_cau: "#YC-0232",
-            loai_yeu_cau: "Trả phòng",
-            ngay_gui: "25/08/2026",
-            phong_lien_quan: "P36",
-            trang_thai: "CHO_DUYET",
-            trang_thai_label: "Chờ duyệt",
-          },
-        ]);
+        setHistoryList([]);
       }
 
       if (
@@ -218,6 +232,14 @@ export default function RoomTransferPage({ onSelectTab }) {
   // Submit Yêu cầu chuyển phòng
   const handleSubmitTransfer = async (e) => {
     e.preventDefault();
+    if (!hasActiveStay) {
+      setFeedbackMessage({
+        type: "error",
+        text: "Bạn chưa có phòng nội trú tại KTX nên chưa thể gửi yêu cầu chuyển phòng. Vui lòng đăng ký ở trước!",
+      });
+      return;
+    }
+
     if (!transferForm.ly_do) {
       setFeedbackMessage({
         type: "error",
@@ -296,6 +318,14 @@ export default function RoomTransferPage({ onSelectTab }) {
   // Submit Yêu cầu trả phòng
   const handleSubmitCheckout = async (e) => {
     e.preventDefault();
+    if (!hasActiveStay) {
+      setFeedbackMessage({
+        type: "error",
+        text: "Bạn chưa có phòng nội trú tại KTX nên chưa thể gửi yêu cầu trả phòng. Vui lòng đăng ký ở trước!",
+      });
+      return;
+    }
+
     if (!checkoutForm.ly_do) {
       setFeedbackMessage({
         type: "error",
@@ -380,20 +410,36 @@ export default function RoomTransferPage({ onSelectTab }) {
       onSelectTab={onSelectTab}
       userRole="Sinh viên"
     >
-      <div className="flex flex-col gap-6 max-w-full">
+      <div className="flex flex-1 flex-col gap-6 self-stretch max-w-full">
         {/* ========================================================================= */}
         {/* TIÊU ĐỀ TRANG: CHUYỂN / TRẢ PHÒNG                                       */}
         {/* ========================================================================= */}
         <div className="flex items-center gap-3 select-none">
-          <ArrowLeftRight className="w-8 h-8 text-[#0c4a6e] stroke-[2.5]" />
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0c4a6e] tracking-tight">
-            Chuyển / trả phòng
-          </h1>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-600">
+            <ArrowLeftRight className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-800">
+              Chuyển / trả phòng
+            </h1>
+            <p className="text-sm text-slate-500">
+              Gửi và theo dõi yêu cầu thay đổi chỗ lưu trú.
+            </p>
+          </div>
         </div>
 
-        {/* ========================================================================= */}
-        {/* 1. KHUNG HIỂN THỊ THÔNG TIN PHÒNG HIỆN TẠI (BANNER XANH TRÊN CÙNG)       */}
-        {/* ========================================================================= */}
+        {studentStatus !== STUDENT_STATUS.ACTIVE_RESIDENT ? (
+          <FeatureLockedNotice
+            featureName="Chuyển / trả phòng"
+            status={studentStatus}
+            onNavigate={onNavigate}
+            onSelectTab={onSelectTab}
+          />
+        ) : (
+          <>
+            {/* ========================================================================= */}
+            {/* 1. KHUNG HIỂN THỊ THÔNG TIN PHÒNG HIỆN TẠI (BANNER XANH TRÊN CÙNG)       */}
+            {/* ========================================================================= */}
         <div className="rounded-2xl bg-gradient-to-r from-sky-400 to-blue-500 text-white p-5 sm:p-6 shadow-sm select-none">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-4 items-center">
             {/* Cột 1: Phòng hiện tại */}
@@ -429,9 +475,44 @@ export default function RoomTransferPage({ onSelectTab }) {
         </div>
 
         {/* ========================================================================= */}
+        {/* THÔNG BÁO NẾU CHƯA CÓ PHÒNG NỘI TRÚ                                     */}
+        {/* ========================================================================= */}
+        {!hasActiveStay && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 select-none shadow-xs">
+            <div className="flex items-start gap-3.5">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  Chưa thể sử dụng tính năng chuyển / trả phòng
+                </h4>
+                <p className="text-xs text-slate-600 mt-1">
+                  Hiện tại bạn chưa lưu trú tại phòng nào trong Ký túc xá. Vui lòng đăng ký ở trước để sử dụng tính năng này!
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (onNavigate) {
+                  onNavigate("/student/register");
+                } else if (onSelectTab) {
+                  onSelectTab("register");
+                } else {
+                  window.history.pushState({}, "", "/student/register");
+                  window.dispatchEvent(new PopStateEvent("popstate"));
+                }
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition shrink-0 cursor-pointer shadow-sm"
+            >
+              Đăng ký phòng ngay
+            </button>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
         {/* 2. KHU VỰC FORM ĐĂNG KÝ & CARD LƯU Ý QUAN TRỌNG                           */}
         {/* ========================================================================= */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs">
+        <div className="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm sm:p-8">
           {/* Tab Switcher: Chuyển đổi giữa Chuyển phòng & Trả phòng */}
           <div className="bg-slate-100 p-1 rounded-2xl inline-flex mb-6 select-none border border-slate-200/40">
             <button
@@ -948,6 +1029,8 @@ export default function RoomTransferPage({ onSelectTab }) {
             </table>
           </div>
         </div>
+          </>
+        )}
       </div>
     </StudentLayout>
   );

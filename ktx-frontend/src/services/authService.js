@@ -1,4 +1,5 @@
-export const API_BASE_URL = "http://localhost:8000/api/v1";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 /**
  * Service gọi API xác thực (Authentication) cho KTX ICTU
@@ -34,6 +35,9 @@ export const authService = {
         localStorage.setItem("ktx_token", data.access_token);
         localStorage.setItem("ktx_user_role", data.role);
         localStorage.setItem("ktx_username", data.username);
+        if (data.full_name) {
+          localStorage.setItem("ktx_fullname", data.full_name);
+        }
         const email = identifier.trim();
         if (/^[^\s@]+@ictu\.edu\.vn$/i.test(email)) {
           localStorage.setItem("ktx_email", email);
@@ -61,8 +65,10 @@ export const authService = {
       const emailVal = (email || emailOrPhone || "").trim();
       const isEmail = emailVal.includes("@");
 
-      // Giữ username do người đăng ký chọn; tương thích với các lời gọi cũ bằng cách suy ra từ email.
-      const usernameVal = (username || (isEmail ? emailVal.split("@")[0] : emailVal)).trim();
+      // Giữ username người dùng chọn; fallback để tương thích với lời gọi cũ.
+      const usernameVal = (
+        username || (isEmail ? emailVal.split("@")[0] : emailVal)
+      ).trim();
 
       const payload = {
         username: usernameVal,

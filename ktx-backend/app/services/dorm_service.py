@@ -453,7 +453,23 @@ def get_available_beds(
     )
 
     if gender:
-        query = query.filter(Phong.loai_phong.ilike(f"%{gender}%"))
+        raw_g = gender.strip().lower()
+        if "nữ" in raw_g or "nu" in raw_g or "female" in raw_g:
+            # Phòng/Tòa dành cho Nữ hoặc Nam & Nữ
+            query = query.filter(
+                (ToaNha.gioi_tinh.ilike("%nữ%"))
+                | (ToaNha.gioi_tinh.ilike("%nu%"))
+                | (ToaNha.gioi_tinh.ilike("%nam &%"))
+                | (ToaNha.gioi_tinh.ilike("%cả hai%"))
+                | (ToaNha.gioi_tinh.is_(None))
+            )
+        elif "nam" in raw_g or "male" in raw_g:
+            # Phòng/Tòa dành cho Nam hoặc Nam & Nữ
+            query = query.filter(
+                (ToaNha.gioi_tinh.ilike("%nam%"))
+                | (ToaNha.gioi_tinh.ilike("%cả hai%"))
+                | (ToaNha.gioi_tinh.is_(None))
+            )
     if building_id:
         query = query.filter(Tang.ma_toa == building_id)
 
@@ -463,6 +479,12 @@ def get_available_beds(
     for room in rooms:
         empty_beds = [bed for bed in room.giuongs if bed.trang_thai == "TRONG"]
         if empty_beds:
+            b_gender = room.tang.toa_nha.gioi_tinh if (room.tang and room.tang.toa_nha) else "Nam & Nữ"
+            if b_gender and b_gender.lower() in ["nu", "nữ"]:
+                b_gender = "Nữ"
+            elif b_gender and b_gender.lower() == "nam":
+                b_gender = "Nam"
+
             results.append(
                 RoomAvailableResponse(
                     ma_phong=room.ma_phong,
@@ -475,6 +497,7 @@ def get_available_beds(
                     so_tang=room.tang.so_tang if room.tang else None,
                     ma_toa=room.tang.ma_toa if room.tang else None,
                     ten_toa=room.tang.toa_nha.ten_toa if (room.tang and room.tang.toa_nha) else None,
+                    gioi_tinh=b_gender,
                     so_giuong_trong=len(empty_beds),
                     danh_sach_giuong_trong=empty_beds,
                 )

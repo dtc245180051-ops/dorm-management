@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.user import TaiKhoan, SinhVien
-from app.services import dorm_service
+from app.models.contract import HopDong
+from app.services import dorm_service, occupancy_request_store
 
 router = APIRouter(prefix="/student/requests", tags=["Yêu cầu Lưu trú Sinh viên"])
 
@@ -15,6 +16,9 @@ router = APIRouter(prefix="/student/requests", tags=["Yêu cầu Lưu trú Sinh 
 class AvailableOptionResponse(BaseModel):
     ma_phong: str
     so_phong: str
+    loai_phong: Optional[str] = None
+    ma_toa_mong_muon: Optional[str] = None
+    gioi_tinh: Optional[str] = None
     ma_tang: Optional[str] = None
     so_tang: Optional[int] = None
     ma_toa: Optional[str] = None
@@ -49,6 +53,8 @@ class RegisterRoomRequest(BaseModel):
     nguyen_vong_phong: Optional[str] = None
     noi_dung_nguyen_vong: Optional[str] = None
     nguyen_vong: Optional[str] = None
+    nguyen_vong_label: Optional[str] = None
+    ma_toa_mong_muon: Optional[str] = None
     xac_nhan: bool = True
 
 
@@ -86,9 +92,12 @@ def get_price_options(db: Session = Depends(get_db)):
     response_model=List[AvailableOptionResponse],
     summary="Lấy danh sách các lựa chọn phòng/chỗ trống cho sinh viên đăng ký",
 )
-def get_available_options(db: Session = Depends(get_db)):
+def get_available_options(
+    gender: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
     """Trả về danh sách phòng còn giường trống để hiển thị trên dropdown form đăng ký."""
-    available_rooms = dorm_service.get_available_beds(db)
+    available_rooms = dorm_service.get_available_beds(db, gender=gender)
     options: List[AvailableOptionResponse] = []
 
     for room in available_rooms:
@@ -107,6 +116,8 @@ def get_available_options(db: Session = Depends(get_db)):
             AvailableOptionResponse(
                 ma_phong=room.ma_phong,
                 so_phong=room.so_phong,
+                loai_phong=room.loai_phong,
+                gioi_tinh=room.gioi_tinh,
                 ma_tang=room.ma_tang,
                 so_tang=room.so_tang,
                 ma_toa=room.ma_toa,
@@ -117,38 +128,18 @@ def get_available_options(db: Session = Depends(get_db)):
         )
 
     # Đảm bảo luôn có ít nhất một số lựa chọn mẫu chuẩn như Figma nếu database chưa có đủ dữ liệu
-    if not options:
-        options = [
-            AvailableOptionResponse(
-                ma_phong="P36",
-                so_phong="36",
-                so_tang=3,
-                ma_toa="A2",
-                ten_toa="Tòa A2",
-                label="P36 - Tầng 3 - Tòa A2",
-                so_cho_trong=2,
-            ),
-            AvailableOptionResponse(
-                ma_phong="P101",
-                so_phong="101",
-                so_tang=1,
-                ma_toa="A1",
-                ten_toa="Tòa A1",
-                label="P101 - Tầng 1 - Tòa A1",
-                so_cho_trong=3,
-            ),
-            AvailableOptionResponse(
-                ma_phong="P205",
-                so_phong="205",
-                so_tang=2,
-                ma_toa="A2",
-                ten_toa="Tòa A2",
-                label="P205 - Tầng 2 - Tòa A2",
-                so_cho_trong=1,
-            ),
-        ]
-
     return options
+
+
+def normalize_room_type(rtype: Optional[str]) -> str:
+    if not rtype:
+        return ""
+    r = rtype.strip().lower()
+    if "dịch vụ" in r or "dich vu" in r or "service" in r:
+        return "dich_vu"
+    if "tiêu chuẩn" in r or "tieu chuan" in r or "standard" in r:
+        return "tieu_chuan"
+    return r
 
 
 @router.post(
@@ -162,6 +153,7 @@ def register_room(
 ):
     """
     Tiếp nhận đơn đăng ký chỗ ở từ sinh viên:
+    - Kiểm tra có phòng phù hợp với giới tính và nguyện vọng không.
     - Cập nhật thông tin liên hệ khẩn cấp và địa chỉ sinh viên vào CSDL nếu đã có hồ sơ.
     - Tạo mã yêu cầu và trả về kết quả thành công.
     """
@@ -171,8 +163,35 @@ def register_room(
             detail="Bạn cần xác nhận thông tin đăng ký là chính xác.",
         )
 
+    clean_msv = req.msv.strip().upper()
+    existing_request = next(
+        (
+            request
+            for request in occupancy_request_store.get_registration_requests()
+            if request.get("msv", "").strip().upper() == clean_msv
+            and request.get("trang_thai") in ("PENDING", "CHO_DUYET")
+        ),
+        None,
+    )
+    if existing_request:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bạn đã có đơn đăng ký phòng đang chờ xét duyệt.",
+        )
+
+    active_contract = (
+        db.query(HopDong)
+        .filter(HopDong.msv == clean_msv, HopDong.trang_thai == "ACTIVE")
+        .first()
+    )
+    if active_contract:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bạn đang có hợp đồng lưu trú đang hiệu lực.",
+        )
+
     # Cập nhật thông tin sinh viên nếu tìm thấy trong CSDL
-    student = db.query(SinhVien).filter(SinhVien.msv == req.msv).first()
+    student = db.query(SinhVien).filter(SinhVien.msv == clean_msv).first()
     if student:
         if req.nguoi_giam_ho:
             student.nguoi_giam_ho = req.nguoi_giam_ho
@@ -188,9 +207,9 @@ def register_room(
 
     request_id = f"DK-{uuid.uuid4().hex[:6].upper()}"
 
-    # Lưu vào store trung tâm để Quản lý tiếp nhận ngay lập tức
-    from app.services import occupancy_request_store
+    # Lưu vào store trung tâm để Quản lý tiếp nhận ngay lập tức kèm gợi ý phù hợp
     req_dict = req.model_dump()
+    req_dict["msv"] = clean_msv
     req_dict["id"] = request_id
     req_dict["ma_yeu_cau"] = request_id
     stored_request = occupancy_request_store.add_request(req_dict)
@@ -200,6 +219,20 @@ def register_room(
         "message": "Gửi yêu cầu đăng ký phòng thành công",
         "data": stored_request,
     }
+
+
+@router.get(
+    "/my-requests",
+    summary="Lấy danh sách các đơn đăng ký của sinh viên",
+)
+def get_my_registration_requests(msv: Optional[str] = None):
+    """Trả về danh sách các đơn đăng ký chỗ ở của sinh viên."""
+    from app.services import occupancy_request_store
+    requests = occupancy_request_store.get_registration_requests()
+    if msv:
+        clean_msv = msv.strip().upper()
+        return [r for r in requests if r.get("msv", "").strip().upper() == clean_msv]
+    return requests
 
 
 class TransferRoomRequest(BaseModel):
@@ -268,4 +301,56 @@ def get_transfer_checkout_history():
     """Lấy danh sách lịch sử yêu cầu chuyển và trả phòng."""
     from app.services import occupancy_request_store
     return occupancy_request_store.get_transfer_checkout_requests()
+
+
+@router.get(
+    "/my-contracts",
+    summary="Lấy danh sách các hợp đồng/lịch sử ở của sinh viên",
+)
+def get_my_stay_contracts(
+    msv: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Trả về danh sách các hợp đồng/lịch sử ở của sinh viên."""
+    if not msv:
+        return []
+    from app.models.contract import HopDong
+    from app.models.dorm import Giuong, Phong, Tang, ToaNha
+
+    clean_msv = msv.strip().upper()
+    contracts = (
+        db.query(HopDong)
+        .filter(HopDong.msv == clean_msv)
+        .order_by(HopDong.ngay_bat_dau.desc())
+        .all()
+    )
+    results = []
+    for c in contracts:
+        giuong = db.query(Giuong).filter(Giuong.ma_giuong == c.ma_giuong).first()
+        phong = db.query(Phong).filter(Phong.ma_phong == giuong.ma_phong).first() if giuong else None
+        tang = db.query(Tang).filter(Tang.ma_tang == phong.ma_tang).first() if phong else None
+        toa = db.query(ToaNha).filter(ToaNha.ma_toa == tang.ma_toa).first() if tang else None
+
+        status_val = c.trang_thai.value if hasattr(c.trang_thai, "value") else str(c.trang_thai)
+        status_label = (
+            "Đang ở" if status_val == "ACTIVE"
+            else "Đã kết thúc" if status_val == "TERMINATED"
+            else "Đã chuyển phòng"
+        )
+        results.append({
+            "id": c.ma_hop_dong,
+            "ma_hop_dong": c.ma_hop_dong,
+            "msv": c.msv,
+            "phong": f"P{phong.so_phong}" if phong else "",
+            "so_phong": str(phong.so_phong) if phong else "",
+            "toa": toa.ten_toa or (f"Tòa {toa.ma_toa}" if toa.ma_toa else "") if toa else "",
+            "tang": str(tang.so_tang) if tang else "",
+            "giuong": giuong.ma_giuong if giuong else "",
+            "loai_phong": phong.loai_phong if phong else "",
+            "thoi_gian_o": "2026-2027",
+            "nam_hoc": "2026-2027",
+            "trang_thai": "DANG_O" if status_val == "ACTIVE" else "KET_THUC",
+            "trang_thai_label": status_label,
+        })
+    return results
 

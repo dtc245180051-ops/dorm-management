@@ -1,18 +1,22 @@
-import { useState, useEffect } from 'react';
-import './Auth.css';
-import { authService } from '../../services/authService';
+import { useState, useEffect } from "react";
+import "./Auth.css";
+import { authService } from "../../services/authService";
 
 /**
  * Kiểm tra định dạng email trường ICTU:
  * Chỉ cần có định dạng đuôi @ictu.edu.vn
  */
 const isValidSchoolEmail = (val) => {
-  if (!val || typeof val !== 'string') return false;
+  if (!val || typeof val !== "string") return false;
   return /^[^\s@]+@ictu\.edu\.vn$/i.test(val.trim());
 };
 
-export default function Login({ onLoginSuccess, initialTab = 'login', onTabChange }) {
-  const [activeTab, setActiveTab] = useState(initialTab || 'login'); // 'login' | 'register'
+export default function Login({
+  onLoginSuccess,
+  initialTab = "login",
+  onTabChange,
+}) {
+  const [activeTab, setActiveTab] = useState(initialTab || "login"); // 'login' | 'register'
 
   useEffect(() => {
     if (initialTab) {
@@ -22,17 +26,17 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
 
   // State form Đăng nhập
   const [loginForm, setLoginForm] = useState({
-    email: '',
-    password: '',
+    identifier: "",
+    password: "",
   });
 
   // State form Đăng ký
   const [registerForm, setRegisterForm] = useState({
-    fullName: '',
-    username: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
+    fullName: "",
+    username: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
 
   // State hiển thị mật khẩu
@@ -41,104 +45,135 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
 
   // State loading & thông báo
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' }); // type: 'error' | 'success' | 'info'
+  const [message, setMessage] = useState({ type: "", text: "" }); // type: 'error' | 'success' | 'info'
   const [, setCurrentUser] = useState(null);
 
   // Xử lý thay đổi form Đăng nhập
   const handleLoginChange = (e) => {
     setLoginForm({ ...loginForm, [e.target.name]: e.target.value });
-    if (message.text) setMessage({ type: '', text: '' });
+    if (message.text) setMessage({ type: "", text: "" });
   };
 
   // Xử lý thay đổi form Đăng ký
   const handleRegisterChange = (e) => {
     setRegisterForm({ ...registerForm, [e.target.name]: e.target.value });
-    if (message.text) setMessage({ type: '', text: '' });
+    if (message.text) setMessage({ type: "", text: "" });
   };
 
   // Submit Đăng nhập
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    const identifier = loginForm.email.trim();
+    const identifier = (loginForm.identifier || loginForm.email || "").trim();
 
     if (!identifier || !loginForm.password) {
-      setMessage({ type: 'error', text: 'Vui lòng nhập email hoặc username và mật khẩu.' });
+      setMessage({
+        type: "error",
+        text: "Vui lòng nhập email hoặc username và mật khẩu.",
+      });
       return;
     }
 
     setLoading(true);
-    setMessage({ type: '', text: '' });
+    setMessage({ type: "", text: "" });
 
-    const result = await authService.login(identifier, loginForm.password);
-    setLoading(false);
+    let authenticatedUser;
+    try {
+      const result = await authService.login(identifier, loginForm.password);
+      if (!result.success) {
+        setMessage({
+          type: "error",
+          text: result.message || "Tài khoản hoặc mật khẩu không chính xác.",
+        });
+        return;
+      }
 
-    if (result.success) {
       if (result.data?.full_name) {
-        localStorage.setItem('ktx_fullname', result.data.full_name);
+        localStorage.setItem("ktx_fullname", result.data.full_name);
       }
       setMessage({
-        type: 'success',
+        type: "success",
         text: `Đăng nhập thành công! Xin chào ${result.data.username} (${result.data.role}).`,
       });
       setCurrentUser(result.data);
+      authenticatedUser = result.data;
+      await new Promise((resolve) => window.setTimeout(resolve, 800));
+    } catch (error) {
+      console.error("Lỗi xử lý đăng nhập:", error);
+      setMessage({
+        type: "error",
+        text: error.message || "Không thể đăng nhập. Vui lòng thử lại.",
+      });
+    } finally {
+      setLoading(false);
+    }
+
+    if (authenticatedUser) {
       if (onLoginSuccess) {
-        onLoginSuccess(result.data.role);
+        onLoginSuccess(authenticatedUser.role);
       } else {
         const targetPath =
-          result.data.role === 'KeToan'
-            ? '/doi-soat'
-            : result.data.role === 'Admin'
-            ? '/admin'
-            : '/student/dashboard';
-        window.history.pushState({}, '', targetPath);
-        window.dispatchEvent(new PopStateEvent('popstate'));
+          authenticatedUser.role === "KeToan"
+            ? "/doi-soat"
+            : authenticatedUser.role === "Admin"
+              ? "/admin"
+              : "/student/dashboard";
+        window.history.pushState({}, "", targetPath);
+        window.dispatchEvent(new PopStateEvent("popstate"));
       }
-    } else {
-      setMessage({
-        type: 'error',
-        text: result.message || 'Email hoặc mật khẩu không chính xác.',
-      });
     }
   };
 
   // Submit Đăng ký
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-    const { fullName, username, email, password, confirmPassword } = registerForm;
+    const { fullName, username, email, password, confirmPassword } =
+      registerForm;
     const emailVal = email.trim();
-    const usernameVal = username.trim();
+    const usernameVal = (username || "").trim();
 
     if (!fullName.trim() || !usernameVal || !emailVal || !password) {
-      setMessage({ type: 'error', text: 'Vui lòng điền đầy đủ các thông tin bắt buộc.' });
+      setMessage({
+        type: "error",
+        text: "Vui lòng điền đầy đủ các thông tin bắt buộc.",
+      });
       return;
     }
 
     if (!/^[a-zA-Z0-9._-]{3,50}$/.test(usernameVal)) {
-      setMessage({ type: 'error', text: 'Username dài 3–50 ký tự, chỉ gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang.' });
+      setMessage({
+        type: "error",
+        text: "Username dài 3–50 ký tự, chỉ gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang.",
+      });
       return;
     }
 
     // Kiểm tra định dạng email trường ICTU (phải có đuôi @ictu.edu.vn)
     if (!isValidSchoolEmail(emailVal)) {
       setMessage({
-        type: 'error',
-        text: 'Email đăng ký phải có định dạng @ictu.edu.vn.',
+        type: "error",
+        text: "Email đăng ký phải có định dạng @ictu.edu.vn.",
       });
       return;
     }
 
     if (password.length < 6) {
-      setMessage({ type: 'error', text: 'Mật khẩu phải có độ dài ít nhất 6 ký tự.' });
+      setMessage({
+        type: "error",
+        text: "Mật khẩu phải có độ dài ít nhất 6 ký tự.",
+      });
       return;
     }
 
     if (password !== confirmPassword) {
-      setMessage({ type: 'error', text: 'Nhập lại mật khẩu không trùng khớp.' });
+      setMessage({
+        type: "error",
+        text: "Nhập lại mật khẩu không trùng khớp.",
+      });
       return;
     }
 
     setLoading(true);
-    setMessage({ type: '', text: '' });
+    setMessage({ type: "", text: "" });
 
     const result = await authService.register({
       fullName,
@@ -149,43 +184,44 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
     setLoading(false);
 
     if (result.success) {
-      localStorage.setItem('ktx_fullname', fullName.trim());
-      localStorage.setItem('ktx_email', emailVal);
+      localStorage.setItem("ktx_fullname", fullName.trim());
+      localStorage.setItem("ktx_email", emailVal);
       // Tự động đăng nhập tài khoản vừa tạo để lưu token
       await authService.login(usernameVal, password);
 
       setMessage({
-        type: 'success',
-        text: 'Đăng ký tài khoản thành công! Đang chuyển đến trang chủ sinh viên...',
+        type: "success",
+        text: "Đăng ký tài khoản thành công! Đang chuyển đến trang chủ sinh viên...",
       });
 
       setTimeout(() => {
         if (onLoginSuccess) {
-          onLoginSuccess('SinhVien');
+          onLoginSuccess("SinhVien");
         } else {
-          window.history.pushState({}, '', '/student/dashboard');
-          window.dispatchEvent(new PopStateEvent('popstate'));
+          window.history.pushState({}, "", "/student/dashboard");
+          window.dispatchEvent(new PopStateEvent("popstate"));
         }
       }, 700);
     } else {
       setMessage({
-        type: 'error',
-        text: result.message || 'Đăng ký không thành công. Vui lòng kiểm tra lại.',
+        type: "error",
+        text:
+          result.message || "Đăng ký không thành công. Vui lòng kiểm tra lại.",
       });
     }
   };
 
   const handleGoogleAuth = () => {
     setMessage({
-      type: 'info',
-      text: 'Tính năng Đăng nhập / Đăng ký với Google đang được phát triển.',
+      type: "info",
+      text: "Tính năng Đăng nhập / Đăng ký với Google đang được phát triển.",
     });
   };
 
   const handleForgotPassword = () => {
     setMessage({
-      type: 'info',
-      text: 'Vui lòng liên hệ ban quản lý KTX hoặc quản trị viên để hỗ trợ đặt lại mật khẩu.',
+      type: "info",
+      text: "Vui lòng liên hệ ban quản lý KTX hoặc quản trị viên để hỗ trợ đặt lại mật khẩu.",
     });
   };
 
@@ -198,18 +234,14 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
           <div className="brand-header">
             <div className="brand-icon-wrapper">
               <svg className="brand-icon-svg" viewBox="0 0 48 48" fill="none">
-                <path
-                  d="M8 20L24 6L40 20V42H8V20Z"
-                  fill="#1d70f5"
-                />
-                <path
-                  d="M19 42V26H29V42H19Z"
-                  fill="#ffffff"
-                />
+                <path d="M8 20L24 6L40 20V42H8V20Z" fill="#1d70f5" />
+                <path d="M19 42V26H29V42H19Z" fill="#ffffff" />
               </svg>
             </div>
             <div className="brand-text">
-              <span className="brand-title">KTX</span>
+              <span className="brand-title">
+                <span className="brand-title-i">i</span>DORM
+              </span>
               <span className="brand-subtitle">Hệ thống ký túc xá</span>
             </div>
           </div>
@@ -222,7 +254,8 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
 
           {/* Giới thiệu ngắn */}
           <p className="welcome-desc">
-            KTX - Giúp sinh viên dễ dàng đăng ký phòng, tra cứu thông tin và quản lý các dịch vụ trong khu ký túc xá.
+            KTX - Giúp sinh viên dễ dàng đăng ký phòng, tra cứu thông tin và
+            quản lý các dịch vụ trong khu ký túc xá.
           </p>
 
           {/* 4 Tính năng minh họa */}
@@ -230,7 +263,16 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
             {/* 1. Đăng ký phòng */}
             <div className="feature-item">
               <div className="feature-circle blue">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M2 4v16" />
                   <path d="M2 8h18a2 2 0 0 1 2 2v10" />
                   <path d="M2 17h20" />
@@ -244,7 +286,16 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
             {/* 2. Tra cứu thông tin */}
             <div className="feature-item">
               <div className="feature-circle green">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
                   <line x1="16" y1="13" x2="8" y2="13" />
@@ -253,13 +304,24 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
                 </svg>
               </div>
               <span className="feature-name">Tra cứu thông tin</span>
-              <span className="feature-caption">Phòng, giường, sinh viên,...</span>
+              <span className="feature-caption">
+                Phòng, giường, sinh viên,...
+              </span>
             </div>
 
             {/* 3. Thanh toán */}
             <div className="feature-item">
               <div className="feature-circle purple">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <circle cx="12" cy="12" r="9" />
                   <path d="M12 7v10" />
                   <path d="M15 9.5a2.5 2.5 0 0 0-5 0c0 2 3 2.5 3 4.5a2.5 2.5 0 0 1-5 0" />
@@ -272,7 +334,16 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
             {/* 4. Quản lý dễ dàng */}
             <div className="feature-item">
               <div className="feature-circle amber">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
               </div>
@@ -288,22 +359,22 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
           <div className="auth-tabs" role="tablist">
             <button
               type="button"
-              className={`auth-tab-btn ${activeTab === 'login' ? 'active' : ''}`}
+              className={`auth-tab-btn ${activeTab === "login" ? "active" : ""}`}
               onClick={() => {
-                setActiveTab('login');
-                setMessage({ type: '', text: '' });
-                if (onTabChange) onTabChange('login');
+                setActiveTab("login");
+                setMessage({ type: "", text: "" });
+                if (onTabChange) onTabChange("login");
               }}
             >
               Đăng nhập
             </button>
             <button
               type="button"
-              className={`auth-tab-btn ${activeTab === 'register' ? 'active' : ''}`}
+              className={`auth-tab-btn ${activeTab === "register" ? "active" : ""}`}
               onClick={() => {
-                setActiveTab('register');
-                setMessage({ type: '', text: '' });
-                if (onTabChange) onTabChange('register');
+                setActiveTab("register");
+                setMessage({ type: "", text: "" });
+                if (onTabChange) onTabChange("register");
               }}
             >
               Đăng ký
@@ -312,28 +383,37 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
 
           {/* Banner thông báo */}
           {message.text && (
-            <div className={`auth-alert ${message.type}`}>
+            <div
+              className={`auth-alert ${message.type}`}
+              role={message.type === "error" ? "alert" : "status"}
+              aria-live="polite"
+            >
               <span>{message.text}</span>
             </div>
           )}
 
           {/* Wrapper chứa Form để giữ cố định chiều cao */}
           <div className="auth-form-wrapper">
-            {activeTab === 'login' ? (
+            {activeTab === "login" ? (
               /* ================= FORM ĐĂNG NHẬP ================= */
-              <form className="auth-form login-form" onSubmit={handleLoginSubmit}>
+              <form
+                className="auth-form login-form"
+                onSubmit={handleLoginSubmit}
+              >
                 <div className="form-fields login-fields">
-                  {/* Email */}
+                  {/* Email hoặc tên người dùng */}
                   <div className="form-group">
-                    <label className="form-label" htmlFor="login-email">Email hoặc username</label>
+                    <label className="form-label" htmlFor="login-identifier">
+                      Email hoặc tên người dùng
+                    </label>
                     <div className="input-wrapper">
                       <input
-                        id="login-email"
-                        name="email"
+                        id="login-identifier"
+                        name="identifier"
                         type="text"
                         className="form-input"
-                        placeholder="Nhập email hoặc username"
-                        value={loginForm.email}
+                        placeholder="Nhập email hoặc tên người dùng"
+                        value={loginForm.identifier || loginForm.email || ""}
                         onChange={handleLoginChange}
                         required
                       />
@@ -342,12 +422,14 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
 
                   {/* Mật khẩu */}
                   <div className="form-group">
-                    <label className="form-label" htmlFor="login-password">Mật khẩu</label>
+                    <label className="form-label" htmlFor="login-password">
+                      Mật khẩu
+                    </label>
                     <div className="input-wrapper">
                       <input
                         id="login-password"
                         name="password"
-                        type={showPassword ? 'text' : 'password'}
+                        type={showPassword ? "text" : "password"}
                         className="form-input"
                         placeholder="Nhập mật khẩu"
                         value={loginForm.password}
@@ -358,15 +440,29 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
                         type="button"
                         className="input-icon-btn"
                         onClick={() => setShowPassword(!showPassword)}
-                        title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                        title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                       >
                         {showPassword ? (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
                             <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
                             <line x1="1" y1="1" x2="23" y2="23" />
                           </svg>
                         ) : (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                             <circle cx="12" cy="12" r="3" />
                           </svg>
@@ -392,7 +488,7 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
                     className="submit-btn"
                     disabled={loading}
                   >
-                    {loading ? <span className="spinner"></span> : 'Đăng nhập'}
+                    {loading ? <span className="spinner"></span> : "Đăng nhập"}
                   </button>
 
                   {/* Hoặc */}
@@ -431,14 +527,14 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
 
                   {/* Chuyển sang Đăng ký */}
                   <div className="switch-auth-text">
-                    Bạn chưa có tài khoản?{' '}
+                    Bạn chưa có tài khoản?{" "}
                     <button
                       type="button"
                       className="switch-auth-link"
                       onClick={() => {
-                        setActiveTab('register');
-                        setMessage({ type: '', text: '' });
-                        if (onTabChange) onTabChange('register');
+                        setActiveTab("register");
+                        setMessage({ type: "", text: "" });
+                        if (onTabChange) onTabChange("register");
                       }}
                     >
                       Đăng ký
@@ -448,12 +544,17 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
               </form>
             ) : (
               /* ================= FORM ĐĂNG KÝ ================= */
-              <form className="auth-form register-form" onSubmit={handleRegisterSubmit}>
+              <form
+                className="auth-form register-form"
+                onSubmit={handleRegisterSubmit}
+              >
                 <div className="form-fields register-fields">
-                  {/* Họ tên & Username */}
+                  {/* Họ tên & Tên người dùng */}
                   <div className="form-row-2col-equal">
                     <div className="form-group">
-                      <label className="form-label" htmlFor="register-fullname">Họ tên</label>
+                      <label className="form-label" htmlFor="register-fullname">
+                        Họ tên
+                      </label>
                       <div className="input-wrapper">
                         <input
                           id="register-fullname"
@@ -468,14 +569,16 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
                       </div>
                     </div>
                     <div className="form-group">
-                      <label className="form-label" htmlFor="register-username">Username</label>
+                      <label className="form-label" htmlFor="register-username">
+                        Tên người dùng
+                      </label>
                       <div className="input-wrapper">
                         <input
                           id="register-username"
                           name="username"
                           type="text"
                           className="form-input"
-                          placeholder="Nhập username"
+                          placeholder="Nhập tên người dùng"
                           value={registerForm.username}
                           onChange={handleRegisterChange}
                           minLength={3}
@@ -488,7 +591,9 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
 
                   {/* Email */}
                   <div className="form-group">
-                    <label className="form-label" htmlFor="register-email">Email</label>
+                    <label className="form-label" htmlFor="register-email">
+                      Email
+                    </label>
                     <div className="input-wrapper">
                       <input
                         id="register-email"
@@ -506,12 +611,14 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
                   {/* Mật khẩu mới & Nhập lại mật khẩu */}
                   <div className="form-row-2col-equal">
                     <div className="form-group">
-                      <label className="form-label" htmlFor="register-password">Mật khẩu mới</label>
+                      <label className="form-label" htmlFor="register-password">
+                        Mật khẩu mới
+                      </label>
                       <div className="input-wrapper">
                         <input
                           id="register-password"
                           name="password"
-                          type={showPassword ? 'text' : 'password'}
+                          type={showPassword ? "text" : "password"}
                           className="form-input"
                           placeholder="Nhập mật khẩu"
                           value={registerForm.password}
@@ -522,15 +629,29 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
                           type="button"
                           className="input-icon-btn"
                           onClick={() => setShowPassword(!showPassword)}
-                          title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                          title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                         >
                           {showPassword ? (
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <svg
+                              width="18"
+                              height="18"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
                               <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
                               <line x1="1" y1="1" x2="23" y2="23" />
                             </svg>
                           ) : (
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <svg
+                              width="18"
+                              height="18"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
                               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                               <circle cx="12" cy="12" r="3" />
                             </svg>
@@ -540,12 +661,17 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label" htmlFor="register-confirmPassword">Nhập lại mật khẩu</label>
+                      <label
+                        className="form-label"
+                        htmlFor="register-confirmPassword"
+                      >
+                        Nhập lại mật khẩu
+                      </label>
                       <div className="input-wrapper">
                         <input
                           id="register-confirmPassword"
                           name="confirmPassword"
-                          type={showConfirmPassword ? 'text' : 'password'}
+                          type={showConfirmPassword ? "text" : "password"}
                           className="form-input"
                           placeholder="Nhập lại mật khẩu"
                           value={registerForm.confirmPassword}
@@ -555,16 +681,36 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
                         <button
                           type="button"
                           className="input-icon-btn"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          title={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                          onClick={() =>
+                            setShowConfirmPassword(!showConfirmPassword)
+                          }
+                          title={
+                            showConfirmPassword
+                              ? "Ẩn mật khẩu"
+                              : "Hiện mật khẩu"
+                          }
                         >
                           {showConfirmPassword ? (
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <svg
+                              width="18"
+                              height="18"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
                               <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
                               <line x1="1" y1="1" x2="23" y2="23" />
                             </svg>
                           ) : (
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <svg
+                              width="18"
+                              height="18"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
                               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                               <circle cx="12" cy="12" r="3" />
                             </svg>
@@ -582,7 +728,7 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
                     className="submit-btn"
                     disabled={loading}
                   >
-                    {loading ? <span className="spinner"></span> : 'Đăng ký'}
+                    {loading ? <span className="spinner"></span> : "Đăng ký"}
                   </button>
 
                   {/* Hoặc */}
@@ -621,14 +767,14 @@ export default function Login({ onLoginSuccess, initialTab = 'login', onTabChang
 
                   {/* Chuyển sang Đăng nhập */}
                   <div className="switch-auth-text">
-                    Bạn đã có tài khoản?{' '}
+                    Bạn đã có tài khoản?{" "}
                     <button
                       type="button"
                       className="switch-auth-link"
                       onClick={() => {
-                        setActiveTab('login');
-                        setMessage({ type: '', text: '' });
-                        if (onTabChange) onTabChange('login');
+                        setActiveTab("login");
+                        setMessage({ type: "", text: "" });
+                        if (onTabChange) onTabChange("login");
                       }}
                     >
                       Đăng nhập

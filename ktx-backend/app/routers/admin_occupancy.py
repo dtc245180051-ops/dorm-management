@@ -50,72 +50,85 @@ def get_request_detail(
     Trả về chi tiết đơn đăng ký của sinh viên kèm gợi ý xếp chỗ của hệ thống/AI.
     """
     clean_id = request_id.strip()
-
     # 1. Kiểm tra đơn trong occupancy_request_store trước
     stored = occupancy_request_store.get_request_by_id(clean_id)
     if stored:
+        # Tự động cập nhật hoặc sửa gợi ý nếu gợi ý chưa khớp giới tính
+        student_gender = stored.get("gioi_tinh", "Nam")
+        available_rooms = dorm_service.get_available_beds(db, gender=student_gender)
+        if available_rooms:
+            # Ưu tiên phòng khớp loại phòng mong muốn
+            pref_type = stored.get("loai_phong")
+            matched_r = next(
+                (r for r in available_rooms if pref_type and r.loai_phong and r.loai_phong.strip().lower() == pref_type.strip().lower()),
+                available_rooms[0]
+            )
+            first_empty_bed = "G01"
+            if matched_r.danh_sach_giuong_trong:
+                first_empty_bed = matched_r.danh_sach_giuong_trong[0].ma_giuong
+
+            stored["goi_y"] = {
+                "ma_toa": matched_r.ma_toa,
+                "ma_phong": matched_r.ma_phong,
+                "ma_giuong": first_empty_bed,
+            }
         return stored
 
     # 2. Tìm kiếm sinh viên từ CSDL theo MSV
     student = db.query(SinhVien).filter(SinhVien.msv == clean_id).first()
     if not student:
-        student = db.query(SinhVien).first()
+        raise HTTPException(status_code=404, detail="Kh?ng t?m th?y ??n ho?c h? s? sinh vi?n")
 
-    # Gợi ý phòng/giường trống đầu tiên từ hệ thống
-    suggested_building = "A"
-    suggested_room = "A203"
-    suggested_bed = "G04"
+    student_gender = student.gioi_tinh
+    available_rooms = dorm_service.get_available_beds(db, gender=student_gender)
+    if not available_rooms:
+        available_rooms = dorm_service.get_available_beds(db)
 
-    available_rooms = dorm_service.get_available_beds(db)
+    suggested_building = None
+    suggested_room = None
+    suggested_bed = None
+
     if available_rooms:
         r = available_rooms[0]
-        suggested_building = r.ma_toa or "A"
-        suggested_room = r.so_phong or f"{suggested_building}203"
-        if r.giuongs:
-            for b in r.giuongs:
-                if b.trang_thai == "TRONG":
-                    suggested_bed = b.ma_giuong
-                    break
+        suggested_building = r.ma_toa
+        suggested_room = r.ma_phong
+        if r.danh_sach_giuong_trong:
+            suggested_bed = r.danh_sach_giuong_trong[0].ma_giuong
 
     email_display = (
         student.nguoi_dung.email
         if student and student.nguoi_dung and student.nguoi_dung.email
-        else "b21dccn001@ictu.edu.vn"
+        else ""
     )
     ho_ten_display = (
         student.nguoi_dung.ho_ten
         if student and student.nguoi_dung and student.nguoi_dung.ho_ten
-        else "Nguyễn Văn A"
+        else ""
     )
     phone_display = (
         student.nguoi_dung.so_dien_thoai
         if student and student.nguoi_dung and student.nguoi_dung.so_dien_thoai
-        else "0987654321"
+        else ""
     )
 
     return {
         "id": clean_id,
-        "msv": student.msv if student else "B21DCCN001",
+        "msv": student.msv,
         "ho_ten": ho_ten_display,
-        "gioi_tinh": student.gioi_tinh if student else "Nam",
-        "ngay_sinh": student.ngay_sinh if student else "2003-05-15",
-        "cccd": student.cccd if student else "001203004567",
+        "gioi_tinh": student.gioi_tinh,
+        "ngay_sinh": student.ngay_sinh or "",
+        "cccd": student.cccd or "",
         "so_dien_thoai": phone_display,
         "email": email_display,
-        "khoa": student.khoa if student else "Công nghệ thông tin",
-        "lop": student.lop if student else "D21CQCN01-B",
-        "dia_chi": student.dia_chi if student else "Số 123 Đường Cầu Giấy, Hà Nội",
-        "doi_tuong_uu_tien": student.doi_tuong_uu_tien if student else "Không thuộc diện ưu tiên",
-        "nguoi_giam_ho": student.nguoi_giam_ho if student else "Nguyễn Văn B",
-        "moi_quan_he": student.moi_quan_he if student else "Bố",
-        "sdt_nguoi_giam_ho": student.sdt_nguoi_giam_ho if student else "0912345678",
-        "nguyen_vong": "Xin hãy xếp cho em 1 phòng nào đó ở tòa A với ạ 🥹",
-        "trang_thai": "CHO_DUYET",
-        "goi_y": {
-            "ma_toa": suggested_building,
-            "ma_phong": suggested_room,
-            "ma_giuong": suggested_bed,
-        },
+        "khoa": student.khoa or "",
+        "lop": student.lop or "",
+        "dia_chi": student.dia_chi or "",
+        "doi_tuong_uu_tien": student.doi_tuong_uu_tien or "",
+        "nguoi_giam_ho": student.nguoi_giam_ho or "",
+        "moi_quan_he": student.moi_quan_he or "",
+        "sdt_nguoi_giam_ho": student.sdt_nguoi_giam_ho or "",
+        "nguyen_vong": "",
+        "trang_thai": "NOT_REGISTERED",
     }
 
 
@@ -131,19 +144,36 @@ def get_available_beds_hierarchical(db: Session = Depends(get_db)):
     results = []
 
     for b in buildings:
+        # Chuẩn hóa giới tính tòa
+        raw_bg = (b.gioi_tinh or "Nam & Nữ").strip()
+        if raw_bg.lower() in ["nu", "nữ"]:
+            normalized_gender = "Nữ"
+        elif raw_bg.lower() == "nam":
+            normalized_gender = "Nam"
+        else:
+            normalized_gender = "Nam & Nữ"
+
         b_data = {
             "ma_toa": b.ma_toa,
             "ten_toa": b.ten_toa,
-            "gioi_tinh": b.gioi_tinh,
+            "gioi_tinh": normalized_gender,
             "rooms": [],
         }
         for floor in b.tangs:
             for room in floor.phongs:
                 empty_beds = [bed for bed in room.giuongs if bed.trang_thai == "TRONG"]
+                occupied_count = len([bed for bed in room.giuongs if bed.trang_thai != "TRONG"])
                 if empty_beds:
                     b_data["rooms"].append({
                         "ma_phong": room.ma_phong,
                         "so_phong": room.so_phong,
+                        "loai_phong": room.loai_phong,
+                        "so_tang": floor.so_tang,
+                        "ma_tang": floor.ma_tang,
+                        "suc_chua": room.suc_chua,
+                        "gioi_tinh": normalized_gender,
+                        "thanh_vien_hien_tai": occupied_count,
+                        "gia_tien_nam": room.gia_tien_nam,
                         "label": f"Phòng {room.so_phong} ({len(empty_beds)} chỗ trống)",
                         "beds": [
                             {
@@ -156,53 +186,7 @@ def get_available_beds_hierarchical(db: Session = Depends(get_db)):
         if b_data["rooms"]:
             results.append(b_data)
 
-    # Đảm bảo có dữ liệu mẫu nếu DB chưa có
-    if not results:
-        results = [
-            {
-                "ma_toa": "A",
-                "ten_toa": "Tòa A",
-                "gioi_tinh": "Nam & Nữ",
-                "rooms": [
-                    {
-                        "ma_phong": "A203",
-                        "so_phong": "A203",
-                        "label": "Phòng A203",
-                        "beds": [
-                            {"ma_giuong": "G01", "label": "Giường G01"},
-                            {"ma_giuong": "G02", "label": "Giường G02"},
-                            {"ma_giuong": "G04", "label": "Giường G04"},
-                        ],
-                    },
-                    {
-                        "ma_phong": "A204",
-                        "so_phong": "A204",
-                        "label": "Phòng A204",
-                        "beds": [
-                            {"ma_giuong": "G01", "label": "Giường G01"},
-                            {"ma_giuong": "G03", "label": "Giường G03"},
-                        ],
-                    },
-                ],
-            },
-            {
-                "ma_toa": "B",
-                "ten_toa": "Tòa B",
-                "gioi_tinh": "Nam & Nữ",
-                "rooms": [
-                    {
-                        "ma_phong": "B101",
-                        "so_phong": "B101",
-                        "label": "Phòng B101",
-                        "beds": [
-                            {"ma_giuong": "G01", "label": "Giường G01"},
-                            {"ma_giuong": "G02", "label": "Giường G02"},
-                        ],
-                    },
-                ],
-            },
-        ]
-
+    # Đảm bảo có dữ liệu mẫu chuẩn nếu DB chưa có
     return results
 
 
@@ -223,37 +207,50 @@ def approve_request(
     - Tạo bản ghi HopDong trạng thái ACTIVE.
     """
     clean_id = request_id.strip()
+    registration = occupancy_request_store.get_request_by_id(clean_id)
+    if not registration:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn đăng ký")
+    if registration.get("trang_thai") not in ("PENDING", "CHO_DUYET"):
+        raise HTTPException(status_code=409, detail="Đơn này đã được xử lý")
+
+    student = db.query(SinhVien).filter(
+        SinhVien.msv == registration.get("msv", "").strip().upper()
+    ).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hồ sơ sinh viên của đơn")
+
+    existing_contract = (
+        db.query(HopDong)
+        .filter(HopDong.msv == student.msv, HopDong.trang_thai == "ACTIVE")
+        .first()
+    )
+    if existing_contract:
+        raise HTTPException(status_code=409, detail="Sinh viên đã có hợp đồng lưu trú đang hiệu lực")
 
     # Định dạng năm hiện tại 2 chữ số (ví dụ 2026 -> 26)
     yy = datetime.date.today().strftime("%y")
 
     # Chuẩn hóa tên tòa, phòng, giường
-    toa = payload.ma_toa or "A"
+    if not payload.ma_toa:
+        raise HTTPException(status_code=400, detail="Vui lòng chọn tòa nhà")
+    toa = payload.ma_toa
     phong = payload.phong_id.replace("Phòng ", "").replace("P", "")
     giuong = payload.giuong_id.replace("Giường ", "").replace("G", "")
 
     # Tự động tạo mã hợp đồng theo chuẩn HD{YY}-{toa}{phong}-G{giuong}
     contract_code = f"HD{yy}-{toa}{phong}-G{giuong}"
 
-    # Cập nhật trong store
-    occupancy_request_store.update_request_status(
-        clean_id,
-        "DA_DUYET",
-        {
-            "ma_hop_dong": contract_code,
-            "ma_toa": toa,
-            "ma_phong": payload.phong_id,
-            "ma_giuong": payload.giuong_id,
-        },
-    )
-
     # Cập nhật trạng thái giường trong CSDL nếu tìm thấy
     bed = db.query(Giuong).filter(Giuong.ma_giuong == payload.giuong_id).first()
-    if bed:
-        bed.trang_thai = "DA_CO_NGUOI"
+    if not bed or bed.ma_phong != payload.phong_id or bed.trang_thai != "TRONG":
+        raise HTTPException(status_code=409, detail="Giường này không còn trống")
+    room = db.query(Phong).filter(Phong.ma_phong == bed.ma_phong).first()
+    floor = db.query(Tang).filter(Tang.ma_tang == room.ma_tang).first() if room else None
+    if not room or not floor or floor.ma_toa != toa:
+        raise HTTPException(status_code=400, detail="Phòng không thuộc tòa nhà đã chọn")
+    bed.trang_thai = "DA_CO_NGUOI"
 
-    student = db.query(SinhVien).filter(SinhVien.msv == clean_id).first()
-    msv = student.msv if student else clean_id
+    msv = student.msv
 
     # Tạo hoặc cập nhật HopDong
     existing_contract = db.query(HopDong).filter(HopDong.ma_hop_dong == contract_code).first()
@@ -274,6 +271,22 @@ def approve_request(
         db.commit()
     except Exception as e:
         db.rollback()
+        raise HTTPException(status_code=500, detail="Không thể hoàn tất xếp phòng")
+
+    occupancy_request_store.update_request_status(
+        clean_id,
+        "APPROVED",
+        {
+            "ma_hop_dong": contract_code,
+            "ma_toa": toa,
+            "toa_nha": floor.toa_nha.ten_toa if floor.toa_nha else toa,
+            "ma_phong": payload.phong_id,
+            "so_phong": room.so_phong,
+            "loai_phong": room.loai_phong,
+            "ma_giuong": payload.giuong_id,
+            "so_giuong": payload.giuong_id,
+        },
+    )
 
     return {
         "status": "success",
@@ -282,9 +295,13 @@ def approve_request(
             "ma_hop_dong": contract_code,
             "msv": msv,
             "ma_toa": toa,
+            "toa_nha": floor.toa_nha.ten_toa if floor.toa_nha else toa,
             "ma_phong": payload.phong_id,
+            "so_phong": room.so_phong,
+            "loai_phong": room.loai_phong,
             "ma_giuong": payload.giuong_id,
-            "trang_thai": "DA_DUYET",
+            "so_giuong": payload.giuong_id,
+            "trang_thai": "APPROVED",
         },
     }
 

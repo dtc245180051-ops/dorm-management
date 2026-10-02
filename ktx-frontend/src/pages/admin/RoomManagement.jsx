@@ -208,7 +208,7 @@ export default function RoomManagement({ searchTerm = "" }) {
   }
 
   return (
-    <div className="flex-1 bg-[#f4f5f7] rounded-2xl border border-slate-200/60 p-7 min-h-0 relative overflow-y-auto flex flex-col">
+    <div className="flex-1 min-h-0 min-w-0 relative flex flex-col">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 bg-emerald-600 text-white text-sm font-semibold rounded-2xl shadow-xl animate-in slide-in-from-top-4 duration-200">
@@ -219,7 +219,7 @@ export default function RoomManagement({ searchTerm = "" }) {
 
       {/* Page Title & Top Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight">
+        <h1 className="text-2xl font-black text-slate-800 tracking-tight uppercase">
           QUẢN LÝ PHÒNG Ở
         </h1>
 

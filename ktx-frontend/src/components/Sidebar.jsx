@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   LayoutGrid,
   Building2,
@@ -7,25 +7,43 @@ import {
   Scale,
   FileText,
   LogOut,
-} from 'lucide-react';
+} from "lucide-react";
 
 const menuItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
-  { id: 'rooms', label: 'Quản lý phòng ở', icon: Building2, active: true },
-  { id: 'students', label: 'Hồ sơ sinh viên', icon: Users },
-  { id: 'incidents', label: 'Phản ánh sự cố', icon: AlertCircle },
-  { id: 'violations', label: 'Quản lý vi phạm', icon: Scale },
-  { id: 'reports', label: 'Báo cáo', icon: FileText },
+  { id: "dashboard", label: "Dashboard", icon: LayoutGrid },
+  { id: "rooms", label: "Quản lý phòng ở", icon: Building2, active: true },
+  { id: "students", label: "Hồ sơ sinh viên", icon: Users },
+  { id: "incidents", label: "Phản ánh sự cố", icon: AlertCircle },
+  { id: "violations", label: "Quản lý vi phạm", icon: Scale },
+  // { id: 'reports', label: 'Báo cáo', icon: FileText },
 ];
 
-export default function Sidebar({ activeTab = 'rooms', onSelectTab }) {
+export default function Sidebar({ activeTab = "rooms", onSelectTab }) {
   return (
     <aside className="w-64 min-h-[calc(100vh-1.75rem)] bg-[#f4f5f7] rounded-2xl border border-slate-200/60 p-6 select-none shrink-0 flex flex-col">
       {/* Logo iDORM */}
-      <div className="mb-8 px-2 flex items-center">
-        <div className="flex items-baseline tracking-tight">
-          <span className="text-3xl font-black text-blue-600 font-sans">i</span>
-          <span className="text-3xl font-black text-slate-900 tracking-normal">DORM</span>
+      <div className="mb-8 px-2 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-sm shrink-0">
+          <svg
+            className="w-5 h-5 fill-current"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+          </svg>
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-baseline leading-none tracking-tight">
+            <span className="text-2xl font-black text-blue-600 font-sans">
+              i
+            </span>
+            <span className="text-2xl font-black text-slate-900 tracking-normal">
+              DORM
+            </span>
+          </div>
+          <div className="text-[10px] text-slate-500 font-medium mt-1 whitespace-nowrap">
+            Hệ thống ký túc xá
+          </div>
         </div>
       </div>
 
@@ -45,13 +63,13 @@ export default function Sidebar({ activeTab = 'rooms', onSelectTab }) {
                 type="button"
                 className={`w-full flex items-center gap-3.5 px-3 py-2.5 rounded-[8px] text-sm transition-all duration-150 text-left cursor-pointer ${
                   isActive
-                    ? 'bg-[#dbeafe] text-blue-600 font-bold'
-                    : 'text-slate-600 hover:bg-slate-200/50 hover:text-slate-900 font-medium'
+                    ? "bg-[#dbeafe] text-blue-600 font-bold"
+                    : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900 font-medium"
                 }`}
               >
                 <Icon
                   className={`w-5 h-5 shrink-0 ${
-                    isActive ? 'text-blue-600' : 'text-slate-500'
+                    isActive ? "text-blue-600" : "text-slate-500"
                   }`}
                 />
                 <span>{item.label}</span>
@@ -69,7 +87,7 @@ export default function Sidebar({ activeTab = 'rooms', onSelectTab }) {
         <button
           type="button"
           onClick={() => {
-            if (window.confirm('Bạn có chắc chắn muốn đăng xuất không?')) {
+            if (window.confirm("Bạn có chắc chắn muốn đăng xuất không?")) {
               localStorage.clear();
               window.location.reload();
             }

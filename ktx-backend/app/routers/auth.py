@@ -40,7 +40,7 @@ def register(
                 phone = raw_val
 
     # Tự động gán username nếu người dùng không truyền trực tiếp
-    username = user_in.username
+    username = user_in.username.strip()[:50] if user_in.username else None
     if not username:
         if email:
             username = email.split("@")[0][:50]
@@ -131,19 +131,26 @@ def register(
     db.flush()
 
     # 8. Tự động liên kết vào bảng sinh_vien nếu là vai trò SinhVien
-    student_code = email.split("@", 1)[0] if email and "@" in email else username
-    if new_account.vai_tro == VaiTro.SINH_VIEN and student_code.upper().startswith("DTC"):
+    if new_account.vai_tro == VaiTro.SINH_VIEN:
         from app.models.user import SinhVien
-        msv_val = student_code.upper()
+        email_code = email.split("@", 1)[0] if email and "@" in email else ""
+        student_code = username if username.upper().startswith("DTC") else email_code
+        msv_val = (
+            student_code.upper()
+            if student_code.upper().startswith("DTC")
+            else username.upper()[:20]
+        )
         existing_sv = db.query(SinhVien).filter(SinhVien.msv == msv_val).first()
         if not existing_sv:
             sv = SinhVien(
                 msv=msv_val,
                 ma_nguoi_dung=new_user.ma_nguoi_dung,
                 lop="DTC-KTX",
-                gioi_tinh=user_in.gender or "Nữ",
+                gioi_tinh=user_in.gender or "Nam",
             )
             db.add(sv)
+        elif not existing_sv.ma_nguoi_dung:
+            existing_sv.ma_nguoi_dung = new_user.ma_nguoi_dung
 
     db.commit()
     db.refresh(new_account)
@@ -201,11 +208,14 @@ def login(
         data={"sub": account.ten_dang_nhap, "role": role_value}
     )
 
+    full_name_val = account.nguoi_dung.ho_ten if account.nguoi_dung else None
+
     return Token(
         access_token=access_token,
         token_type="bearer",
         role=role_value,
         username=account.ten_dang_nhap,
+        full_name=full_name_val,
     )
 
 

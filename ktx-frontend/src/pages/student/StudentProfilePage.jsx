@@ -97,13 +97,19 @@ export default function StudentProfilePage({ onSelectTab }) {
       try {
         const currentUser = await authService.getCurrentUser();
         const userProfile = currentUser?.nguoi_dung || currentUser?.user || {};
+        const accountEmail =
+          userProfile.email ||
+          currentUser?.email ||
+          localStorage.getItem("ktx_email");
         accountProfile = {
           ho_ten: userProfile.ho_ten || currentUser?.full_name,
           msv:
+            accountEmail?.split("@")[0]?.trim() ||
+            userProfile.msv ||
+            currentUser?.msv ||
             currentUser?.ten_dang_nhap ||
-            currentUser?.username ||
-            currentUser?.msv,
-          email: userProfile.email || currentUser?.email,
+            currentUser?.username,
+          email: accountEmail,
           so_dien_thoai: userProfile.so_dien_thoai || currentUser?.phone,
           vai_tro:
             (userProfile.vai_tro || currentUser?.vai_tro) === "SinhVien"
@@ -122,11 +128,15 @@ export default function StudentProfilePage({ onSelectTab }) {
         const student = await occupancyService.getStudentProfile();
         if (student) {
           const savedAvatar = localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY);
+          const profileEmail = accountProfile.email || student.email || "";
+          const msvFromEmail = profileEmail.split("@")[0].trim();
           const studentProfile = {
             ...student,
             ...Object.fromEntries(
               Object.entries(accountProfile).filter(([, value]) => value),
             ),
+            msv: msvFromEmail || accountProfile.msv || student.msv,
+            email: profileEmail || student.email,
             avatar_url: savedAvatar || student.avatar_url || "/avatar.png",
           };
           setProfile(studentProfile);
@@ -273,17 +283,24 @@ export default function StudentProfilePage({ onSelectTab }) {
         {/* ========================================================================= */}
         {/* 1. TIÊU ĐỀ TRANG: ICON NGƯỜI DÙNG USER + TIÊU ĐỀ THÔNG TIN CÁ NHÂN         */}
         {/* ========================================================================= */}
-        <div className="flex items-center gap-3.5 select-none pt-1">
-          <User className="w-8 h-8 text-blue-600 stroke-[2.3]" />
-          <h1 className="text-2xl sm:text-[26px] font-black text-[#0f3b79] tracking-tight">
-            Thông tin cá nhân
-          </h1>
+        <div className="flex items-center gap-3 select-none pt-1">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-600">
+            <User className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-800">
+              Thông tin cá nhân
+            </h1>
+            <p className="text-sm text-slate-500">
+              Quản lý hồ sơ và thông tin liên hệ của bạn.
+            </p>
+          </div>
         </div>
 
         {/* ========================================================================= */}
         {/* 2. THẺ HỒ SƠ TỔNG QUAN (TOP PROFILE CARD)                                  */}
         {/* ========================================================================= */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-7 shadow-xs flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-6 shadow-sm flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
           {/* Cột trái: Avatar tròn lớn kèm nút Camera */}
           <div className="relative shrink-0 select-none">
             <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full border-4 border-blue-100 overflow-hidden shadow-xs flex items-center justify-center bg-blue-50">
@@ -382,7 +399,7 @@ export default function StudentProfilePage({ onSelectTab }) {
         {/* ========================================================================= */}
         {/* 3. KHỐI THÔNG TIN CHI TIẾT (DETAILED INFORMATION)                          */}
         {/* ========================================================================= */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-7 shadow-xs">
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-6 shadow-sm">
           <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-4 tracking-tight">
             Thông tin chi tiết
           </h3>

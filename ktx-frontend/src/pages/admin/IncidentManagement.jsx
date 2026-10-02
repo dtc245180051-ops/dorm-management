@@ -113,6 +113,12 @@ export default function IncidentManagement({ searchTerm = '' }) {
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h1 className="text-2xl font-black uppercase tracking-tight text-slate-800">
+          PHẢN ÁNH SỰ CỐ
+        </h1>
+      </div>
+
       {/* Thông báo cập nhật */}
       {notification && (
         <div

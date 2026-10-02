@@ -166,7 +166,7 @@ export default function StudentDashboard({ user, onNavigate }) {
   const closeModal = () => setActiveModal(null);
 
   return (
-    <div className="student-main-content">
+    <div className="student-main-content min-h-full w-full">
       {/* ================= BANNER CHÀO MỪNG ================= */}
       <section className="student-banner-card">
         <div
@@ -581,7 +581,7 @@ export default function StudentDashboard({ user, onNavigate }) {
                 <div>
                   <h3 className="student-chatbot-title">Chatbot KTX</h3>
                   <span className="student-chatbot-subtitle">
-                    Luôn sẵn sàng hỗ trợ bạn
+                    Tư vấn quy định, giờ giấc & nếp sống nội trú
                   </span>
                 </div>
               </div>
@@ -606,22 +606,22 @@ export default function StudentDashboard({ user, onNavigate }) {
               <div className="student-chatbot-chip-row">
                 <button
                   className="student-chatbot-chip"
-                  onClick={() => handleOpenChatbot("Hỏi về nội quy")}
+                  onClick={() => handleOpenChatbot("Giờ đóng / mở cổng")}
                 >
-                  Hỏi về nội quy
+                  Giờ đóng / mở cổng
                 </button>
                 <button
                   className="student-chatbot-chip"
-                  onClick={() => handleOpenChatbot("Tra cứu phòng")}
+                  onClick={() => handleOpenChatbot("Quy định nấu ăn")}
                 >
-                  Tra cứu phòng
+                  Quy định nấu ăn
                 </button>
               </div>
               <button
                 className="student-chatbot-chip full-chip"
-                onClick={() => handleOpenChatbot("Hỏi về đăng ký phòng")}
+                onClick={() => handleOpenChatbot("Quy định tiếp khách & qua đêm")}
               >
-                Hỏi về đăng ký phòng
+                Quy định tiếp khách & qua đêm
               </button>
             </div>
 

@@ -3,44 +3,21 @@ from typing import Dict, List, Optional
 
 # In-memory store lưu trữ danh sách các đơn đăng ký chỗ ở để liên kết trực tiếp
 # giữa sinh viên và quản lý KTX
-REGISTRATION_REQUESTS: List[Dict] = [
-    {
-        "id": "DK-001",
-        "msv": "B21DCCN001",
-        "ho_ten": "Nguyễn Văn A",
-        "gioi_tinh": "Nam",
-        "ngay_sinh": "2003-05-15",
-        "cccd": "001203004567",
-        "so_dien_thoai": "0987654321",
-        "email": "nguyenvana@ictu.edu.vn",
-        "khoa": "Công nghệ thông tin",
-        "lop": "D21CQCN01-B",
-        "dia_chi": "Số 123 Đường Cầu Giấy, Hà Nội",
-        "doi_tuong_uu_tien": "Không thuộc diện ưu tiên",
-        "nguoi_giam_ho": "Nguyễn Văn B",
-        "moi_quan_he": "Bố",
-        "sdt_nguoi_giam_ho": "0912345678",
-        "nguyen_vong": "Xin hãy xếp cho em 1 phòng nào đó ở tòa A với ạ 🥹",
-        "nguyen_vong_phong": "P36",
-        "nguyen_vong_label": "P36 - Tầng 3 - Tòa A2",
-        "ngay_gui": "2026-09-26T15:00:00",
-        "trang_thai": "CHO_DUYET",
-        "goi_y": {
-            "ma_toa": "A",
-            "ma_phong": "A203",
-            "ma_giuong": "G04",
-        },
-    }
-]
+REGISTRATION_REQUESTS: List[Dict] = []
 
 
 def add_request(req_data: dict) -> dict:
     """Thêm một đơn đăng ký mới vào hệ thống quản lý."""
+    now = datetime.datetime.now()
+    date_str = now.strftime("%d/%m/%Y")
+    time_str = now.strftime("%H:%M")
+
     new_req = {
         "id": req_data.get("id") or req_data.get("ma_yeu_cau") or f"DK-{len(REGISTRATION_REQUESTS) + 1:03d}",
+        "ma_yeu_cau": req_data.get("ma_yeu_cau") or req_data.get("id") or f"DK-{len(REGISTRATION_REQUESTS) + 1:03d}",
         "msv": req_data.get("msv", ""),
         "ho_ten": req_data.get("ho_ten", "Sinh viên"),
-        "gioi_tinh": req_data.get("gioi_tinh", "Nam"),
+        "gioi_tinh": req_data.get("gioi_tinh", ""),
         "ngay_sinh": req_data.get("ngay_sinh", ""),
         "cccd": req_data.get("cccd", ""),
         "so_dien_thoai": req_data.get("so_dien_thoai", ""),
@@ -52,21 +29,29 @@ def add_request(req_data: dict) -> dict:
         "nguoi_giam_ho": req_data.get("nguoi_giam_ho", ""),
         "moi_quan_he": req_data.get("moi_quan_he", ""),
         "sdt_nguoi_giam_ho": req_data.get("sdt_nguoi_giam_ho", ""),
+        "loai_phong": req_data.get("loai_phong", "") or "Phòng tiêu chuẩn",
+        "tang_mong_muon": req_data.get("tang_mong_muon", ""),
+        "muc_gia_mong_muon": req_data.get("muc_gia_mong_muon", ""),
         "nguyen_vong": req_data.get("noi_dung_nguyen_vong") or req_data.get("nguyen_vong") or req_data.get("nguyen_vong_label") or "Xin đăng ký phòng KTX",
         "nguyen_vong_phong": req_data.get("nguyen_vong_phong", ""),
         "nguyen_vong_label": req_data.get("nguyen_vong_label", ""),
-        "ngay_gui": datetime.datetime.now().isoformat(),
-        "trang_thai": "CHO_DUYET",
-        "goi_y": {
-            "ma_toa": "A",
-            "ma_phong": "A203",
-            "ma_giuong": "G04",
-        },
+        "ngay_dang_ky": date_str,
+        "ngay_gui": f"{date_str} {time_str}",
+        "ngay_gui_time": f"{date_str} {time_str}",
+        "nam_hoc": req_data.get("nam_hoc") or "2026-2027",
+        "trang_thai": "PENDING",
+        "trang_thai_label": "Đang xét duyệt",
+        "ma_toa_mong_muon": req_data.get("ma_toa_mong_muon", ""),
     }
 
     # Đưa lên đầu danh sách để quản lý thấy ngay đơn mới nhất
     REGISTRATION_REQUESTS.insert(0, new_req)
     return new_req
+
+
+def get_registration_requests() -> List[Dict]:
+    """Lấy danh sách các đơn đăng ký chỗ ở."""
+    return REGISTRATION_REQUESTS
 
 
 def get_all_requests() -> List[Dict]:
@@ -98,7 +83,7 @@ def update_request_status(req_id: str, new_status: str, extra_data: Optional[dic
     req = get_request_by_id(req_id)
     if req:
         req["trang_thai"] = new_status
-        req["trang_thai_label"] = "Đã duyệt" if new_status == "DA_DUYET" else "Từ chối"
+        req["trang_thai_label"] = "Đã duyệt" if new_status in ("DA_DUYET", "APPROVED") else "Từ chối"
         if extra_data:
             req.update(extra_data)
         return req
