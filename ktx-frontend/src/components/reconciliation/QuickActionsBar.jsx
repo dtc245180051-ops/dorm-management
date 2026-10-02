@@ -42,12 +42,12 @@ export default function QuickActionsBar({
             />
 
             {statementFile ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   className="recon-file-link-btn"
                   onClick={() => fileInputRef.current?.click()}
-                  title="Nhấn để chọn file sao kê khác"
+                  title="File sao kê hiện tại: Nhấn để xem hoặc chọn file khác"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -61,19 +61,29 @@ export default function QuickActionsBar({
                 <button
                   type="button"
                   style={{
-                    fontSize: '12px',
-                    padding: '3px 8px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    fontSize: '12.5px',
+                    padding: '4px 10px',
                     borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    background: '#f8fafc',
+                    border: '1.5px solid #2b85ec',
+                    background: '#eff6ff',
                     cursor: 'pointer',
-                    color: '#475569',
-                    fontWeight: 500,
+                    color: '#1a73e8',
+                    fontWeight: 600,
+                    transition: 'all 0.15s ease',
                   }}
                   onClick={() => fileInputRef.current?.click()}
-                  title="Chọn file sao kê khác"
+                  title="Chọn file sao kê khác để thay thế"
                 >
-                  Đổi file
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 2v6h-6" />
+                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                    <path d="M3 22v-6h6" />
+                    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                  </svg>
+                  <span>Đổi file khác</span>
                 </button>
               </div>
             ) : (

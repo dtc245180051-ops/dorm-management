@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import './TransactionReconciliation.css';
 import { reconciliationService } from '../../services/reconciliationService';
 import QuickActionsBar from '../../components/reconciliation/QuickActionsBar';
@@ -8,6 +8,16 @@ import TransactionTable from '../../components/reconciliation/TransactionTable';
 import ManualMatchModal from '../../components/reconciliation/ManualMatchModal';
 import TransactionDetailModal from '../../components/reconciliation/TransactionDetailModal';
 import Pagination from '../../components/reconciliation/Pagination';
+
+// Helper lấy cache upload sao kê từ sessionStorage / localStorage
+const getCachedStatement = () => {
+  try {
+    const raw = sessionStorage.getItem('ktx_statement_upload') || localStorage.getItem('ktx_statement_upload');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
 
 /**
  * Trang "ĐỐI SOÁT GIAO DỊCH" (Dành cho Kế toán iDORM)
@@ -19,16 +29,19 @@ import Pagination from '../../components/reconciliation/Pagination';
  *    - Trích xuất metadata (Tên file, Ngân hàng, Kỳ sao kê)
  *    - Parse từng dòng và chạy quy tắc đối soát tự động từ backend
  *    - Cập nhật số liệu thống kê (Tổng giao dịch, Khớp tự động, Cần xử lý tay)
+ *    - Lưu trạng thái vào bộ nhớ để khi chuyển tab/quay lại không bị mất
  * 3. Khớp tay:
  *    - Mở popup chọn sinh viên & hóa đơn gạch nợ thủ công
  *    - Cập nhật dòng thành "Đã khớp" (xanh lá), thao tác "Xem"
  */
 export default function TransactionReconciliation({ searchTerm = '' }) {
+  const cachedStatement = getCachedStatement();
+
   // 1. Trạng thái Upload file sao kê
-  const [isUploaded, setIsUploaded] = useState(false);
-  const [statementFile, setStatementFile] = useState('');
-  const [quickBank, setQuickBank] = useState('TP Bank - TK 20020813520');
-  const [quickPeriod, setQuickPeriod] = useState('--');
+  const [isUploaded, setIsUploaded] = useState(() => Boolean(cachedStatement?.isUploaded));
+  const [statementFile, setStatementFile] = useState(() => cachedStatement?.statementFile || '');
+  const [quickBank, setQuickBank] = useState(() => cachedStatement?.quickBank || 'TP Bank - TK 20020813520');
+  const [quickPeriod, setQuickPeriod] = useState(() => cachedStatement?.quickPeriod || '--');
 
   // 2. Danh sách giao dịch thật & Phân trang
   const [transactions, setTransactions] = useState([]);
@@ -37,7 +50,7 @@ export default function TransactionReconciliation({ searchTerm = '' }) {
   const [apiError, setApiError] = useState('');
 
   // 3. Thống kê (Mặc định = 0 khi chưa upload)
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState(() => cachedStatement?.stats || {
     totalTransactions: 0,
     autoMatched: 0,
     manualRequired: 0,
@@ -115,11 +128,22 @@ export default function TransactionReconciliation({ searchTerm = '' }) {
         setTotalItems(result.data.total || 0);
 
         if (result.data.statistics) {
-          setStats({
+          const newStats = {
             totalTransactions: result.data.statistics.totalTransactions,
             autoMatched: result.data.statistics.autoMatched,
             manualRequired: result.data.statistics.manualRequired,
-          });
+          };
+          setStats(newStats);
+
+          try {
+            const raw = sessionStorage.getItem('ktx_statement_upload') || localStorage.getItem('ktx_statement_upload');
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              const updated = { ...parsed, stats: newStats };
+              sessionStorage.setItem('ktx_statement_upload', JSON.stringify(updated));
+              localStorage.setItem('ktx_statement_upload', JSON.stringify(updated));
+            }
+          } catch {}
         }
       } else {
         if (result.status === 401) {
@@ -140,6 +164,13 @@ export default function TransactionReconciliation({ searchTerm = '' }) {
     [isUploaded, filters, searchTerm, currentPage, pageSize]
   );
 
+  // Khôi phục dữ liệu đối soát khi chuyển trang quay lại nếu đã upload file
+  useEffect(() => {
+    if (isUploaded) {
+      loadTransactions({ page: 1, hasUploaded: true, force: true });
+    }
+  }, []);
+
   // 8. Xử lý Upload file sao kê ngân hàng (Excel/CSV)
   const handleFileUpload = async (file) => {
     if (!file) return;
@@ -153,17 +184,35 @@ export default function TransactionReconciliation({ searchTerm = '' }) {
 
       if (res.success && res.data) {
         setIsUploaded(true);
-        setStatementFile(res.data.fileName || file.name);
-        if (res.data.bankName) setQuickBank(res.data.bankName);
-        if (res.data.period) setQuickPeriod(res.data.period);
+        const fileName = res.data.fileName || file.name;
+        const bankName = res.data.bankName || quickBank;
+        const period = res.data.period || quickPeriod;
+        const newStats = res.data.statistics
+          ? {
+              totalTransactions: res.data.statistics.totalTransactions,
+              autoMatched: res.data.statistics.autoMatched,
+              manualRequired: res.data.statistics.manualRequired,
+            }
+          : stats;
+
+        setStatementFile(fileName);
+        if (res.data.bankName) setQuickBank(bankName);
+        if (res.data.period) setQuickPeriod(period);
+        if (res.data.statistics) setStats(newStats);
         setCurrentPage(1);
 
-        if (res.data.statistics) {
-          setStats({
-            totalTransactions: res.data.statistics.totalTransactions,
-            autoMatched: res.data.statistics.autoMatched,
-            manualRequired: res.data.statistics.manualRequired,
-          });
+        const cacheObj = {
+          isUploaded: true,
+          statementFile: fileName,
+          quickBank: bankName,
+          quickPeriod: period,
+          stats: newStats,
+        };
+        try {
+          sessionStorage.setItem('ktx_statement_upload', JSON.stringify(cacheObj));
+          localStorage.setItem('ktx_statement_upload', JSON.stringify(cacheObj));
+        } catch (e) {
+          console.warn('Cannot write statement upload cache:', e);
         }
 
         // Tải trang 1 đúng pageSize 5 để đồng bộ hoàn toàn với phân trang
@@ -254,11 +303,23 @@ export default function TransactionReconciliation({ searchTerm = '' }) {
       );
 
       // Cập nhật card thống kê: Khớp tự động/đã khớp tăng 1, Cần xử lý tay giảm 1
-      setStats((prev) => ({
-        ...prev,
-        autoMatched: prev.autoMatched + 1,
-        manualRequired: Math.max(0, prev.manualRequired - 1),
-      }));
+      setStats((prev) => {
+        const updated = {
+          ...prev,
+          autoMatched: prev.autoMatched + 1,
+          manualRequired: Math.max(0, prev.manualRequired - 1),
+        };
+        try {
+          const raw = sessionStorage.getItem('ktx_statement_upload') || localStorage.getItem('ktx_statement_upload');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const cacheUpdated = { ...parsed, stats: updated };
+            sessionStorage.setItem('ktx_statement_upload', JSON.stringify(cacheUpdated));
+            localStorage.setItem('ktx_statement_upload', JSON.stringify(cacheUpdated));
+          }
+        } catch {}
+        return updated;
+      });
     }
 
     // 13.2. Đồng bộ lại dữ liệu mới nhất từ CSDL backend

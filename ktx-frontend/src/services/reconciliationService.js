@@ -488,32 +488,20 @@ export const reconciliationService = {
           data,
           message: data.message || 'Gán giao dịch thủ công thành công',
         };
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        return {
+          success: false,
+          message: errData.detail || 'Lỗi khi gán giao dịch thủ công: Số tiền hoặc thông tin không hợp lệ',
+        };
       }
     } catch (error) {
-      console.warn('Lỗi manualMatch API, cập nhật bộ đệm:', error);
+      console.warn('Lỗi manualMatch API:', error);
+      return {
+        success: false,
+        message: `Lỗi kết nối máy chủ: ${error.message}`,
+      };
     }
-
-    // Fallback cập nhật cache
-    const cache = getCachedData();
-    if (cache && cache.items) {
-      const target = cache.items.find(
-        (i) => i.id === transactionId || i.bankTransactionCode === transactionId
-      );
-      if (target) {
-        target.status = 'MATCHED_MANUALLY';
-        target.invoiceCode = invoiceId;
-        target.matched_invoice = invoiceId;
-        target.studentCode = studentId;
-        target.studentName = `Sinh viên ${studentId}`;
-        target.action = 'VIEW';
-        saveCacheData(cache);
-      }
-    }
-
-    return {
-      success: true,
-      message: 'Gán giao dịch thủ công thành công',
-    };
   },
 
   /**

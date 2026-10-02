@@ -153,6 +153,13 @@ export default function ManualMatchModal({
   const handleConfirm = async () => {
     if (!selectedInvoice || !transaction) return;
 
+    if (!isAmountMatched) {
+      setErrorMessage(
+        `Không thể gán: Số tiền giao dịch (${formatCurrency(transaction.amount)}) không khớp với số tiền trên hóa đơn (${formatCurrency(selectedInvoice.amount)}). Chênh lệch: ${formatCurrency(Math.abs(diffAmount))}`
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage('');
 
@@ -435,13 +442,15 @@ export default function ManualMatchModal({
           <button
             type="button"
             className="recon-modal-btn recon-btn-confirm"
-            disabled={!selectedInvoice || isSubmitting}
+            disabled={!selectedInvoice || isSubmitting || !isAmountMatched}
             onClick={handleConfirm}
             style={{
-              backgroundColor: selectedInvoice ? '#0084ff' : '#ffffff',
-              color: selectedInvoice ? '#ffffff' : '#94a3b8',
-              borderColor: selectedInvoice ? '#0084ff' : '#cbd5e1',
+              backgroundColor: selectedInvoice && isAmountMatched ? '#0084ff' : '#cbd5e1',
+              color: selectedInvoice && isAmountMatched ? '#ffffff' : '#64748b',
+              borderColor: selectedInvoice && isAmountMatched ? '#0084ff' : '#cbd5e1',
+              cursor: selectedInvoice && isAmountMatched ? 'pointer' : 'not-allowed',
             }}
+            title={selectedInvoice && !isAmountMatched ? 'Số tiền giao dịch và hóa đơn có chênh lệch, không thể gán' : ''}
           >
             {isSubmitting ? (
               <span>Đang xử lý...</span>

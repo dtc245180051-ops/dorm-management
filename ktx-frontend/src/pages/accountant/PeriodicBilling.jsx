@@ -166,13 +166,24 @@ export default function PeriodicBilling({ searchTerm = '' }) {
 
   // Quản lý upload file chỉ số điện nước & tính toán tự động
   const [isUploadingReadings, setIsUploadingReadings] = useState(false);
-  const [uploadReadingsInfo, setUploadReadingsInfo] = useState(null);
-  const [uploadedCandidates, setUploadedCandidates] = useState(null);
+
+  // Helper đọc cache upload điện nước theo tháng từ sessionStorage
+  const getCachedUpload = useCallback((month) => {
+    try {
+      const raw = sessionStorage.getItem(`ktx_utility_upload_${month}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const [uploadReadingsInfo, setUploadReadingsInfo] = useState(() => getCachedUpload(utilityMonth)?.info || null);
+  const [uploadedCandidates, setUploadedCandidates] = useState(() => getCachedUpload(utilityMonth)?.candidates || null);
+  const [utilityRooms, setUtilityRooms] = useState(() => getCachedUpload(utilityMonth)?.rooms || []);
   const fileInputRef = useRef(null);
 
   // State dữ liệu danh sách sinh viên & phòng
   const [roomStudents, setRoomStudents] = useState([]);
-  const [utilityRooms, setUtilityRooms] = useState(MOCK_UTILITY_BILLING_ROOMS);
 
   // Trạng thái hiển thị tất cả
   const [showAll, setShowAll] = useState(false);
@@ -216,33 +227,23 @@ export default function PeriodicBilling({ searchTerm = '' }) {
     }
   }, [billingMonth, appliedTarget]);
 
-  // 2. Tải danh sách phòng điện nước từ Backend API
-  const loadUtilityCandidates = useCallback(async () => {
-    const data = await invoiceService.getUtilityCandidates(utilityMonth);
-    if (data && Array.isArray(data) && data.length > 0) {
-      setUtilityRooms(
-        data.map((r) => ({
-          room: `P${r.so_phong} - ${r.toa_nha}`,
-          so_phong: r.so_phong,
-          toa_nha: r.toa_nha,
-          elecMeter: r.chi_so_dien_cu_moi,
-          elecUsage: `${r.so_dien_kwh} kWh`,
-          waterMeter: r.chi_so_nuoc_cu_moi,
-          waterUsage: `${r.so_nuoc_m3} m³`,
-          totalAmount: `${r.tong_tien.toLocaleString('vi-VN')} VND`,
-          rawAmount: r.tong_tien,
-        }))
-      );
+  // 2. Khi đổi tháng điện nước, khôi phục cache nếu tháng đó đã nạp file, ngược lại reset rỗng
+  useEffect(() => {
+    const cached = getCachedUpload(utilityMonth);
+    if (cached) {
+      setUtilityRooms(cached.rooms || []);
+      setUploadReadingsInfo(cached.info || null);
+      setUploadedCandidates(cached.candidates || null);
+    } else {
+      setUtilityRooms([]);
+      setUploadReadingsInfo(null);
+      setUploadedCandidates(null);
     }
-  }, [utilityMonth]);
+  }, [utilityMonth, getCachedUpload]);
 
   useEffect(() => {
     loadRoomCandidates();
   }, [loadRoomCandidates]);
-
-  useEffect(() => {
-    loadUtilityCandidates();
-  }, [loadUtilityCandidates]);
 
   // 3. Lọc dữ liệu sinh viên theo loại phòng áp dụng và từ khóa tìm kiếm
   const targetRoomStudents = useMemo(() => {
@@ -297,37 +298,51 @@ export default function PeriodicBilling({ searchTerm = '' }) {
     if (!file) return;
 
     setIsUploadingReadings(true);
-    setUploadReadingsInfo(null);
 
     try {
       const res = await invoiceService.uploadUtilityReadings(file, utilityMonth, 3000, 15000);
       if (res.success && res.data) {
         const items = res.data.items || [];
-        setUploadedCandidates(items);
-        setUtilityRooms(
-          items.map((r) => ({
-            room: `P${r.so_phong} - ${r.toa_nha}`,
-            so_phong: r.so_phong,
-            toa_nha: r.toa_nha,
-            elecMeter: r.chi_so_dien_cu_moi,
-            elecUsage: `${r.so_dien_kwh} kWh`,
-            waterMeter: r.chi_so_nuoc_cu_moi,
-            waterUsage: `${r.so_nuoc_m3} m³`,
-            totalAmount: `${r.tong_tien.toLocaleString('vi-VN')} VND`,
-            rawAmount: r.tong_tien,
-            so_dien_cu: r.so_dien_cu,
-            so_dien_moi: r.so_dien_moi,
-            so_nuoc_cu: r.so_nuoc_cu,
-            so_nuoc_moi: r.so_nuoc_moi,
-            tien_dien: r.tien_dien,
-            tien_nuoc: r.tien_nuoc,
-          }))
-        );
-        setUploadReadingsInfo({
+        const mappedRooms = items.map((r) => ({
+          room: `P${r.so_phong} - ${r.toa_nha}`,
+          so_phong: r.so_phong,
+          toa_nha: r.toa_nha,
+          elecMeter: r.chi_so_dien_cu_moi,
+          elecUsage: `${r.so_dien_kwh} kWh`,
+          waterMeter: r.chi_so_nuoc_cu_moi,
+          waterUsage: `${r.so_nuoc_m3} m³`,
+          totalAmount: `${r.tong_tien.toLocaleString('vi-VN')} VND`,
+          rawAmount: r.tong_tien,
+          so_dien_cu: r.so_dien_cu,
+          so_dien_moi: r.so_dien_moi,
+          so_nuoc_cu: r.so_nuoc_cu,
+          so_nuoc_moi: r.so_nuoc_moi,
+          tien_dien: r.tien_dien,
+          tien_nuoc: r.tien_nuoc,
+        }));
+        const info = {
           fileName: res.data.fileName || file.name,
           totalRooms: res.data.totalRooms || items.length,
           totalAmount: res.data.totalAmount || 0,
-        });
+        };
+
+        setUploadedCandidates(items);
+        setUtilityRooms(mappedRooms);
+        setUploadReadingsInfo(info);
+
+        try {
+          sessionStorage.setItem(
+            `ktx_utility_upload_${utilityMonth}`,
+            JSON.stringify({
+              rooms: mappedRooms,
+              info,
+              candidates: items,
+            })
+          );
+        } catch (e) {
+          console.warn('Cannot save uploaded utility cache:', e);
+        }
+
         setToastMessage(`Đã đọc và tính toán thành công điện nước cho ${items.length} phòng từ file!`);
       } else {
         setToastMessage(`Lỗi tải file: ${res.message || 'Không thể xử lý file chỉ số'}`);
@@ -339,10 +354,6 @@ export default function PeriodicBilling({ searchTerm = '' }) {
       if (fileInputRef.current) fileInputRef.current.value = '';
       setTimeout(() => setToastMessage(''), 5000);
     }
-  };
-
-  const handleDownloadTemplate = () => {
-    invoiceService.downloadUtilityTemplate();
   };
 
   // 5. Xử lý xác nhận phát hành hóa đơn (gọi API Backend)
@@ -367,6 +378,12 @@ export default function PeriodicBilling({ searchTerm = '' }) {
         setToastMessage(`Lỗi: ${result.message}`);
       }
     } else {
+      if (utilityRooms.length === 0) {
+        setToastMessage('Chưa có dữ liệu chỉ số điện nước. Vui lòng upload file Excel/CSV trước khi phát hành!');
+        setTimeout(() => setToastMessage(''), 4000);
+        return;
+      }
+
       const payload = {
         thang: utilityMonth,
         han_thanh_toan: utilityDeadline,
@@ -379,7 +396,13 @@ export default function PeriodicBilling({ searchTerm = '' }) {
       const result = await invoiceService.publishUtilityInvoices(payload);
       if (result.success) {
         setToastMessage(result.data?.message || `Đã phát hành thành công hóa đơn điện nước ${utilityMonth}!`);
-        loadUtilityCandidates();
+        // Reset sau khi phát hành thành công
+        setUtilityRooms([]);
+        setUploadReadingsInfo(null);
+        setUploadedCandidates(null);
+        try {
+          sessionStorage.removeItem(`ktx_utility_upload_${utilityMonth}`);
+        } catch {}
       } else {
         setToastMessage(`Lỗi: ${result.message}`);
       }
@@ -392,8 +415,11 @@ export default function PeriodicBilling({ searchTerm = '' }) {
 
   // Xử lý khi nhấn nút Áp dụng trong tab Hóa đơn tiền điện nước theo tháng
   const handleApplyUtility = () => {
-    loadUtilityCandidates();
-    setToastMessage(`Đã áp dụng cấu hình cho ${utilityMonth}!`);
+    if (utilityRooms.length === 0) {
+      setToastMessage(`Đã cập nhật cấu hình cho ${utilityMonth}. Vui lòng upload file chỉ số điện nước để tính toán!`);
+    } else {
+      setToastMessage(`Đã áp dụng cấu hình cho ${utilityMonth}!`);
+    }
     setTimeout(() => {
       setToastMessage('');
     }, 3000);
@@ -637,33 +663,37 @@ export default function PeriodicBilling({ searchTerm = '' }) {
               style={{ display: 'none' }}
               onChange={handleFileUpload}
             />
-            <button
-              type="button"
-              className="billing-btn-upload-readings"
-              disabled={isUploadingReadings}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              {isUploadingReadings ? 'Đang đọc và tính toán chỉ số...' : 'Upload file chỉ số điện nước (Excel/CSV)'}
-            </button>
-
-            <button
-              type="button"
-              className="billing-btn-download-template"
-              onClick={handleDownloadTemplate}
-              title="Tải file Excel mẫu để nhập chỉ số cũ - mới"
-            >
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              Tải file mẫu Excel
-            </button>
+            {uploadReadingsInfo ? (
+              <button
+                type="button"
+                className="billing-btn-change-file"
+                disabled={isUploadingReadings}
+                onClick={() => fileInputRef.current?.click()}
+                title="Tải lên file chỉ số khác để thay thế dữ liệu hiện tại"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 2v6h-6" />
+                  <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                  <path d="M3 22v-6h6" />
+                  <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                </svg>
+                {isUploadingReadings ? 'Đang đọc và tính toán chỉ số...' : 'Đổi file khác'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="billing-btn-upload-readings"
+                disabled={isUploadingReadings}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                {isUploadingReadings ? 'Đang đọc và tính toán chỉ số...' : 'Upload file chỉ số điện nước (Excel/CSV)'}
+              </button>
+            )}
           </div>
 
           {uploadReadingsInfo && (
@@ -735,7 +765,26 @@ export default function PeriodicBilling({ searchTerm = '' }) {
               </tr>
             </thead>
             <tbody>
-              {filteredUtilityRooms.length > 0 ? (
+              {utilityRooms.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="billing-empty-state" style={{ padding: '42px 16px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="12" y1="18" x2="12" y2="12" />
+                        <line x1="9" y1="15" x2="15" y2="15" />
+                      </svg>
+                      <span style={{ fontSize: '15px', fontWeight: 600, color: '#334155' }}>
+                        Chưa có dữ liệu chỉ số điện nước
+                      </span>
+                      <span style={{ fontSize: '13.5px', color: '#64748b' }}>
+                        Vui lòng tải lên file chỉ số điện nước (Excel/CSV) để xem trước dữ liệu và tính tiền cho các phòng.
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredUtilityRooms.length > 0 ? (
                 filteredUtilityRooms.map((item, index) => (
                   <tr key={`${item.room}-${index}`}>
                     <td className="col-student-id">{item.room}</td>
@@ -761,19 +810,32 @@ export default function PeriodicBilling({ searchTerm = '' }) {
       {/* ================= ACTIONS DƯỚI BẢNG ================= */}
       <div className="billing-footer-actions">
         {/* Link Xem tất cả */}
-        <button
-          type="button"
-          className="billing-view-all-link"
-          onClick={() => setShowAll(!showAll)}
-        >
-          {showAll ? 'Thu gọn danh sách' : 'Xem tất cả'}
-        </button>
+        {((activeTab === 'room' && targetRoomStudents.length > 3) || (activeTab === 'utility' && utilityRooms.length > 3)) ? (
+          <button
+            type="button"
+            className="billing-view-all-link"
+            onClick={() => setShowAll(!showAll)}
+          >
+            {showAll ? 'Thu gọn danh sách' : 'Xem tất cả'}
+          </button>
+        ) : (
+          <div />
+        )}
 
         {/* Button Phát hành hóa đơn */}
         <button
           type="button"
-          className="billing-publish-btn"
-          onClick={() => setShowConfirmModal(true)}
+          className={`billing-publish-btn ${activeTab === 'utility' && utilityRooms.length === 0 ? 'billing-btn-disabled' : ''}`}
+          disabled={activeTab === 'utility' && utilityRooms.length === 0}
+          onClick={() => {
+            if (activeTab === 'utility' && utilityRooms.length === 0) {
+              setToastMessage('Vui lòng upload file chỉ số điện nước trước khi phát hành!');
+              setTimeout(() => setToastMessage(''), 3000);
+              return;
+            }
+            setShowConfirmModal(true);
+          }}
+          title={activeTab === 'utility' && utilityRooms.length === 0 ? 'Vui lòng upload file chỉ số trước khi phát hành' : ''}
         >
           {activeTab === 'room'
             ? 'Phát hành hóa đơn tiền phòng'

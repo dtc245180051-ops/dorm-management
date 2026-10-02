@@ -1004,7 +1004,7 @@ class ReconciliationService:
             )
         ).delete(synchronize_session=False)
 
-        # 4. Đảm bảo hóa đơn HD-2026-00130 của Ngô Phương Mai tồn tại (Dòng 1)
+        # 4. Đảm bảo hóa đơn HD-2026-00130 của Ngô Phương Mai tồn tại (Phòng tiêu chuẩn 350.000 đ)
         hd_130 = db.query(HoaDon).filter(HoaDon.ma_hoa_don == "HD-2026-00130").first()
         if not hd_130:
             hd_130 = HoaDon(
@@ -1013,51 +1013,23 @@ class ReconciliationService:
                 ho_ten="Ngô Phương Mai",
                 loai_hoa_don=LoaiHoaDon.TIEN_PHONG.value,
                 ky_thanh_toan="Tháng 09/2026",
-                so_tien=600000.0,
+                so_tien=350000.0,
                 ngay_lap=datetime.date(2026, 9, 1),
                 han_thanh_toan=datetime.date(2026, 9, 20),
                 trang_thai=TrangThaiHoaDon.DA_THANH_TOAN.value,
-                ghi_chu="Hóa đơn tiền phòng Tháng 09/2026",
+                ghi_chu="Hóa đơn tiền phòng tiêu chuẩn Tháng 09/2026",
             )
             db.add(hd_130)
             db.flush()
         else:
             hd_130.msv = "DTC245180037"
             hd_130.ho_ten = "Ngô Phương Mai"
-            hd_130.so_tien = 600000.0
+            hd_130.so_tien = 350000.0
             hd_130.trang_thai = TrangThaiHoaDon.DA_THANH_TOAN.value
             db.flush()
 
-        # 5. Đảm bảo hóa đơn tiền phòng chưa thanh toán tồn tại từ màn Lập hóa đơn (Dòng 2)
-        hd_unpaid = (
-            db.query(HoaDon)
-            .filter(HoaDon.ma_hoa_don == "HDTP-20260926-5A08F4")
-            .first()
-        )
-        if not hd_unpaid:
-            hd_unpaid = HoaDon(
-                ma_hoa_don="HDTP-20260926-5A08F4",
-                msv="DTC245180037",
-                ho_ten="Ngô Phương Mai",
-                loai_hoa_don=LoaiHoaDon.TIEN_PHONG.value,
-                ky_thanh_toan="Tháng 09/2026",
-                so_tien=350000.0,
-                ngay_lap=datetime.date(2026, 9, 26),
-                han_thanh_toan=datetime.date(2026, 10, 15),
-                trang_thai=TrangThaiHoaDon.CHUA_THANH_TOAN.value,
-                ghi_chu="Phát hành hóa đơn tiền phòng tiêu chuẩn Tháng 09/2026",
-            )
-            db.add(hd_unpaid)
-            db.flush()
-        else:
-            hd_unpaid.ho_ten = "Ngô Phương Mai"
-            hd_unpaid.so_tien = 350000.0
-            hd_unpaid.ky_thanh_toan = "Tháng 09/2026"
-            # Nếu giao dịch FT2625501980 chưa khớp thì hóa đơn này phải ở trạng thái chưa thanh toán
-            tx_check = db.query(GiaoDichNganHang).filter(GiaoDichNganHang.ma_giao_dich_ngan_hang == "FT2625501980").first()
-            if not tx_check or tx_check.trang_thai not in [TrangThaiDoiSoat.MATCHED.value, TrangThaiDoiSoat.MATCHED_MANUALLY.value]:
-                hd_unpaid.trang_thai = TrangThaiHoaDon.CHUA_THANH_TOAN.value
-            db.flush()
+        # Dọn dẹp hóa đơn trùng HDTP-20260926-5A08F4 nếu có
+        db.query(HoaDon).filter(HoaDon.ma_hoa_don == "HDTP-20260926-5A08F4").delete(synchronize_session=False)
 
         # 6. Đảm bảo Dòng 1: Giao dịch khớp tự động thành công (FT2625501977)
         tx1 = db.query(GiaoDichNganHang).filter(GiaoDichNganHang.ma_giao_dich_ngan_hang == "FT2625501977").first()

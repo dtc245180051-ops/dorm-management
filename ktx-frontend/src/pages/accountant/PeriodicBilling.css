@@ -258,10 +258,10 @@
   cursor: not-allowed;
 }
 
-.billing-btn-download-template {
+.billing-btn-change-file {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   height: 40px;
   padding: 0 16px;
   border-radius: 8px;
@@ -272,6 +272,20 @@
   border: 1.5px solid #2b85ec;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(43, 133, 236, 0.12);
+}
+
+.billing-btn-change-file:hover {
+  background-color: #eff6ff;
+  border-color: #1a73e8;
+  color: #1a73e8;
+  transform: translateY(-1px);
+}
+
+.billing-btn-change-file:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .billing-btn-download-template:hover {
@@ -448,6 +462,15 @@
 
 .billing-publish-btn:active {
   transform: translateY(0);
+}
+
+.billing-publish-btn:disabled,
+.billing-publish-btn.billing-btn-disabled {
+  background-color: #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 /* ================= MODAL XÁC NHẬN ================= */
