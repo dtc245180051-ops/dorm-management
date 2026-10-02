@@ -10,6 +10,7 @@ from sqlalchemy import and_, desc, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.contract import HopDong
+from app.models.debt import SoCongNo
 from app.models.dorm import Phong
 from app.models.invoice import HoaDon, LoaiHoaDon, TrangThaiHoaDon
 from app.models.reconciliation import GiaoDichNganHang, TrangThaiDoiSoat
@@ -23,6 +24,7 @@ from app.schemas.reconciliation import (
     StudentSearchItem,
     TransactionDetailResponse,
     TransactionStatistics,
+    UnpaidInvoiceItem,
 )
 
 
@@ -34,12 +36,55 @@ class ReconciliationService:
         return dt.strftime("%d/%m %H:%M")
 
     @staticmethod
+    def parse_transfer_syntax(content: Optional[str]) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+        """
+        Phân tích cú pháp nội dung chuyển khoản theo đúng quy định:
+        1. Tiền phòng: Bắt buộc cú pháp 'TP <mã sinh viên>' (hoặc 'TIEN PHONG <mã sinh viên>', 'TIEN PHÒNG <mã sinh viên>')
+           - Trả về ('TIEN_PHONG', student_code, None)
+        2. Tiền điện nước: Bắt buộc cú pháp 'DN <số phòng>' (hoặc 'DIEN NUOC <số phòng>', 'DIENNUOC <số phòng>', 'TIEN NUOC <số phòng>')
+           - Trả về ('DIEN_NUOC', None, room_code)
+        3. Sai cú pháp: Các trường hợp còn lại
+           - Trả về (None, None, None)
+        """
+        if not content:
+            return None, None, None
+
+        raw = content.strip()
+
+        # Regex tiền phòng: bắt đầu hoặc có từ khóa TP / TIEN PHONG / TIEN PHÒNG rồi đến mã sinh viên
+        pattern_room = re.compile(
+            r"^\s*(?:TP|TIEN\s*PH[OÒ]NG)\s*[:\-]?(?:\s*|\b)([A-Za-z0-9]+)",
+            re.IGNORECASE,
+        )
+        m_tp = pattern_room.search(raw)
+        if m_tp:
+            code = m_tp.group(1).strip().upper()
+            # Mã SV phải có ít nhất 1 chữ số và độ dài >= 4
+            if any(c.isdigit() for c in code) and len(code) >= 4:
+                return "TIEN_PHONG", code, None
+
+        # Regex tiền điện nước: bắt đầu hoặc có từ khóa DN / DIEN NUOC / DIENNUOC / TIEN NUOC rồi đến số phòng
+        pattern_util = re.compile(
+            r"^\s*(?:DN|DIEN\s*NUOC|DIENNUOC|TIEN\s*NUOC|TIEN\s*DIEN(?:\s*NUOC)?)\s*[:\-]?(?:\s*|\b)([A-Za-z0-9_\-]+)",
+            re.IGNORECASE,
+        )
+        m_dn = pattern_util.search(raw)
+        if m_dn:
+            room = m_dn.group(1).strip()
+            # Số phòng không được là các từ dừng (stopwords)
+            if room.upper() not in ["TIEN", "NUOC", "DIEN", "KTX", "NOP"]:
+                return "DIEN_NUOC", None, room
+
+        return None, None, None
+
+    @staticmethod
     def parse_student_code(content: Optional[str]) -> Optional[str]:
         """
-        Phân tích nội dung chuyển khoản để xác định mã sinh viên theo format của project:
-        - Các tiền tố mã sinh viên chuẩn: DTC + số (vd DTC245180037, DTC2151001) hoặc SV + số (SV001, SV002...).
-        - Trả về mã sinh viên dạng chữ in hoa nếu tìm thấy, hoặc None nếu nội dung không chứa mã SV.
+        Helper trích xuất mã SV nếu có từ nội dung chuyển khoản
         """
+        fee_type, code, _ = ReconciliationService.parse_transfer_syntax(content)
+        if fee_type == "TIEN_PHONG" and code:
+            return code
         if not content:
             return None
         match = re.search(r'\b(DTC\d+|SV\d+)\b', content.strip(), re.IGNORECASE)
@@ -47,154 +92,225 @@ class ReconciliationService:
             return match.group(1).upper()
         return None
 
+    @staticmethod
+    def is_room_match(target_room: Optional[str], ma_phong: Optional[str], so_phong: Optional[str]) -> bool:
+        """
+        Kiểm tra độ trùng khớp giữa phòng trong nội dung CK (ví dụ: 'P203', '203', 'P36-A2')
+        với thông tin phòng của hóa đơn (ma_phong: 'A203', 'P36_A2'; so_phong: '203 - Tòa A1', 'P36-A2').
+        Quy tắc:
+        - Bỏ qua ký tự đặc biệt, so sánh không phân biệt hoa thường.
+        - Khớp trọn bộ danh sách số (ví dụ: 'P203' -> ['203'] == 'A203' -> ['203']).
+        - Hỗ trợ số phòng 3 chữ số (ví dụ: '203', '101', '102') khớp tiền tố của '203 - Tòa A1'.
+        - Tránh khớp sai giữa các phòng khác tòa (ví dụ: 'P36-A8' KHÔNG khớp 'P36-A2').
+        """
+        if not target_room:
+            return False
+
+        t_clean = re.sub(r"[^a-zA-Z0-9]", "", target_room).lower()
+        m_clean = re.sub(r"[^a-zA-Z0-9]", "", ma_phong or "").lower()
+        s_clean = re.sub(r"[^a-zA-Z0-9]", "", so_phong or "").lower()
+
+        # 1. Khớp chính xác hoàn toàn chuỗi chuẩn hóa
+        if t_clean and (t_clean == m_clean or t_clean == s_clean):
+            return True
+
+        d_target = re.findall(r"\d+", target_room)
+        d_ma = re.findall(r"\d+", ma_phong or "")
+        d_so = re.findall(r"\d+", so_phong or "")
+
+        if not d_target:
+            return False
+
+        # 2. Khớp trọn bộ danh sách số (ví dụ: 'P203' -> ['203'] == 'A203' -> ['203'])
+        # hoặc 'P36-A2' -> ['36', '2'] == 'P36_A2' -> ['36', '2']
+        if d_target == d_ma or d_target == d_so:
+            return True
+
+        # 3. Target là số phòng dạng 3 chữ số (ví dụ: 101, 102, 203, P203, P101)
+        # và số phòng trong ma_phong hoặc so_phong bắt đầu bằng số này
+        if len(d_target) == 1 and len(d_target[0]) >= 3:
+            room_num = d_target[0]
+            if (d_ma and d_ma[0] == room_num) or (d_so and d_so[0] == room_num):
+                return True
+
+        return False
+
     @classmethod
     def auto_reconcile_transaction(cls, db: Session, tx: GiaoDichNganHang) -> None:
         """
-        Nghiệp vụ đối soát giao dịch ngân hàng theo đúng quy tắc thực tế:
+        Nghiệp vụ đối soát giao dịch ngân hàng theo quy tắc:
         - Nếu giao dịch đã khớp thủ công (MATCHED_MANUALLY) thì giữ nguyên.
-        - Bước 1: Phân tích nội dung chuyển khoản để lấy studentCode.
-        - Trường hợp A: Không có mã sinh viên trong nội dung:
-          -> status = INVALID_SYNTAX ("Sai cú pháp")
-          -> invoiceCode = None
-          -> ghi_chu_doi_soat = "Thiếu mã SV"
-          -> Không gạch nợ.
-        - Trường hợp B: Có mã sinh viên nhưng KHÔNG tìm thấy SinhVien trong DB:
-          -> status = STUDENT_NOT_FOUND ("Sinh viên không tồn tại")
-          -> invoiceCode = None
-          -> ghi_chu_doi_soat = "Sinh viên không tồn tại"
-          -> Không gạch nợ.
-        - Trường hợp C & D: Có mã sinh viên và tìm thấy SinhVien:
-          - Tìm các hóa đơn nợ chưa thanh toán (CHUA_THANH_TOAN, QUA_HAN) của sinh viên.
-          - Nếu không có hóa đơn nợ nào:
-            -> status = MANUAL_REQUIRED
-            -> invoiceCode = None
-            -> ghi_chu_doi_soat = "Không có hóa đơn nợ"
-          - Nếu có hóa đơn nợ:
-            - Tìm hóa đơn có số tiền khớp với giao dịch: abs(inv.so_tien - tx.so_tien) < 1.0.
-            - Nếu TÌM ĐƯỢC hóa đơn khớp tiền (Trường hợp C):
-              -> GẠCH NỢ: inv.trang_thai = DA_THANH_TOAN
-              -> tx.ma_hoa_don = inv.ma_hoa_don
-              -> tx.msv = sv.msv
-              -> tx.trang_thai = TrangThaiDoiSoat.AUTO_MATCHED.value
-              -> tx.ghi_chu_doi_soat = f"Khớp tự động với hóa đơn {inv.ma_hoa_don}"
-              -> tx.nguoi_xu_ly = "Hệ thống"
-              -> tx.ngay_cap_nhat = datetime.datetime.now()
-            - Nếu KHÔNG tìm thấy hóa đơn khớp tiền (Trường hợp D - sai số tiền):
-              -> status = ERROR ("Lỗi đối soát")
-              -> invoiceCode = None
-              -> tx.msv = sv.msv
-              -> tx.ghi_chu_doi_soat = "Sai số tiền hóa đơn"
-              -> KHÔNG gạch nợ.
+        - Phân tích cú pháp nội dung chuyển khoản:
+          1. Tiền phòng (TP <mã sinh viên>):
+             - Khớp với hóa đơn tiền phòng (TIEN_PHONG, CHUA_THANH_TOAN / QUA_HAN) của SV.
+             - Nếu khớp số tiền: GẠCH NỢ (DA_THANH_TOAN), cập nhật Sổ công nợ, gắn mã HĐ, trạng thái 'Đã khớp'.
+          2. Tiền điện nước (DN <số phòng>):
+             - Khớp với hóa đơn tiền điện nước (DIEN_NUOC, CHUA_THANH_TOAN / QUA_HAN) của phòng.
+             - Nếu khớp số tiền: GẠCH NỢ (DA_THANH_TOAN), cập nhật Sổ công nợ, gắn mã HĐ, trạng thái 'Đã khớp'.
+          3. Không đúng cú pháp (hoặc không khớp số tiền/không tìm thấy hóa đơn):
+             - Trạng thái: Sai cú pháp (INVALID_SYNTAX).
+             - Khớp với hóa đơn: Rỗng (None).
+             - Ghi chú: "Sai cú pháp".
+             - Không gạch nợ.
         """
         if tx.trang_thai == TrangThaiDoiSoat.MATCHED_MANUALLY.value:
             return
 
-        student_code = cls.parse_student_code(tx.noi_dung_chuyen_khoan)
+        fee_type, student_code, room_code = cls.parse_transfer_syntax(tx.noi_dung_chuyen_khoan)
 
-        # Trường hợp A: Không có mã sinh viên trong nội dung
-        if not student_code:
+        # 1. Trường hợp không đúng cú pháp: Cột hóa đơn sẽ không có gì, trạng thái là Sai cú pháp
+        if not fee_type:
             tx.trang_thai = TrangThaiDoiSoat.INVALID_SYNTAX.value
             tx.ma_hoa_don = None
             tx.msv = None
-            tx.ghi_chu_doi_soat = "Thiếu mã SV"
+            tx.ghi_chu_doi_soat = "Sai cú pháp"
             return
 
-        # Nếu giao dịch đã khớp trước đó và hóa đơn hợp lệ thì giữ nguyên
+        # Nếu giao dịch đã khớp trước đó và hóa đơn thực sự khớp cú pháp/đối tượng thì giữ nguyên
         if tx.trang_thai in [TrangThaiDoiSoat.MATCHED.value, TrangThaiDoiSoat.AUTO_MATCHED.value] and tx.ma_hoa_don:
             inv = db.query(HoaDon).filter(HoaDon.ma_hoa_don == tx.ma_hoa_don).first()
             if inv and abs(float(inv.so_tien) - float(tx.so_tien)) < 1.0:
-                return
-
-        # Trường hợp B & C & D: Có mã sinh viên
-        sv = db.query(SinhVien).filter(SinhVien.msv.ilike(student_code)).first()
-        if not sv:
-            # Sinh viên không tồn tại trong hệ thống -> quy về Sai cú pháp
-            tx.trang_thai = TrangThaiDoiSoat.INVALID_SYNTAX.value
-            tx.ma_hoa_don = None
-            tx.msv = None
-            tx.ghi_chu_doi_soat = "Thiếu mã sinh viên"
-            return
-
-        # Tìm các hóa đơn chưa thanh toán của sinh viên
-        unpaid_invoices = (
-            db.query(HoaDon)
-            .filter(
-                HoaDon.msv == sv.msv,
-                HoaDon.trang_thai.in_([
-                    TrangThaiHoaDon.CHUA_THANH_TOAN.value,
-                    TrangThaiHoaDon.QUA_HAN.value,
-                ]),
-            )
-            .order_by(HoaDon.han_thanh_toan.asc())
-            .all()
-        )
-
-        if not unpaid_invoices:
-            # Nếu giao dịch đã từng khớp với hóa đơn của SV này (đã được gạch nợ trước đó)
-            if tx.ma_hoa_don:
-                inv = db.query(HoaDon).filter(HoaDon.ma_hoa_don == tx.ma_hoa_don, HoaDon.msv == sv.msv).first()
-                if inv and abs(float(inv.so_tien) - float(tx.so_tien)) < 1.0:
-                    tx.trang_thai = TrangThaiDoiSoat.MATCHED.value
-                    tx.msv = sv.msv
-                    tx.ghi_chu_doi_soat = f"Khớp tự động với hóa đơn {inv.ma_hoa_don}"
+                is_valid = False
+                if fee_type == "TIEN_PHONG" and student_code and inv.msv and inv.msv.upper() == student_code.upper():
+                    is_valid = True
+                elif fee_type == "DIEN_NUOC" and room_code and cls.is_room_match(room_code, inv.ma_phong, getattr(inv, "so_phong", "")):
+                    is_valid = True
+                if is_valid:
                     return
 
-            tx.trang_thai = TrangThaiDoiSoat.MANUAL_REQUIRED.value
-            tx.ma_hoa_don = None
-            tx.msv = sv.msv
-            tx.ghi_chu_doi_soat = "Không có hóa đơn nợ"
-            return
+        # 2. Xử lý TIỀN PHÒNG (TP <mã sinh viên>)
+        if fee_type == "TIEN_PHONG" and student_code:
+            tx.msv = student_code
 
-        # Tìm hóa đơn khớp chính xác số tiền
-        matching_invoice = next(
-            (inv for inv in unpaid_invoices if abs(float(inv.so_tien) - float(tx.so_tien)) < 1.0),
-            None,
-        )
-
-        if not matching_invoice:
-            # Kiểm tra xem có hóa đơn nào của SV này đã thanh toán khớp đúng số tiền không
-            paid_invoices = (
+            # Tìm các hóa đơn tiền phòng chưa thanh toán của sinh viên
+            unpaid_invoices = (
                 db.query(HoaDon)
                 .filter(
-                    HoaDon.msv == sv.msv,
-                    HoaDon.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value,
+                    HoaDon.loai_hoa_don == LoaiHoaDon.TIEN_PHONG.value,
+                    HoaDon.msv.ilike(student_code),
+                    HoaDon.trang_thai.in_([
+                        TrangThaiHoaDon.CHUA_THANH_TOAN.value,
+                        TrangThaiHoaDon.QUA_HAN.value,
+                    ]),
                 )
+                .order_by(HoaDon.han_thanh_toan.asc())
                 .all()
             )
+
+            # Tìm hóa đơn khớp số tiền
             matching_invoice = next(
-                (inv for inv in paid_invoices if abs(float(inv.so_tien) - float(tx.so_tien)) < 1.0),
+                (inv for inv in unpaid_invoices if abs(float(inv.so_tien) - float(tx.so_tien)) < 1.0),
                 None,
             )
 
-        if matching_invoice:
-            # Trường hợp C: Khớp tự động thành công + TỰ ĐỘNG GẠCH NỢ
-            matching_invoice.trang_thai = TrangThaiHoaDon.DA_THANH_TOAN.value
-            tx.ma_hoa_don = matching_invoice.ma_hoa_don
-            tx.msv = sv.msv
-            tx.trang_thai = TrangThaiDoiSoat.MATCHED.value
-            tx.ghi_chu_doi_soat = f"Khớp tự động với hóa đơn {matching_invoice.ma_hoa_don}"
-            tx.nguoi_xu_ly = "Hệ thống"
-            tx.ngay_cap_nhat = datetime.datetime.now()
-        else:
-            # Kiểm tra trường hợp Chuyển thiếu: SV có hóa đơn nợ nhưng nộp số tiền ít hơn hóa đơn
-            partial_inv = next(
-                (inv for inv in unpaid_invoices if float(tx.so_tien) < float(inv.so_tien)),
-                None,
-            )
-            if partial_inv:
-                tx.trang_thai = TrangThaiDoiSoat.PARTIAL.value
-                tx.ma_hoa_don = partial_inv.ma_hoa_don
-                tx.msv = sv.msv
-                con_thieu = float(partial_inv.so_tien) - float(tx.so_tien)
-                tx.ghi_chu_doi_soat = f"Chuyển thiếu {con_thieu:,.0f} đ cho hóa đơn {partial_inv.ma_hoa_don}"
+            # Nếu không tìm thấy trong hóa đơn chưa thanh toán, kiểm tra xem hóa đơn đã được thanh toán chưa
+            if not matching_invoice:
+                paid_invoices = (
+                    db.query(HoaDon)
+                    .filter(
+                        HoaDon.loai_hoa_don == LoaiHoaDon.TIEN_PHONG.value,
+                        HoaDon.msv.ilike(student_code),
+                        HoaDon.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value,
+                    )
+                    .all()
+                )
+                matching_invoice = next(
+                    (inv for inv in paid_invoices if abs(float(inv.so_tien) - float(tx.so_tien)) < 1.0),
+                    None,
+                )
+
+            if matching_invoice:
+                # Khớp thành công -> TỰ ĐỘNG GẠCH NỢ
+                matching_invoice.trang_thai = TrangThaiHoaDon.DA_THANH_TOAN.value
+                cong_no = db.query(SoCongNo).filter(SoCongNo.ma_hoa_don == matching_invoice.ma_hoa_don).first()
+                if cong_no:
+                    cong_no.da_tra = float(matching_invoice.so_tien)
+                    cong_no.con_thieu = 0.0
+                    cong_no.trang_thai = "DA_THANH_TOAN"
+                    cong_no.ngay_cap_nhat = datetime.datetime.now()
+
+                tx.ma_hoa_don = matching_invoice.ma_hoa_don
+                code_to_set = matching_invoice.msv or student_code
+                sv_exists = db.query(SinhVien).filter(SinhVien.msv == code_to_set).first() if code_to_set else None
+                tx.msv = sv_exists.msv if sv_exists else None
+                tx.trang_thai = TrangThaiDoiSoat.AUTO_MATCHED.value
+                tx.ghi_chu_doi_soat = f"Khớp tự động với hóa đơn {matching_invoice.ma_hoa_don}"
                 tx.nguoi_xu_ly = "Hệ thống"
                 tx.ngay_cap_nhat = datetime.datetime.now()
             else:
-                # Trường hợp khác (nộp thừa hoặc không khớp)
-                tx.trang_thai = TrangThaiDoiSoat.ERROR.value
+                # Chỉ giữ 2 trạng thái: Đã khớp hoặc Sai cú pháp
+                tx.trang_thai = TrangThaiDoiSoat.INVALID_SYNTAX.value
                 tx.ma_hoa_don = None
-                tx.msv = sv.msv
-                tx.ghi_chu_doi_soat = "Sai số tiền hóa đơn"
+                tx.msv = None
+                tx.ghi_chu_doi_soat = "Sai cú pháp"
+            return
+
+        # 3. Xử lý TIỀN ĐIỆN NƯỚC (DN <số phòng>)
+        if fee_type == "DIEN_NUOC" and room_code:
+            # Tìm các hóa đơn tiền điện nước chưa thanh toán
+            unpaid_util = (
+                db.query(HoaDon)
+                .filter(
+                    HoaDon.loai_hoa_don == LoaiHoaDon.DIEN_NUOC.value,
+                    HoaDon.trang_thai.in_([
+                        TrangThaiHoaDon.CHUA_THANH_TOAN.value,
+                        TrangThaiHoaDon.QUA_HAN.value,
+                    ]),
+                )
+                .order_by(HoaDon.han_thanh_toan.asc())
+                .all()
+            )
+
+            # Lọc danh sách hóa đơn khớp với phòng (hỗ trợ cả P203 khớp A203 / 203 - Tòa A1)
+            candidate_invoices = [
+                inv for inv in unpaid_util
+                if cls.is_room_match(room_code, inv.ma_phong, getattr(inv, "so_phong", ""))
+            ]
+
+            matching_invoice = next(
+                (inv for inv in candidate_invoices if abs(float(inv.so_tien) - float(tx.so_tien)) < 1.0),
+                None,
+            )
+
+            if not matching_invoice:
+                paid_util = (
+                    db.query(HoaDon)
+                    .filter(
+                        HoaDon.loai_hoa_don == LoaiHoaDon.DIEN_NUOC.value,
+                        HoaDon.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value,
+                    )
+                    .all()
+                )
+                for inv in paid_util:
+                    if cls.is_room_match(room_code, inv.ma_phong, getattr(inv, "so_phong", "")):
+                        if abs(float(inv.so_tien) - float(tx.so_tien)) < 1.0:
+                            matching_invoice = inv
+                            break
+
+            if matching_invoice:
+                # Khớp thành công -> TỰ ĐỘNG GẠCH NỢ
+                matching_invoice.trang_thai = TrangThaiHoaDon.DA_THANH_TOAN.value
+                cong_no = db.query(SoCongNo).filter(SoCongNo.ma_hoa_don == matching_invoice.ma_hoa_don).first()
+                if cong_no:
+                    cong_no.da_tra = float(matching_invoice.so_tien)
+                    cong_no.con_thieu = 0.0
+                    cong_no.trang_thai = "DA_THANH_TOAN"
+                    cong_no.ngay_cap_nhat = datetime.datetime.now()
+
+                tx.ma_hoa_don = matching_invoice.ma_hoa_don
+                sv_exists = db.query(SinhVien).filter(SinhVien.msv == matching_invoice.msv).first() if matching_invoice.msv else None
+                tx.msv = sv_exists.msv if sv_exists else None
+                tx.trang_thai = TrangThaiDoiSoat.AUTO_MATCHED.value
+                tx.ghi_chu_doi_soat = f"Khớp tự động với hóa đơn {matching_invoice.ma_hoa_don}"
+                tx.nguoi_xu_ly = "Hệ thống"
+                tx.ngay_cap_nhat = datetime.datetime.now()
+            else:
+                # Chỉ giữ 2 trạng thái: Đã khớp hoặc Sai cú pháp
+                tx.trang_thai = TrangThaiDoiSoat.INVALID_SYNTAX.value
+                tx.ma_hoa_don = None
+                tx.msv = None
+                tx.ghi_chu_doi_soat = "Sai cú pháp"
+            return
 
     @classmethod
     def _to_item_response(cls, tx: GiaoDichNganHang, db: Session) -> ReconciliationItemResponse:
@@ -217,62 +333,27 @@ class ReconciliationService:
 
         st = tx.trang_thai
         invoice_code = tx.ma_hoa_don
-        invoice_display = invoice_code
-        matched_inv = invoice_code
+        invoice_display = invoice_code or ""
+        matched_inv = invoice_code or ""
         status_text = "Đã khớp"
         action = "VIEW"
         display_message = tx.ghi_chu_doi_soat or ""
 
-        if st in [TrangThaiDoiSoat.MATCHED.value, TrangThaiDoiSoat.AUTO_MATCHED.value]:
+        # Hệ thống chỉ quy về đúng 2 trạng thái: Đã khớp hoặc Sai cú pháp
+        if st in [TrangThaiDoiSoat.MATCHED.value, TrangThaiDoiSoat.AUTO_MATCHED.value, TrangThaiDoiSoat.MATCHED_MANUALLY.value]:
             st = "MATCHED"
             status_text = "Đã khớp"
             action = "VIEW"
-            invoice_display = invoice_code or "Đã khớp"
-            matched_inv = invoice_code
-        elif st == TrangThaiDoiSoat.MATCHED_MANUALLY.value:
-            st = "MATCHED"
-            status_text = "Đã khớp"
-            action = "VIEW"
-            invoice_display = invoice_code or "Đã khớp"
-            matched_inv = invoice_code
-        elif st == TrangThaiDoiSoat.PARTIAL.value:
-            st = "PARTIAL"
-            status_text = "Chuyển thiếu"
-            action = "VIEW"
-            invoice_display = invoice_code or "Chuyển thiếu"
-            matched_inv = f"{invoice_code} (Chuyển thiếu)" if invoice_code else "Chuyển thiếu"
-            display_message = tx.ghi_chu_doi_soat or "Chuyển thiếu tiền hóa đơn"
-        elif st in [TrangThaiDoiSoat.INVALID_SYNTAX.value, TrangThaiDoiSoat.STUDENT_NOT_FOUND.value]:
+            invoice_display = invoice_code or ""
+            matched_inv = invoice_code or ""
+        else:
+            st = "INVALID_SYNTAX"
             status_text = "Sai cú pháp"
             action = "MANUAL_MATCH"
             invoice_code = None
-            invoice_display = "Thiếu mã sinh viên"
-            display_message = "Thiếu mã sinh viên"
-            matched_inv = "Thiếu mã sinh viên"
-        elif st == TrangThaiDoiSoat.ERROR.value:
-            status_text = "Lỗi đối soát"
-            action = "VIEW"
-            invoice_code = None
-            invoice_display = "Sai số tiền hóa đơn"
-            display_message = "Số tiền giao dịch không khớp hóa đơn nợ"
-            matched_inv = "Sai số tiền hóa đơn"
-        elif st == TrangThaiDoiSoat.MANUAL_REQUIRED.value:
-            parsed_code = cls.parse_student_code(tx.noi_dung_chuyen_khoan)
-            if not parsed_code:
-                st = TrangThaiDoiSoat.INVALID_SYNTAX.value
-                status_text = "Sai cú pháp"
-                action = "MANUAL_MATCH"
-                invoice_code = None
-                invoice_display = "Thiếu mã sinh viên"
-                display_message = "Thiếu mã sinh viên"
-                matched_inv = "Thiếu mã sinh viên"
-            else:
-                status_text = "Không tìm thấy SV"
-                action = "MANUAL_MATCH"
-                invoice_code = None
-                invoice_display = "Không tìm thấy SV"
-                display_message = tx.ghi_chu_doi_soat or "Không tìm thấy SV"
-                matched_inv = "Không tìm thấy SV"
+            invoice_display = ""
+            matched_inv = ""
+            display_message = "Sai cú pháp"
 
         return ReconciliationItemResponse(
             id=tx.id,
@@ -394,18 +475,14 @@ class ReconciliationService:
                         TrangThaiDoiSoat.MATCHED_MANUALLY.value,
                     ])
                 )
-            elif s_val in ["MANUAL_REQUIRED", "INVALID_SYNTAX"]:
+            else:
                 query = query.filter(
-                    GiaoDichNganHang.trang_thai.in_([
-                        TrangThaiDoiSoat.MANUAL_REQUIRED.value,
-                        TrangThaiDoiSoat.INVALID_SYNTAX.value,
-                        TrangThaiDoiSoat.STUDENT_NOT_FOUND.value,
+                    ~GiaoDichNganHang.trang_thai.in_([
+                        TrangThaiDoiSoat.MATCHED.value,
+                        TrangThaiDoiSoat.AUTO_MATCHED.value,
+                        TrangThaiDoiSoat.MATCHED_MANUALLY.value,
                     ])
                 )
-            elif s_val == "PARTIAL":
-                query = query.filter(GiaoDichNganHang.trang_thai == TrangThaiDoiSoat.PARTIAL.value)
-            else:
-                query = query.filter(GiaoDichNganHang.trang_thai == s_val)
 
         # 4. Lọc theo từ khóa (Mã GD, nội dung chuyển khoản, mã hóa đơn, MSV)
         if keyword and keyword.strip():
@@ -426,7 +503,7 @@ class ReconciliationService:
         page_size = max(1, page_size)
         offset = (page - 1) * page_size
         items_db = (
-            query.order_by(desc(GiaoDichNganHang.ngay_giao_dich), desc(GiaoDichNganHang.id))
+            query.order_by(GiaoDichNganHang.id.asc())
             .offset(offset)
             .limit(page_size)
             .all()
@@ -434,7 +511,7 @@ class ReconciliationService:
 
         items = [cls._to_item_response(tx, db) for tx in items_db]
 
-        # 6. Tính toán thống kê thật từ database theo đúng mục 12
+        # 6. Tính toán thống kê thật từ database
         total_tx = db.query(func.count(GiaoDichNganHang.id)).scalar() or 0
         auto_matched = (
             db.query(func.count(GiaoDichNganHang.id))
@@ -448,19 +525,7 @@ class ReconciliationService:
             .scalar()
             or 0
         )
-        manual_required = (
-            db.query(func.count(GiaoDichNganHang.id))
-            .filter(
-                GiaoDichNganHang.trang_thai.in_([
-                    TrangThaiDoiSoat.INVALID_SYNTAX.value,
-                    TrangThaiDoiSoat.STUDENT_NOT_FOUND.value,
-                    TrangThaiDoiSoat.MANUAL_REQUIRED.value,
-                    TrangThaiDoiSoat.ERROR.value,
-                ])
-            )
-            .scalar()
-            or 0
-        )
+        manual_required = max(0, total_tx - auto_matched)
 
         statistics = TransactionStatistics(
             totalTransactions=total_tx,
@@ -631,20 +696,98 @@ class ReconciliationService:
         return results
 
     @classmethod
+    def get_unpaid_invoices(
+        cls,
+        db: Session,
+        keyword: Optional[str] = None,
+        invoice_type: Optional[str] = None,
+        amount: Optional[float] = None,
+    ) -> List[UnpaidInvoiceItem]:
+        """
+        Lấy danh sách các hóa đơn chưa thanh toán trong hệ thống để kế toán gán khớp tay:
+        - Hỗ trợ cả Hóa đơn Tiền phòng (theo Sinh viên) và Hóa đơn Điện nước (theo Phòng).
+        - Tìm kiếm linh hoạt theo Số phòng, Mã SV, Tên SV, Mã hóa đơn.
+        - Ưu tiên hiển thị các hóa đơn trùng khớp số tiền lên đầu.
+        """
+        query = db.query(HoaDon).filter(
+            HoaDon.trang_thai != TrangThaiHoaDon.DA_THANH_TOAN.value,
+            HoaDon.trang_thai != TrangThaiHoaDon.DA_HUY.value,
+        )
+        if invoice_type and invoice_type != "ALL":
+            query = query.filter(HoaDon.loai_hoa_don == invoice_type)
+
+        invoices = query.order_by(HoaDon.ngay_lap.desc()).all()
+
+        results: List[UnpaidInvoiceItem] = []
+        kw = (keyword or "").strip().lower()
+
+        for inv in invoices:
+            is_tien_phong = inv.loai_hoa_don == LoaiHoaDon.TIEN_PHONG.value
+            type_name = "Tiền phòng" if is_tien_phong else "Tiền điện nước"
+
+            # Tìm tên phòng
+            room_str = "Chưa xếp phòng"
+            if inv.so_phong:
+                sp = inv.so_phong.strip()
+                room_str = sp if (sp.startswith("P") or sp.startswith("p")) else f"P{sp}"
+            elif inv.hop_dong and inv.hop_dong.giuong and inv.hop_dong.giuong.phong:
+                p = inv.hop_dong.giuong.phong
+                t = p.tang.toa_nha.ten_toa if p.tang and p.tang.toa_nha else ""
+                room_str = f"P{p.so_phong} - {t}".strip(" -")
+
+            # Tìm đối tượng
+            if is_tien_phong:
+                target_name = f"{inv.ho_ten or inv.msv or 'Sinh viên'} ({inv.msv or ''})".strip()
+            else:
+                target_name = f"Phòng {inv.so_phong or room_str}"
+
+            # Lọc theo từ khóa tìm kiếm nếu có
+            if kw:
+                searchable = f"{inv.ma_hoa_don} {inv.msv or ''} {inv.ho_ten or ''} {room_str} {inv.so_phong or ''} {target_name} {inv.ky_thanh_toan or ''}".lower()
+                if kw not in searchable:
+                    continue
+
+            due_str = inv.han_thanh_toan.strftime("%d/%m/%Y") if inv.han_thanh_toan else ""
+            status_text = "Chờ thanh toán" if inv.trang_thai in ["CHO_THANH_TOAN", "CHUA_THANH_TOAN"] else inv.trang_thai
+
+            results.append(
+                UnpaidInvoiceItem(
+                    id=inv.ma_hoa_don,
+                    invoiceCode=inv.ma_hoa_don,
+                    invoiceType=inv.loai_hoa_don,
+                    invoiceTypeName=type_name,
+                    targetName=target_name,
+                    room=room_str,
+                    msv=inv.msv,
+                    studentName=inv.ho_ten,
+                    period=inv.ky_thanh_toan or "Tháng 09/2026",
+                    amount=float(inv.so_tien),
+                    status=inv.trang_thai,
+                    statusText=status_text,
+                    dueDate=due_str,
+                )
+            )
+
+        # Sắp xếp: Ưu tiên hóa đơn trùng khớp số tiền lên đầu
+        if amount is not None and amount > 0:
+            results.sort(key=lambda x: (abs(x.amount - amount) > 0.01, x.dueDate or ""))
+
+        return results
+
+    @classmethod
     def manual_match(
         cls,
         db: Session,
         transaction_id: str,
-        student_id: str,
+        student_id: Optional[str],
         invoice_id: str,
         accountant_username: str,
     ) -> ManualMatchResponse:
         """
-        Thực hiện gán giao dịch thủ công với hóa đơn sinh viên:
-        - Validate chặt chẽ 9 bước theo yêu cầu.
-        - Thực hiện toàn bộ trong Database Transaction.
-        - Cập nhật giao dịch -> MATCHED_MANUALLY.
-        - Cập nhật hóa đơn -> DA_THANH_TOAN.
+        Thực hiện gán giao dịch thủ công với hóa đơn:
+        - Hỗ trợ cả Hóa đơn Tiền phòng (theo SV) và Hóa đơn Điện nước (theo Phòng).
+        - Validate chặt chẽ tính tồn tại, chưa thanh toán và số tiền khớp.
+        - Cập nhật giao dịch -> MATCHED, hóa đơn -> DA_THANH_TOAN và gạch nợ sổ công nợ.
         """
         # 1. Kiểm tra Transaction tồn tại
         tx = None
@@ -674,15 +817,7 @@ class ReconciliationService:
                 detail=f"Giao dịch '{tx.ma_giao_dich_ngan_hang}' đã được đối soát trước đó (Trạng thái: {tx.trang_thai})",
             )
 
-        # 3. Kiểm tra Sinh viên tồn tại
-        sv = db.query(SinhVien).filter(SinhVien.msv == student_id).first()
-        if not sv:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Sinh viên với mã '{student_id}' không tồn tại",
-            )
-
-        # 4. Kiểm tra Hóa đơn tồn tại
+        # 3. Kiểm tra Hóa đơn tồn tại
         invoice = db.query(HoaDon).filter(HoaDon.ma_hoa_don == invoice_id).first()
         if not invoice:
             raise HTTPException(
@@ -690,14 +825,24 @@ class ReconciliationService:
                 detail=f"Hóa đơn với mã '{invoice_id}' không tồn tại",
             )
 
-        # 5. Kiểm tra Hóa đơn thuộc đúng Sinh viên
-        if invoice.msv != sv.msv:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Hóa đơn '{invoice_id}' (thuộc MSV: {invoice.msv}) không thuộc về sinh viên đã chọn (MSV: {sv.msv})",
-            )
+        # 4. Kiểm tra Sinh viên (nếu có truyền hoặc nếu là TIEN_PHONG)
+        sv = None
+        if student_id:
+            sv = db.query(SinhVien).filter(SinhVien.msv == student_id).first()
+            if not sv:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Sinh viên với mã '{student_id}' không tồn tại",
+                )
+            if invoice.msv and invoice.msv != sv.msv:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Hóa đơn '{invoice_id}' (thuộc MSV: {invoice.msv}) không thuộc về sinh viên đã chọn (MSV: {sv.msv})",
+                )
+        elif invoice.msv:
+            sv = db.query(SinhVien).filter(SinhVien.msv == invoice.msv).first()
 
-        # 6. Kiểm tra Hóa đơn còn trạng thái cho phép thanh toán
+        # 5. Kiểm tra Hóa đơn còn trạng thái cho phép thanh toán
         if invoice.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -710,7 +855,7 @@ class ReconciliationService:
                 detail=f"Hóa đơn '{invoice_id}' đã bị hủy, không thể đối soát",
             )
 
-        # 7. Kiểm tra Transaction amount hợp lệ
+        # 6. Kiểm tra Transaction amount hợp lệ
         if tx.so_tien <= 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -726,7 +871,7 @@ class ReconciliationService:
                 ),
             )
 
-        # 8. Kiểm tra không có transaction khác đã được gán vào hóa đơn này
+        # 7. Kiểm tra không có transaction khác đã được gán vào hóa đơn này
         other_tx = (
             db.query(GiaoDichNganHang)
             .filter(
@@ -746,16 +891,24 @@ class ReconciliationService:
                 detail=f"Hóa đơn '{invoice_id}' đã được gán đối soát với giao dịch '{other_tx.ma_giao_dich_ngan_hang}'",
             )
 
-        # 9. Thực hiện cập nhật trong Database Transaction
+        # 8. Thực hiện cập nhật trong Database Transaction
         try:
             tx.ma_hoa_don = invoice.ma_hoa_don
-            tx.msv = sv.msv
+            tx.msv = sv.msv if sv else invoice.msv
             tx.trang_thai = TrangThaiDoiSoat.MATCHED.value
             tx.ghi_chu_doi_soat = f"Khớp thủ công bởi {accountant_username}"
             tx.nguoi_xu_ly = accountant_username
             tx.ngay_cap_nhat = datetime.datetime.now()
 
             invoice.trang_thai = TrangThaiHoaDon.DA_THANH_TOAN.value
+
+            # Cập nhật sổ công nợ nếu có
+            cong_no = db.query(SoCongNo).filter(SoCongNo.ma_hoa_don == invoice.ma_hoa_don).first()
+            if cong_no:
+                cong_no.da_thu = invoice.so_tien
+                cong_no.con_lai = 0.0
+                cong_no.trang_thai = "DA_THU"
+                cong_no.ngay_thu = datetime.date.today()
 
             db.commit()
             db.refresh(tx)
@@ -851,7 +1004,7 @@ class ReconciliationService:
             )
         ).delete(synchronize_session=False)
 
-        # 4. Đảm bảo hóa đơn HD-2026-00130 của Ngô Phương Mai tồn tại (Dòng 1)
+        # 4. Đảm bảo hóa đơn HD-2026-00130 của Ngô Phương Mai tồn tại (Phòng tiêu chuẩn 350.000 đ)
         hd_130 = db.query(HoaDon).filter(HoaDon.ma_hoa_don == "HD-2026-00130").first()
         if not hd_130:
             hd_130 = HoaDon(
@@ -860,49 +1013,23 @@ class ReconciliationService:
                 ho_ten="Ngô Phương Mai",
                 loai_hoa_don=LoaiHoaDon.TIEN_PHONG.value,
                 ky_thanh_toan="Tháng 09/2026",
-                so_tien=600000.0,
+                so_tien=350000.0,
                 ngay_lap=datetime.date(2026, 9, 1),
                 han_thanh_toan=datetime.date(2026, 9, 20),
                 trang_thai=TrangThaiHoaDon.DA_THANH_TOAN.value,
-                ghi_chu="Hóa đơn tiền phòng Tháng 09/2026",
+                ghi_chu="Hóa đơn tiền phòng tiêu chuẩn Tháng 09/2026",
             )
             db.add(hd_130)
             db.flush()
         else:
             hd_130.msv = "DTC245180037"
             hd_130.ho_ten = "Ngô Phương Mai"
-            hd_130.so_tien = 600000.0
+            hd_130.so_tien = 350000.0
             hd_130.trang_thai = TrangThaiHoaDon.DA_THANH_TOAN.value
             db.flush()
 
-        # 5. Đảm bảo hóa đơn tiền phòng chưa thanh toán tồn tại từ màn Lập hóa đơn (Dòng 2)
-        hd_unpaid = (
-            db.query(HoaDon)
-            .filter(HoaDon.ma_hoa_don == "HDTP-20260926-5A08F4")
-            .first()
-        )
-        if not hd_unpaid:
-            hd_unpaid = HoaDon(
-                ma_hoa_don="HDTP-20260926-5A08F4",
-                msv="DTC245180037",
-                ho_ten="Ngô Phương Mai",
-                loai_hoa_don=LoaiHoaDon.TIEN_PHONG.value,
-                ky_thanh_toan="Học kỳ I (2026 – 2027)",
-                so_tien=1800000.0,
-                ngay_lap=datetime.date(2026, 9, 26),
-                han_thanh_toan=datetime.date(2026, 10, 15),
-                trang_thai=TrangThaiHoaDon.CHUA_THANH_TOAN.value,
-                ghi_chu="Phát hành hóa đơn tiền phòng Học kỳ I (2026 – 2027)",
-            )
-            db.add(hd_unpaid)
-            db.flush()
-        else:
-            hd_unpaid.ho_ten = "Ngô Phương Mai"
-            # Nếu giao dịch FT2625501980 chưa khớp thì hóa đơn này phải ở trạng thái chưa thanh toán
-            tx_check = db.query(GiaoDichNganHang).filter(GiaoDichNganHang.ma_giao_dich_ngan_hang == "FT2625501980").first()
-            if not tx_check or tx_check.trang_thai not in [TrangThaiDoiSoat.MATCHED.value, TrangThaiDoiSoat.MATCHED_MANUALLY.value]:
-                hd_unpaid.trang_thai = TrangThaiHoaDon.CHUA_THANH_TOAN.value
-            db.flush()
+        # Dọn dẹp hóa đơn trùng HDTP-20260926-5A08F4 nếu có
+        db.query(HoaDon).filter(HoaDon.ma_hoa_don == "HDTP-20260926-5A08F4").delete(synchronize_session=False)
 
         # 6. Đảm bảo Dòng 1: Giao dịch khớp tự động thành công (FT2625501977)
         tx1 = db.query(GiaoDichNganHang).filter(GiaoDichNganHang.ma_giao_dich_ngan_hang == "FT2625501977").first()
@@ -910,8 +1037,8 @@ class ReconciliationService:
             tx1 = GiaoDichNganHang(
                 ma_giao_dich_ngan_hang="FT2625501977",
                 ngay_giao_dich=datetime.datetime(2026, 9, 12, 10, 0),
-                so_tien=600000.0,
-                noi_dung_chuyen_khoan="DTC245180037 nop tien phong",
+                so_tien=350000.0,
+                noi_dung_chuyen_khoan="TP DTC245180037",
                 ten_ngan_hang="TP Bank",
                 so_tai_khoan="20020813520",
                 trang_thai=TrangThaiDoiSoat.MATCHED.value,
@@ -922,23 +1049,124 @@ class ReconciliationService:
             )
             db.add(tx1)
 
-        # 7. Đảm bảo Dòng 2: Giao dịch cần khớp tay do thiếu mã SV (FT2625501980)
+        # 7. Đảm bảo Dòng 2: Giao dịch cần khớp tay do sai cú pháp (FT2625501980)
         tx2 = db.query(GiaoDichNganHang).filter(GiaoDichNganHang.ma_giao_dich_ngan_hang == "FT2625501980").first()
         if not tx2:
             tx2 = GiaoDichNganHang(
                 ma_giao_dich_ngan_hang="FT2625501980",
                 ngay_giao_dich=datetime.datetime(2026, 9, 12, 9, 15),
-                so_tien=1800000.0,
+                so_tien=350000.0,
                 noi_dung_chuyen_khoan="Ngo Phuong Mai nop tien phong KTX",
                 ten_ngan_hang="TP Bank",
                 so_tai_khoan="20020813520",
                 trang_thai=TrangThaiDoiSoat.INVALID_SYNTAX.value,
                 ma_hoa_don=None,
                 msv=None,
-                ghi_chu_doi_soat="Thiếu mã SV",
+                ghi_chu_doi_soat="Sai cú pháp",
                 nguoi_xu_ly=None,
             )
             db.add(tx2)
+
+        # 8. Đảm bảo dữ liệu hóa đơn mẫu cho file sao kê hóa đơn KTX
+        def _ensure_sv(msv_code: str, name_str: str):
+            sv_inst = db.query(SinhVien).filter(SinhVien.msv == msv_code).first()
+            if not sv_inst:
+                tk = db.query(TaiKhoan).filter(TaiKhoan.ten_dang_nhap == msv_code.lower()).first()
+                if not tk:
+                    tk = TaiKhoan(
+                        ma_tai_khoan=str(uuid.uuid4()),
+                        ten_dang_nhap=msv_code.lower(),
+                        mat_khau=get_password_hash("password123"),
+                        vai_tro=VaiTro.SINH_VIEN,
+                    )
+                    db.add(tk)
+                    db.flush()
+                nd = db.query(NguoiDung).filter(NguoiDung.ma_tai_khoan == tk.ma_tai_khoan).first()
+                if not nd:
+                    nd = NguoiDung(
+                        ma_nguoi_dung=str(uuid.uuid4()),
+                        ma_tai_khoan=tk.ma_tai_khoan,
+                        ho_ten=name_str,
+                        email=f"{msv_code.lower()}@ictu.edu.vn",
+                    )
+                    db.add(nd)
+                    db.flush()
+                sv_inst = SinhVien(
+                    msv=msv_code,
+                    ma_nguoi_dung=nd.ma_nguoi_dung,
+                    lop="K18-CNTT",
+                    gioi_tinh="Nam",
+                )
+                db.add(sv_inst)
+                db.flush()
+            return sv_inst
+
+        _ensure_sv("DTC2456789634", "Sinh viên DTC2456789634")
+        _ensure_sv("DTC2456789635", "Sinh viên DTC2456789635")
+
+        hd_sv1 = db.query(HoaDon).filter(HoaDon.ma_hoa_don == "HDTP-2026-DTC2456789634").first()
+        if not hd_sv1:
+            hd_sv1 = HoaDon(
+                ma_hoa_don="HDTP-2026-DTC2456789634",
+                msv="DTC2456789634",
+                ho_ten="Sinh viên DTC2456789634",
+                loai_hoa_don=LoaiHoaDon.TIEN_PHONG.value,
+                ky_thanh_toan="Tháng 09/2026",
+                so_tien=350000.0,
+                ngay_lap=datetime.date(2026, 9, 1),
+                han_thanh_toan=datetime.date(2026, 9, 30),
+                trang_thai=TrangThaiHoaDon.CHUA_THANH_TOAN.value,
+                ghi_chu="Hóa đơn tiền phòng tiêu chuẩn Tháng 09/2026",
+            )
+            db.add(hd_sv1)
+
+        hd_dn1 = db.query(HoaDon).filter(HoaDon.ma_hoa_don == "HDDN-2026-P36-A2").first()
+        if not hd_dn1:
+            hd_dn1 = HoaDon(
+                ma_hoa_don="HDDN-2026-P36-A2",
+                ma_phong="P36_A2",
+                so_phong="P36-A2",
+                loai_hoa_don=LoaiHoaDon.DIEN_NUOC.value,
+                ky_thanh_toan="Tháng 09/2026",
+                so_tien=120000.0,
+                ngay_lap=datetime.date(2026, 9, 1),
+                han_thanh_toan=datetime.date(2026, 9, 30),
+                trang_thai=TrangThaiHoaDon.CHUA_THANH_TOAN.value,
+                ghi_chu="Hóa đơn tiền điện nước phòng P36-A2",
+            )
+            db.add(hd_dn1)
+
+        hd_sv2 = db.query(HoaDon).filter(HoaDon.ma_hoa_don == "HDTP-2026-DTC2456789635").first()
+        if not hd_sv2:
+            hd_sv2 = HoaDon(
+                ma_hoa_don="HDTP-2026-DTC2456789635",
+                msv="DTC2456789635",
+                ho_ten="Sinh viên DTC2456789635",
+                loai_hoa_don=LoaiHoaDon.TIEN_PHONG.value,
+                ky_thanh_toan="Tháng 09/2026",
+                so_tien=600000.0,
+                ngay_lap=datetime.date(2026, 9, 1),
+                han_thanh_toan=datetime.date(2026, 9, 30),
+                trang_thai=TrangThaiHoaDon.CHUA_THANH_TOAN.value,
+                ghi_chu="Hóa đơn tiền phòng DTC2456789635",
+            )
+            db.add(hd_sv2)
+
+        hd_dn2 = db.query(HoaDon).filter(HoaDon.ma_hoa_don == "HDDN-2026-P36-A3").first()
+        if not hd_dn2:
+            hd_dn2 = HoaDon(
+                ma_hoa_don="HDDN-2026-P36-A3",
+                ma_phong="P36_A3",
+                so_phong="P36-A3",
+                loai_hoa_don=LoaiHoaDon.DIEN_NUOC.value,
+                ky_thanh_toan="Tháng 09/2026",
+                so_tien=95000.0,
+                ngay_lap=datetime.date(2026, 9, 1),
+                han_thanh_toan=datetime.date(2026, 9, 30),
+                trang_thai=TrangThaiHoaDon.CHUA_THANH_TOAN.value,
+                ghi_chu="Hóa đơn tiền điện nước phòng P36-A3",
+            )
+            db.add(hd_dn2)
 
         db.commit()
 
@@ -957,8 +1185,8 @@ class ReconciliationService:
         1. Trích xuất metadata: Tên file, Ngân hàng, Kỳ sao kê.
         2. Đọc và parse dữ liệu từng dòng giao dịch.
         3. Chạy đối soát tự động:
-           - Có Mã SV và khớp hóa đơn -> Đã khớp (MATCHED), gạch nợ.
-           - Không chứa Mã SV -> Sai cú pháp (INVALID_SYNTAX), thao tác Khớp tay.
+           - Đúng cú pháp TP <mã SV> hoặc DN <số phòng> và khớp hóa đơn -> Đã khớp (MATCHED), gạch nợ.
+           - Không đúng cú pháp -> Sai cú pháp (INVALID_SYNTAX), cột khớp hóa đơn rỗng.
         4. Cập nhật thống kê và trả về danh sách giao dịch.
         """
         import csv
@@ -985,8 +1213,24 @@ class ReconciliationService:
             try:
                 from openpyxl import load_workbook
                 wb = load_workbook(io.BytesIO(file_bytes), data_only=True)
-                ws = wb.active
-                for row in ws.iter_rows(values_only=True):
+                # Tìm sheet phù hợp nhất (ưu tiên sheet có chữ 'sao kê', 'saoke', 'giao dịch', 'trans', hoặc sheet có nhiều dòng dữ liệu nhất)
+                target_ws = None
+                for sname in wb.sheetnames:
+                    s_clean = sname.lower().replace(" ", "").replace("_", "")
+                    if any(k in s_clean for k in ["saoke", "giaodich", "trans"]):
+                        target_ws = wb[sname]
+                        break
+                if not target_ws:
+                    best_ws = wb.active
+                    max_valid_rows = 0
+                    for candidate_ws in wb.worksheets:
+                        cnt = sum(1 for r in candidate_ws.iter_rows(values_only=True) if any(c is not None and str(c).strip() != "" for c in r))
+                        if cnt > max_valid_rows:
+                            max_valid_rows = cnt
+                            best_ws = candidate_ws
+                    target_ws = best_ws or wb.active
+
+                for row in target_ws.iter_rows(values_only=True):
                     if row and any(c is not None and str(c).strip() != "" for c in row):
                         raw_rows.append([str(c).strip() if c is not None else "" for c in row])
             except Exception as e:
@@ -1166,13 +1410,11 @@ class ReconciliationService:
                 tx.noi_dung_chuyen_khoan = content
                 tx.ten_ngan_hang = detected_bank.split(" - ")[0] if " - " in detected_bank else detected_bank
                 tx.so_tai_khoan = acc_val or tx.so_tai_khoan
-                if tx_code == "FT2625501980":
+                if tx.trang_thai != TrangThaiDoiSoat.MATCHED_MANUALLY.value:
                     tx.trang_thai = TrangThaiDoiSoat.INVALID_SYNTAX.value
                     tx.ma_hoa_don = None
                     tx.msv = None
-                    inv_reset = db.query(HoaDon).filter(HoaDon.ma_hoa_don == "HDTP-20260926-5A08F4").first()
-                    if inv_reset:
-                        inv_reset.trang_thai = TrangThaiHoaDon.CHUA_THANH_TOAN.value
+                    tx.ghi_chu_doi_soat = "Sai cú pháp"
                 db.flush()
 
             # Chạy quy tắc đối soát tự động bám sát nghiệp vụ

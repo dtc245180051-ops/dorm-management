@@ -131,6 +131,13 @@ export const authService = {
   },
 
   /**
+   * Lấy token hiện tại từ localStorage
+   */
+  getToken() {
+    return localStorage.getItem("ktx_token");
+  },
+
+  /**
    * Đăng xuất
    */
   logout() {

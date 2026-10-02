@@ -345,6 +345,99 @@ def submit_checkout_request(
 
 
 @router.get(
+    "/current-room",
+    summary="Lấy thông tin phòng hiện tại của sinh viên đang đăng nhập",
+)
+def get_current_room(
+    current_user: TaiKhoan = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Trả về thông tin phòng hiện tại của sinh viên đang đăng nhập dựa vào hợp đồng ACTIVE.
+    Nếu chưa có hợp đồng, trả về null để frontend hiển thị 'Chưa có phòng'.
+    """
+    from app.models.contract import HopDong, Phi
+    from app.models.dorm import Giuong, Phong, Tang, ToaNha
+    from sqlalchemy.orm import joinedload
+
+    # Lấy MSV từ tài khoản đang đăng nhập
+    msv = None
+    if current_user.nguoi_dung and current_user.nguoi_dung.sinh_vien:
+        msv = current_user.nguoi_dung.sinh_vien.msv
+
+    if not msv:
+        return {"data": None, "message": "Sinh viên chưa được xếp phòng"}
+
+    # Tìm hợp đồng ACTIVE
+    active_contract = (
+        db.query(HopDong)
+        .options(
+            joinedload(HopDong.giuong)
+            .joinedload(Giuong.phong)
+            .joinedload(Phong.tang)
+            .joinedload(Tang.toa_nha)
+        )
+        .filter(HopDong.msv == msv, HopDong.trang_thai == "ACTIVE")
+        .first()
+    )
+
+    if not active_contract or not active_contract.giuong or not active_contract.giuong.phong:
+        return {"data": None, "message": "Sinh viên chưa được xếp phòng"}
+
+    bed = active_contract.giuong
+    room = bed.phong
+    floor = room.tang
+    building = floor.toa_nha if floor else None
+
+    # Đếm số sinh viên đang ở trong phòng
+    occupied_count = (
+        db.query(HopDong)
+        .join(Giuong, HopDong.ma_giuong == Giuong.ma_giuong)
+        .filter(Giuong.ma_phong == room.ma_phong, HopDong.trang_thai == "ACTIVE")
+        .count()
+    )
+    suc_chua = room.suc_chua or 8
+    thanh_vien = f"{occupied_count}/{suc_chua} người"
+
+    # Tìm khoản phí liên quan đến hợp đồng này
+    phi = (
+        db.query(Phi)
+        .filter(Phi.ma_hop_dong == active_contract.ma_hop_dong, Phi.loai_phi == "TIEN_PHONG")
+        .first()
+    )
+    billing = None
+    if phi:
+        so_tien = int(phi.so_tien) if phi.so_tien else 0
+        so_tien_fmt = f"{so_tien:,}".replace(",", ".") + "đ"
+        trang_thai_phi = "Đã thanh toán" if phi.trang_thai == "DA_THANH_TOAN" else "Chưa thanh toán"
+        billing = {
+            "amount": so_tien_fmt,
+            "period": "/năm",
+            "status": trang_thai_phi,
+        }
+
+    toa_label = building.ten_toa if building else (f"Tòa {floor.ma_toa}" if floor and floor.ma_toa else "")
+    tang_val = str(floor.so_tang) if floor and floor.so_tang else ""
+
+    return {
+        "data": {
+            "so_phong": f"P{room.so_phong}" if room.so_phong and not str(room.so_phong).startswith("P") else room.so_phong,
+            "toa": toa_label,
+            "tang": tang_val,
+            "thanh_vien": thanh_vien,
+            "so_thanh_vien": occupied_count,
+            "suc_chua": suc_chua,
+            "ma_giuong": bed.ma_giuong,
+            "ma_hop_dong": active_contract.ma_hop_dong,
+            "ngay_bat_dau": str(active_contract.ngay_bat_dau) if active_contract.ngay_bat_dau else None,
+            "ngay_ket_thuc": str(active_contract.ngay_ket_thuc) if active_contract.ngay_ket_thuc else None,
+            "billing": billing,
+        },
+        "message": "OK"
+    }
+
+
+@router.get(
     "/transfer-checkout-history",
     summary="Lấy lịch sử các yêu cầu chuyển và trả phòng",
 )

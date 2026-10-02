@@ -1,3 +1,4 @@
+from app.models.debt import SoCongNo
 from app.models.contract import HopDong, Phi, ThanhToan, YeuCauChuyenTraPhong
 from app.models.dorm import Giuong, Phong, Tang, ToaNha
 from app.models.incident import NoiQuy, PhanAnh, ViPham
@@ -26,6 +27,7 @@ __all__ = [
     "HoaDon",
     "LoaiHoaDon",
     "TrangThaiHoaDon",
+    "SoCongNo",
     # Bank Reconciliation
     "GiaoDichNganHang",
     "TrangThaiDoiSoat",

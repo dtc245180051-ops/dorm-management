@@ -16,10 +16,36 @@ from app.schemas.reconciliation import (
     StudentInvoiceItem,
     StudentSearchItem,
     TransactionDetailResponse,
+    UnpaidInvoiceItem,
 )
 from app.services.reconciliation_service import ReconciliationService
 
 router = APIRouter(tags=["Đối soát giao dịch (Kế toán)"])
+
+
+@router.get(
+    "/reconciliation/unpaid-invoices",
+    response_model=List[UnpaidInvoiceItem],
+    status_code=status.HTTP_200_OK,
+    summary="[Kế toán] Lấy danh sách hóa đơn chưa thanh toán để khớp tay",
+)
+def get_unpaid_invoices(
+    keyword: Optional[str] = Query(None, description="Tìm theo số phòng, mã SV, họ tên, mã hóa đơn"),
+    invoice_type: Optional[str] = Query(None, description="ALL, TIEN_PHONG, hoặc DIEN_NUOC"),
+    amount: Optional[float] = Query(None, description="Số tiền giao dịch để ưu tiên gợi ý hóa đơn trùng khớp"),
+    current_user: TaiKhoan = Depends(require_ke_toan),
+    db: Session = Depends(get_db),
+):
+    """
+    Dành riêng cho Kế toán.
+    Lấy danh sách các hóa đơn chưa thanh toán (cả tiền phòng và điện nước) để kế toán chọn khớp tay linh hoạt.
+    """
+    return ReconciliationService.get_unpaid_invoices(
+        db=db,
+        keyword=keyword,
+        invoice_type=invoice_type,
+        amount=amount,
+    )
 
 
 @router.get(

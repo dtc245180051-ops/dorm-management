@@ -63,24 +63,7 @@ export default function AccountantLayout({
         {/* Section: MENU */}
         <div className="acc-nav-section-title">MENU</div>
         <nav className="acc-nav-list">
-          {/* Dashboard */}
-          <button
-            type="button"
-            className={`acc-nav-item ${currentMenu === 'dashboard' ? 'active' : ''}`}
-            onClick={() => handleSelectMenu('dashboard')}
-          >
-            <div className="acc-nav-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="7" height="7" rx="1.5" />
-                <rect x="14" y="3" width="7" height="7" rx="1.5" />
-                <rect x="14" y="14" width="7" height="7" rx="1.5" />
-                <rect x="3" y="14" width="7" height="7" rx="1.5" />
-              </svg>
-            </div>
-            <span>Dashboard</span>
-          </button>
-
-          {/* Lập hóa đơn (Active mặc định theo Figma) */}
+          {/* Lập hóa đơn */}
           <button
             type="button"
             className={`acc-nav-item ${currentMenu === 'billing' ? 'active' : ''}`}
@@ -128,24 +111,6 @@ export default function AccountantLayout({
               </svg>
             </div>
             <span>Sổ công nợ</span>
-          </button>
-
-          {/* Báo cáo tài chính */}
-          <button
-            type="button"
-            className={`acc-nav-item ${currentMenu === 'financial-report' ? 'active' : ''}`}
-            onClick={() => handleSelectMenu('financial-report')}
-          >
-            <div className="acc-nav-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <path d="M12 18v-4" />
-                <path d="M8 18v-2" />
-                <path d="M16 18v-6" />
-              </svg>
-            </div>
-            <span>Báo cáo tài chính</span>
           </button>
         </nav>
 

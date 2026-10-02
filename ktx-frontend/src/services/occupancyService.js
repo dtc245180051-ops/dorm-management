@@ -158,7 +158,9 @@ function getLocalCurrentRoomInfo() {
       return null;
     }
     const raw = localStorage.getItem(CURRENT_ROOM_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && parsed.so_phong ? parsed : null;
   } catch (e) {
     return null;
   }
@@ -1804,7 +1806,20 @@ export const occupancyService = {
    * Lấy thông tin phòng hiện tại của sinh viên
    */
   getCurrentRoomInfo: async () => {
-    return getLocalCurrentRoomInfo();
+    try {
+      const res = await api.get('/student/requests/current-room');
+      const data = res.data?.data || null;
+      if (data && data.so_phong) {
+        // Lưu vào cache localStorage để dùng offline
+        saveLocalCurrentRoomInfo(data);
+        return data;
+      }
+      return null; // Sinh viên chưa có phòng
+    } catch (err) {
+      console.warn('GET /student/requests/current-room failed, trying local cache:', err);
+      // Fallback đọc cache nếu có
+      return getLocalCurrentRoomInfo();
+    }
   },
 
   /**
@@ -2077,7 +2092,18 @@ export const occupancyService = {
   },
 
   getCurrentRoomInfo: async () => {
-    return getLocalCurrentRoomInfo();
+    try {
+      const res = await api.get('/student/requests/current-room');
+      const data = res.data?.data || null;
+      if (data && data.so_phong) {
+        saveLocalCurrentRoomInfo(data);
+        return data;
+      }
+      return null;
+    } catch (err) {
+      console.warn('GET /student/requests/current-room failed, trying local cache:', err);
+      return getLocalCurrentRoomInfo();
+    }
   },
 
   getStudentProfile: async () => {

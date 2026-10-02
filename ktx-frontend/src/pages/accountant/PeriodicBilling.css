@@ -210,6 +210,124 @@
   transform: translateY(0);
 }
 
+/* ================= UPLOAD METER READINGS BAR ================= */
+.billing-upload-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 14px 20px;
+  margin-bottom: 20px;
+}
+
+.billing-upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.billing-btn-upload-readings {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 8px;
+  background-color: #2b85ec;
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(43, 133, 236, 0.2);
+}
+
+.billing-btn-upload-readings:hover {
+  background-color: #1a73e8;
+  transform: translateY(-1px);
+}
+
+.billing-btn-upload-readings:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.billing-btn-change-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #2b85ec;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: 1.5px solid #2b85ec;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(43, 133, 236, 0.12);
+}
+
+.billing-btn-change-file:hover {
+  background-color: #eff6ff;
+  border-color: #1a73e8;
+  color: #1a73e8;
+  transform: translateY(-1px);
+}
+
+.billing-btn-change-file:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.billing-btn-download-template:hover {
+  background-color: #eff6ff;
+  border-color: #1a73e8;
+  color: #1a73e8;
+}
+
+.billing-upload-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.room-type-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.room-type-tag.tag-standard {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.room-type-tag.tag-service {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
 /* ================= TABLE ================= */
 .billing-table-wrapper {
   width: 100%;
@@ -346,6 +464,15 @@
 
 .billing-publish-btn:active {
   transform: translateY(0);
+}
+
+.billing-publish-btn:disabled,
+.billing-publish-btn.billing-btn-disabled {
+  background-color: #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 /* ================= MODAL XÁC NHẬN ================= */

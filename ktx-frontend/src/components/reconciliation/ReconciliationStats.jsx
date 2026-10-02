@@ -17,15 +17,15 @@ export default function ReconciliationStats({
         <div className="recon-stat-value text-blue">{totalCount}</div>
       </div>
 
-      {/* CARD 2: KHỚP TỰ ĐỘNG */}
+      {/* CARD 2: ĐÃ KHỚP */}
       <div className="recon-stat-card">
-        <div className="recon-stat-label">KHỚP TỰ ĐỘNG</div>
+        <div className="recon-stat-label">ĐÃ KHỚP</div>
         <div className="recon-stat-value text-green">{autoMatchedCount}</div>
       </div>
 
-      {/* CARD 3: CẦN XỬ LÝ TAY */}
+      {/* CARD 3: SAI CÚ PHÁP */}
       <div className="recon-stat-card">
-        <div className="recon-stat-label">CẦN XỬ LÝ TAY</div>
+        <div className="recon-stat-label">SAI CÚ PHÁP</div>
         <div className="recon-stat-value text-red">{manualRequiredCount}</div>
       </div>
     </div>

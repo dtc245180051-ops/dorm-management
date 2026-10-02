@@ -325,6 +325,8 @@ export default function ProcessRegistrationPage({
         ma_toa: selectedBuilding,
         phong_id: selectedRoom,
         giuong_id: selectedBed,
+        msv: requestData?.msv,
+        ho_ten: requestData?.ho_ten,
       };
 
       const result = await occupancyService.approveRequest(requestId, payload);

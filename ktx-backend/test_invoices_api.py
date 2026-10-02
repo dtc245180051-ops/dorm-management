@@ -31,9 +31,6 @@ def http_request(method, endpoint, data=None, token=None, headers=None, params=N
     if params:
         endpoint = f"{endpoint}?{urllib.parse.urlencode(params)}"
     url = f"{BASE_URL}{endpoint}"
-    if "?" in url:
-        base, qs = url.split("?", 1)
-        url = f"{base}?{urllib.parse.quote(qs, safe='=&')}"
     req_headers = headers or {}
     if token:
         req_headers["Authorization"] = f"Bearer {token}"
