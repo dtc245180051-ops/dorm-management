@@ -421,22 +421,63 @@ export const reconciliationService = {
   },
 
   /**
+   * Lấy danh sách hóa đơn chưa thanh toán (cả tiền phòng và điện nước) để kế toán khớp tay
+   * @param {Object} params - { keyword, invoiceType, amount }
+   */
+  async getUnpaidInvoices({ keyword = '', invoiceType = 'ALL', amount = null } = {}) {
+    try {
+      const headers = await this.getAuthHeaders();
+      const params = new URLSearchParams();
+      if (keyword) params.append('keyword', keyword);
+      if (invoiceType && invoiceType !== 'ALL') params.append('invoice_type', invoiceType);
+      if (amount !== null && amount !== undefined) params.append('amount', amount);
+
+      const response = await fetch(
+        `${API_BASE_URL}/reconciliation/unpaid-invoices?${params.toString()}`,
+        {
+          method: 'GET',
+          headers,
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          success: true,
+          data,
+        };
+      }
+    } catch (error) {
+      console.warn('Lỗi getUnpaidInvoices API:', error);
+    }
+
+    return {
+      success: true,
+      data: [],
+    };
+  },
+
+  /**
    * Thực hiện gán giao dịch thủ công qua API
    * @param {string|number} transactionId
-   * @param {Object} payload - { studentId, invoiceId }
+   * @param {Object} payload - { invoiceId, studentId }
    */
   async manualMatch(transactionId, { studentId, invoiceId }) {
     try {
       const headers = await this.getAuthHeaders();
+      const bodyData = {
+        invoiceId: (invoiceId || '').trim(),
+      };
+      if (studentId) {
+        bodyData.studentId = studentId.trim();
+      }
+
       const response = await fetch(
         `${API_BASE_URL}/reconciliation/${encodeURIComponent(transactionId)}/manual-match`,
         {
           method: 'POST',
           headers,
-          body: JSON.stringify({
-            studentId: (studentId || '').trim(),
-            invoiceId: (invoiceId || '').trim(),
-          }),
+          body: JSON.stringify(bodyData),
         }
       );
 
@@ -447,32 +488,20 @@ export const reconciliationService = {
           data,
           message: data.message || 'Gán giao dịch thủ công thành công',
         };
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        return {
+          success: false,
+          message: errData.detail || 'Lỗi khi gán giao dịch thủ công: Số tiền hoặc thông tin không hợp lệ',
+        };
       }
     } catch (error) {
-      console.warn('Lỗi manualMatch API, cập nhật bộ đệm:', error);
+      console.warn('Lỗi manualMatch API:', error);
+      return {
+        success: false,
+        message: `Lỗi kết nối máy chủ: ${error.message}`,
+      };
     }
-
-    // Fallback cập nhật cache
-    const cache = getCachedData();
-    if (cache && cache.items) {
-      const target = cache.items.find(
-        (i) => i.id === transactionId || i.bankTransactionCode === transactionId
-      );
-      if (target) {
-        target.status = 'MATCHED_MANUALLY';
-        target.invoiceCode = invoiceId;
-        target.matched_invoice = invoiceId;
-        target.studentCode = studentId;
-        target.studentName = `Sinh viên ${studentId}`;
-        target.action = 'VIEW';
-        saveCacheData(cache);
-      }
-    }
-
-    return {
-      success: true,
-      message: 'Gán giao dịch thủ công thành công',
-    };
   },
 
   /**

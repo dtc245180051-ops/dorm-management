@@ -63,6 +63,22 @@ class StudentInvoiceItem(BaseModel):
     dueDate: str
 
 
+class UnpaidInvoiceItem(BaseModel):
+    id: str
+    invoiceCode: str
+    invoiceType: str  # TIEN_PHONG or DIEN_NUOC
+    invoiceTypeName: str
+    targetName: str  # Tên SV hoặc Phòng
+    room: Optional[str] = None
+    msv: Optional[str] = None
+    studentName: Optional[str] = None
+    period: str
+    amount: float
+    status: str
+    statusText: str
+    dueDate: Optional[str] = None
+
+
 class TransactionDetailResponse(BaseModel):
     transaction: ReconciliationItemResponse
     student: Optional[Dict[str, Any]] = None
@@ -71,8 +87,8 @@ class TransactionDetailResponse(BaseModel):
 
 
 class ManualMatchRequest(BaseModel):
-    studentId: str = Field(..., description="Mã sinh viên hoặc ID sinh viên")
     invoiceId: str = Field(..., description="Mã hóa đơn cần gán")
+    studentId: Optional[str] = Field(None, description="Mã sinh viên hoặc ID sinh viên (nếu là tiền phòng)")
 
 
 class ManualMatchResponse(BaseModel):

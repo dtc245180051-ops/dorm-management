@@ -178,9 +178,7 @@ export default function TransactionTable({
                         {matchedCode}
                       </span>
                     ) : (
-                      <span className="recon-invoice-missing">
-                        {missingText}
-                      </span>
+                      <span className="recon-invoice-missing">-</span>
                     )}
                   </td>
 
@@ -188,7 +186,7 @@ export default function TransactionTable({
                   <td className="recon-td td-status">
                     <TransactionStatusBadge
                       status={isMatched ? 'MATCHED' : 'INVALID_SYNTAX'}
-                      customLabel={isMatched ? 'Đã khớp' : 'Khớp tay'}
+                      customLabel={isMatched ? 'Đã khớp' : 'Sai cú pháp'}
                     />
                   </td>
 

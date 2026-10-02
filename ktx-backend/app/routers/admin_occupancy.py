@@ -1,16 +1,22 @@
 import datetime
+import logging
 import re
+import uuid
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import RoleChecker, get_current_user
-from app.models.user import SinhVien, TaiKhoan
+from app.core.security import get_password_hash
+from app.models.user import SinhVien, TaiKhoan, NguoiDung, VaiTro
 from app.models.dorm import ToaNha, Tang, Phong, Giuong
 from app.models.contract import HopDong
 from app.services import dorm_service, occupancy_request_store
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin/occupancy", tags=["Quản lý Xử lý Lưu trú (Admin)"])
 
@@ -19,6 +25,8 @@ class ApproveRequestPayload(BaseModel):
     ma_toa: Optional[str] = None
     phong_id: str
     giuong_id: str
+    msv: Optional[str] = None
+    ho_ten: Optional[str] = None
 
 
 class RejectRequestPayload(BaseModel):
@@ -209,7 +217,7 @@ def get_available_beds_hierarchical(db: Session = Depends(get_db)):
 @router.put(
     "/requests/{request_id}/approve",
     summary="Phê duyệt đơn đăng ký & tự động tạo hợp đồng xếp phòng",
-    dependencies=[Depends(RoleChecker(["QuanLy"]))],
+    dependencies=[Depends(RoleChecker(["QuanLy", "KeToan"]))],
 )
 def approve_request(
     request_id: str,
@@ -218,72 +226,202 @@ def approve_request(
 ):
     """
     Phê duyệt đơn đăng ký:
-    - Tự động sinh mã hợp đồng theo chuẩn: HD{YY}-{toa}{phong}-G{giuong}
-    - Cập nhật trạng thái giường sang đã có người ở.
-    - Tạo bản ghi HopDong trạng thái ACTIVE.
+    - Tìm và đảm bảo sinh viên tồn tại trong CSDL.
+    - Tìm và đảm bảo Tòa nhà, Tầng, Phòng, Giường tồn tại trong CSDL để thỏa mãn FK.
+    - Tự động sinh mã hợp đồng chuẩn <= 20 ký tự: HD{YY}-{toa}{phong}-G{giuong}.
+    - Cập nhật trạng thái giường sang DA_CO_NGUOI.
+    - Tạo hoặc cập nhật bản ghi HopDong trạng thái ACTIVE và commit vào MySQL.
     """
     clean_id = request_id.strip()
 
-    # Định dạng năm hiện tại 2 chữ số (ví dụ 2026 -> 26)
-    yy = datetime.date.today().strftime("%y")
+    # 1. Tìm thông tin đơn từ store
+    req_item = occupancy_request_store.get_request_by_id(clean_id)
+    target_msv = payload.msv or (req_item.get("msv") if req_item else None) or clean_id
+    target_msv = target_msv.strip()
 
-    # Chuẩn hóa tên tòa, phòng, giường
-    toa = payload.ma_toa or "A"
-    phong = payload.phong_id.replace("Phòng ", "").replace("P", "")
-    giuong = payload.giuong_id.replace("Giường ", "").replace("G", "")
+    # Nếu clean_id là mã đơn (bắt đầu bằng DK- hoặc #) và req_item chưa có, quét danh sách tất cả các đơn
+    if (target_msv.startswith("DK-") or target_msv.startswith("#DK")) and not req_item:
+        for r in occupancy_request_store.get_all_requests():
+            if r.get("id") == clean_id or r.get("ma_yeu_cau") == clean_id:
+                req_item = r
+                if r.get("msv"):
+                    target_msv = r.get("msv").strip()
+                break
 
-    # Tự động tạo mã hợp đồng theo chuẩn HD{YY}-{toa}{phong}-G{giuong}
-    contract_code = f"HD{yy}-{toa}{phong}-G{giuong}"
+    # 2. Đảm bảo bản ghi SinhVien tồn tại trong CSDL để thỏa mãn Foreign Key hop_dong.msv
+    student = db.query(SinhVien).filter(func.lower(SinhVien.msv) == target_msv.lower()).first()
+    if not student:
+        # Thử tìm theo TaiKhoan
+        tk = db.query(TaiKhoan).filter(func.lower(TaiKhoan.ten_dang_nhap) == target_msv.lower()).first()
+        if tk and tk.nguoi_dung:
+            student = SinhVien(
+                msv=target_msv,
+                ma_nguoi_dung=tk.nguoi_dung.ma_nguoi_dung,
+                lop="DTC-KTX",
+                gioi_tinh="Nam",
+            )
+            db.add(student)
+            db.flush()
+        else:
+            name_val = payload.ho_ten or (req_item.get("ho_ten") if req_item else "Sinh viên")
+            email_val = (req_item.get("email") if req_item else None) or f"{target_msv.lower()}@ictu.edu.vn"
+            phone_val = req_item.get("so_dien_thoai") if req_item else None
+            gender_val = req_item.get("gioi_tinh") if req_item else "Nam"
+            lop_val = req_item.get("lop") if req_item else "DTC-KTX"
+            new_acc = TaiKhoan(
+                ma_tai_khoan=str(uuid.uuid4()),
+                ten_dang_nhap=target_msv.lower()[:50],
+                mat_khau=get_password_hash("password123"),
+                vai_tro=VaiTro.SINH_VIEN,
+            )
+            db.add(new_acc)
+            db.flush()
+            nd = NguoiDung(
+                ma_nguoi_dung=str(uuid.uuid4()),
+                ma_tai_khoan=new_acc.ma_tai_khoan,
+                ho_ten=name_val,
+                email=email_val,
+                so_dien_thoai=phone_val,
+            )
+            db.add(nd)
+            db.flush()
+            student = SinhVien(
+                msv=target_msv,
+                ma_nguoi_dung=nd.ma_nguoi_dung,
+                lop=lop_val,
+                gioi_tinh=gender_val,
+            )
+            db.add(student)
+            db.flush()
 
-    # Cập nhật trong store
-    occupancy_request_store.update_request_status(
-        clean_id,
-        "DA_DUYET",
-        {
-            "ma_hop_dong": contract_code,
-            "ma_toa": toa,
-            "ma_phong": payload.phong_id,
-            "ma_giuong": payload.giuong_id,
-        },
-    )
+    # 3. Đảm bảo cấu trúc Tòa nhà -> Tầng -> Phòng -> Giường tồn tại để thỏa mãn Foreign Key hop_dong.ma_giuong
+    raw_toa = (payload.ma_toa or (req_item.get("goi_y", {}).get("ma_toa") if req_item else None) or "A1").strip().upper()
+    m_toa = re.search(r"([A-Za-z]+\d*)", raw_toa)
+    toa_code = m_toa.group(1).upper() if m_toa else raw_toa
 
-    # Cập nhật trạng thái giường trong CSDL nếu tìm thấy
-    bed = db.query(Giuong).filter(Giuong.ma_giuong == payload.giuong_id).first()
-    if bed:
+    toa = db.query(ToaNha).filter((ToaNha.ma_toa == toa_code) | (ToaNha.ten_toa.ilike(f"%{toa_code}%"))).first()
+    if not toa:
+        toa = ToaNha(
+            ma_toa=toa_code[:20],
+            ten_toa=f"Tòa {toa_code}"[:50],
+            so_tang=5,
+        )
+        db.add(toa)
+        db.flush()
+
+    # Tầng: xác định từ số phòng (ví dụ P101 -> tầng 1, P205 -> tầng 2, P36 -> tầng 3)
+    raw_phong = payload.phong_id.strip()
+    digits = re.findall(r"\d", raw_phong)
+    floor_num = int(digits[0]) if digits else 1
+    tang_code = f"TANG_{floor_num}_{toa.ma_toa}"[:20]
+    tang = db.query(Tang).filter(Tang.ma_tang == tang_code).first()
+    if not tang:
+        tang = Tang(
+            ma_tang=tang_code,
+            so_tang=floor_num,
+            ma_toa=toa.ma_toa,
+        )
+        db.add(tang)
+        db.flush()
+
+    # Phòng
+    phong_code = raw_phong[:20]
+    phong = db.query(Phong).filter(Phong.ma_phong == phong_code).first()
+    if not phong:
+        so_p = "".join(digits) if digits else raw_phong.replace("Phòng ", "").replace("P", "")
+        phong = Phong(
+            ma_phong=phong_code,
+            so_phong=so_p[:20],
+            suc_chua=4,
+            loai_phong="TIÊU CHUẨN",
+            gia_tien_nam=6600000.0,
+            ma_tang=tang.ma_tang,
+        )
+        db.add(phong)
+        db.flush()
+
+    # Giường
+    raw_giuong = payload.giuong_id.strip()
+    giuong_code = raw_giuong[:20]
+    bed = db.query(Giuong).filter(Giuong.ma_giuong == giuong_code).first()
+    if not bed:
+        bed = Giuong(
+            ma_giuong=giuong_code,
+            trang_thai="DA_CO_NGUOI",
+            ma_phong=phong.ma_phong,
+        )
+        db.add(bed)
+        db.flush()
+    else:
         bed.trang_thai = "DA_CO_NGUOI"
+        if bed.ma_phong != phong.ma_phong:
+            bed.ma_phong = phong.ma_phong
 
-    student = db.query(SinhVien).filter(SinhVien.msv == clean_id).first()
-    msv = student.msv if student else clean_id
+    # 4. Định dạng năm và mã hợp đồng chuẩn (không quá 20 ký tự theo MySQL schema)
+    yy = datetime.date.today().strftime("%y")
+    clean_p = phong.so_phong.replace("Phòng ", "").replace("P", "")
+    clean_g = bed.ma_giuong.replace("Giường ", "").replace("G", "").replace("_", "")
+    contract_code = f"HD{yy}-{toa.ma_toa}{clean_p}-G{clean_g}"[:20]
 
-    # Tạo hoặc cập nhật HopDong
-    existing_contract = db.query(HopDong).filter(HopDong.ma_hop_dong == contract_code).first()
-    if not existing_contract:
+    # Kiểm tra nếu sinh viên đã có hợp đồng ACTIVE
+    existing_contract = db.query(HopDong).filter(
+        HopDong.msv == student.msv,
+        HopDong.trang_thai == "ACTIVE"
+    ).first()
+
+    if existing_contract:
+        existing_contract.ma_giuong = bed.ma_giuong
+        existing_contract.ngay_bat_dau = datetime.date.today()
+        existing_contract.ngay_ket_thuc = datetime.date.today() + datetime.timedelta(days=365)
+        contract_code = existing_contract.ma_hop_dong
+    else:
+        # Nếu mã hợp đồng đã bị bản ghi khác sử dụng, tạo mã duy nhất
+        if db.query(HopDong).filter(HopDong.ma_hop_dong == contract_code).first():
+            contract_code = f"HD{yy}-{student.msv[:6]}-{clean_g}"[:20]
+            if db.query(HopDong).filter(HopDong.ma_hop_dong == contract_code).first():
+                contract_code = f"HD{yy}-{int(datetime.datetime.now().timestamp()) % 1000000}"[:20]
+
         new_contract = HopDong(
             ma_hop_dong=contract_code,
-            msv=msv,
-            ma_giuong=payload.giuong_id,
+            msv=student.msv,
+            ma_giuong=bed.ma_giuong,
             ngay_bat_dau=datetime.date.today(),
             ngay_ket_thuc=datetime.date.today() + datetime.timedelta(days=365),
             trang_thai="ACTIVE",
         )
         db.add(new_contract)
-    else:
-        existing_contract.trang_thai = "ACTIVE"
+
+    # 5. Cập nhật trong store để quản lý thấy ngay trên giao diện
+    occupancy_request_store.update_request_status(
+        clean_id,
+        "DA_DUYET",
+        {
+            "ma_hop_dong": contract_code,
+            "ma_toa": toa.ma_toa,
+            "ma_phong": phong.ma_phong,
+            "ma_giuong": bed.ma_giuong,
+        },
+    )
 
     try:
         db.commit()
     except Exception as e:
         db.rollback()
+        logger.error(f"Error approving request and committing contract: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi cơ sở dữ liệu khi tạo hợp đồng: {str(e)}",
+        )
 
     return {
         "status": "success",
         "message": f"Phê duyệt và xếp phòng thành công cho đơn {request_id}",
         "data": {
             "ma_hop_dong": contract_code,
-            "msv": msv,
-            "ma_toa": toa,
-            "ma_phong": payload.phong_id,
-            "ma_giuong": payload.giuong_id,
+            "msv": student.msv,
+            "ma_toa": toa.ma_toa,
+            "ma_phong": phong.ma_phong,
+            "ma_giuong": bed.ma_giuong,
             "trang_thai": "DA_DUYET",
         },
     }

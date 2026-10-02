@@ -15,9 +15,9 @@ export default function DebtLedger({ searchTerm = '' }) {
   // Dữ liệu màn hình tổng quan
   const [summaryData, setSummaryData] = useState({
     statistics: {
-      totalReceivable: 1850000000.0,
-      totalCollected: 1710000000.0,
-      totalOutstanding: 140000000.0,
+      totalReceivable: 0,
+      totalCollected: 0,
+      totalOutstanding: 0,
     },
     items: [],
   });
@@ -109,10 +109,10 @@ export default function DebtLedger({ searchTerm = '' }) {
   if (selectedStudentId) {
     const student = personalDebt || {
       studentId: selectedStudentId,
-      fullName: 'Nguyễn Hoàng Long',
-      room: 'A105',
-      phone: '0987 654 321',
-      totalDebt: 3145000.0,
+      fullName: 'Đang tải...',
+      room: '--',
+      phone: '--',
+      totalDebt: 0,
       fees: [],
     };
 
@@ -289,9 +289,9 @@ export default function DebtLedger({ searchTerm = '' }) {
       <div className="debt-stats-grid">
         {/* Card 1: Tổng nợ cần thu */}
         <div className="debt-stat-card">
-          <div className="debt-stat-label">TỔNG NỢ CẦN THU (KỲ & THÁNG)</div>
+          <div className="debt-stat-label">TỔNG NỢ CẦN THU (THEO THÁNG)</div>
           <div className="debt-stat-value text-blue">
-            {formatFullVND(statistics?.totalReceivable || 1850000000)}
+            {formatFullVND(statistics?.totalReceivable ?? 0)}
           </div>
         </div>
 
@@ -299,7 +299,7 @@ export default function DebtLedger({ searchTerm = '' }) {
         <div className="debt-stat-card">
           <div className="debt-stat-label">ĐÃ THU HOÀN TẤT</div>
           <div className="debt-stat-value text-green">
-            {formatFullVND(statistics?.totalCollected || 1710000000)}
+            {formatFullVND(statistics?.totalCollected ?? 0)}
           </div>
         </div>
 
@@ -307,7 +307,7 @@ export default function DebtLedger({ searchTerm = '' }) {
         <div className="debt-stat-card">
           <div className="debt-stat-label">CÒN NỢ TỒN ĐỌNG</div>
           <div className="debt-stat-value text-red">
-            {formatFullVND(statistics?.totalOutstanding || 140000000)}
+            {formatFullVND(statistics?.totalOutstanding ?? 0)}
           </div>
         </div>
       </div>
