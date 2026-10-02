@@ -8,105 +8,137 @@ import occupancyService from '../../services/occupancyService';
  * MOCK DATA CHO PHÂN HỆ SINH VIÊN (Khớp 100% bản thiết kế Figma)
  * ============================================================================
  */
-const MOCK_STUDENT_DATA = {
-  room: {
-    roomNumber: 'P36',
-    building: 'Tòa A2',
-    floor: 'Tầng 3',
-    currentMembers: 6,
-    maxCapacity: 8,
+// Dữ liệu tĩnh cho danh sách chức năng (không phải dữ liệu người dùng)
+const SERVICE_LIST = [
+  {
+    id: 'reg-room',
+    title: 'Đăng ký phòng',
+    desc: 'Đăng ký ở KTX theo kỳ hoặc theo nhu cầu.',
+    cardClass: 'card-blue', // Ô 1: Xanh dương
+    iconType: 'calendar',
   },
-  billing: {
-    amount: '1.940.000đ',
-    period: '/năm',
-    status: 'Đã thanh toán',
+  {
+    id: 'move-room',
+    title: 'Chuyển / trả phòng',
+    desc: 'Thực hiện chuyển phòng hoặc trả phòng khi cần thiết.',
+    cardClass: 'card-green', // Ô 2: Xanh lá cây
+    iconType: 'exchange',
   },
-  complaints: {
-    total: 0,
-    processing: 0,
-    resolved: 0,
+  {
+    id: 'search-room',
+    title: 'Tra cứu phòng trống',
+    desc: 'Xem danh sách phòng trống hiện có tại các khu',
+    cardClass: 'card-purple', // Ô 3: Tím hồng
+    iconType: 'search',
   },
-  notifications: [
-    { id: 1, title: 'Thông báo đăng ký ở (2026-2027)', date: '01/08/2026' },
-    { id: 2, title: 'Danh sách phòng trống', date: '25/08/2026' },
-    { id: 3, title: 'Kiểm tra phòng định kỳ', date: '15/09/2026' },
-  ],
-  services: [
-    {
-      id: 'reg-room',
-      title: 'Đăng ký phòng',
-      desc: 'Đăng ký ở KTX theo kỳ hoặc theo nhu cầu.',
-      cardClass: 'card-blue', // Ô 1: Xanh dương
-      iconType: 'calendar',
-    },
-    {
-      id: 'move-room',
-      title: 'Chuyển / trả phòng',
-      desc: 'Thực hiện chuyển phòng hoặc trả phòng khi cần thiết.',
-      cardClass: 'card-green', // Ô 2: Xanh lá cây
-      iconType: 'exchange',
-    },
-    {
-      id: 'search-room',
-      title: 'Tra cứu phòng trống',
-      desc: 'Xem danh sách phòng trống hiện có tại các khu',
-      cardClass: 'card-purple', // Ô 3: Tím hồng
-      iconType: 'search',
-    },
-    {
-      id: 'history-room',
-      title: 'Lịch sử phòng',
-      desc: 'Xem lịch sử phòng ở và quá trình lưu trú của bạn.',
-      cardClass: 'card-orange', // Ô 4: Nâu cam
-      iconType: 'clock',
-    },
-    {
-      id: 'payment',
-      title: 'Thanh toán phí KTX',
-      desc: 'Tra cứu và thanh toán các khoản phí ký túc xá',
-      cardClass: 'card-teal', // Ô 5: Xanh ngọc mint
-      iconType: 'card',
-    },
-    {
-      id: 'feedback',
-      title: 'Gửi phản ánh',
-      desc: 'Gửi yêu cầu hỗ trợ, phản ánh các vấn đề trong KTX',
-      cardClass: 'card-slate', // Ô 6: Xám xanh
-      iconType: 'message',
-    },
-  ],
-};
+  {
+    id: 'history-room',
+    title: 'Lịch sử phòng',
+    desc: 'Xem lịch sử phòng ở và quá trình lưu trú của bạn.',
+    cardClass: 'card-orange', // Ô 4: Nâu cam
+    iconType: 'clock',
+  },
+  {
+    id: 'payment',
+    title: 'Thanh toán phí KTX',
+    desc: 'Tra cứu và thanh toán các khoản phí ký túc xá',
+    cardClass: 'card-teal', // Ô 5: Xanh ngọc mint
+    iconType: 'card',
+  },
+  {
+    id: 'feedback',
+    title: 'Gửi phản ánh',
+    desc: 'Gửi yêu cầu hỗ trợ, phản ánh các vấn đề trong KTX',
+    cardClass: 'card-slate', // Ô 6: Xám xanh
+    iconType: 'message',
+  },
+];
+
+// Thông báo tĩnh mẫu (không phải dữ liệu cá nhân sinh viên)
+const STATIC_NOTIFICATIONS = [
+  { id: 1, title: 'Thông báo đăng ký ở (2026-2027)', date: '01/08/2026' },
+  { id: 2, title: 'Danh sách phòng trống', date: '25/08/2026' },
+  { id: 3, title: 'Kiểm tra phòng định kỳ', date: '15/09/2026' },
+];
 
 export default function StudentDashboard({ user, onNavigate }) {
   const [activeModal, setActiveModal] = useState(null);
-  const [currentRoomInfo, setCurrentRoomInfo] = useState({
-    phong_hien_tai: 'P36 – Tòa A2 – Tầng 3',
-    thanh_vien: '6/8 người',
-    thoi_gian_luu_tru: '09/2025 – Nay',
-    so_phong: 'P36',
-    toa: 'Tòa A2',
-    tang: 'Tầng 3',
-    so_thanh_vien: 6,
-    suc_chua: 8,
-  });
+  // Khởi tạo rỗng — sẽ được điền từ API thực
+  const [currentRoomInfo, setCurrentRoomInfo] = useState(null);
+  const [billing, setBilling] = useState(null);
+  const [complaints, setComplaints] = useState({ total: 0, processing: 0, resolved: 0 });
+  // Trạng thái đơn đăng ký — đọc từ localStorage, không cần gọi thêm service
+  const [registrationStatus, setRegistrationStatus] = useState(null);
 
   const loadRoomInfo = async () => {
     try {
       const info = await occupancyService.getCurrentRoomInfo();
-      if (info) {
-        setCurrentRoomInfo((prev) => ({ ...prev, ...info }));
+      // Chỉ set nếu API trả về dữ liệu thực (có so_phong)
+      if (info && info.so_phong) {
+        setCurrentRoomInfo(info);
+        // billing nằm trong info.billing từ API
+        if (info.billing) {
+          setBilling(info.billing);
+        } else {
+          setBilling(null);
+        }
+      } else {
+        setCurrentRoomInfo(null); // Sinh viên chưa có phòng
+        setBilling(null);
       }
     } catch (e) {
       console.error('Error loading room info in StudentDashboard:', e);
+      setCurrentRoomInfo(null);
+      setBilling(null);
     }
   };
 
   useEffect(() => {
+    // Dọn dẹp cache cũ chứa dữ liệu mẫu (P36, 6/8...) nếu có
+    // để API backend luôn là nguồn dữ liệu chính xác
+    const cachedRoom = localStorage.getItem('dorm_current_room_info');
+    if (cachedRoom) {
+      try {
+        const parsed = JSON.parse(cachedRoom);
+        // Nếu cache đang chứa dữ liệu mẫu hardcode thì xóa đi
+        if (parsed?.so_phong === '36' || parsed?.phong_hien_tai?.includes('P36')) {
+          localStorage.removeItem('dorm_current_room_info');
+        }
+      } catch (_) {
+        localStorage.removeItem('dorm_current_room_info');
+      }
+    }
+
     loadRoomInfo();
     const handleUpdate = () => {
       loadRoomInfo();
     };
     window.addEventListener('occupancy-updated', handleUpdate);
+    // Đọc trạng thái đơn đăng ký từ localStorage
+    // localStorage key 'dorm_registration_requests' do occupancyService.registerRoom() ghi sau khi SV đăng ký
+    const loadRegistrationStatus = () => {
+      try {
+        const raw = localStorage.getItem('dorm_registration_requests');
+        if (raw) {
+          const list = JSON.parse(raw);
+          // Lấy đơn mới nhất (index 0), bỏ qua đơn mẫu củ (msv chứa 'xxxxxxxx')
+          const real = list.find(
+            (r) => r.msv && !r.msv.includes('xxxxxxxx') && !r.msv.includes('XXXXXX')
+          );
+          if (real) {
+            setRegistrationStatus(real);
+          } else {
+            setRegistrationStatus(null);
+          }
+        } else {
+          setRegistrationStatus(null);
+        }
+      } catch (_) {
+        setRegistrationStatus(null);
+      }
+    };
+
+    loadRegistrationStatus();
     return () => {
       window.removeEventListener('occupancy-updated', handleUpdate);
     };
@@ -195,8 +227,12 @@ export default function StudentDashboard({ user, onNavigate }) {
           onClick={() =>
             setActiveModal({
               title: 'Thông tin phòng hiện tại',
-              desc: `Phòng ${MOCK_STUDENT_DATA.room.roomNumber} - ${MOCK_STUDENT_DATA.room.building}`,
-              detail: `Vị trí: ${MOCK_STUDENT_DATA.room.floor}. Trạng thái giường đang lưu trú hiệu lực.`,
+              desc: currentRoomInfo
+                ? `Phòng ${currentRoomInfo.so_phong} - ${currentRoomInfo.toa || ''}`
+                : 'Chưa có phòng',
+              detail: currentRoomInfo
+                ? `Vị trí: Tầng ${currentRoomInfo.tang || '--'}. Trạng thái giường đang lưu trú hiệu lực.`
+                : 'Bạn chưa được xếp phòng. Vui lòng đăng ký phòng để được sắp xếp.',
             })
           }
         >
@@ -209,9 +245,11 @@ export default function StudentDashboard({ user, onNavigate }) {
             </div>
             <div className="student-stat-info">
               <span className="student-stat-label">Phòng hiện tại</span>
-              <span className="student-stat-value">{currentRoomInfo.so_phong || 'P36'}</span>
+              <span className="student-stat-value">{currentRoomInfo?.so_phong || 'Chưa có phòng'}</span>
               <span className="student-stat-subtext">
-                {currentRoomInfo.toa || 'Tòa A2'} - {currentRoomInfo.tang ? `Tầng ${currentRoomInfo.tang}` : 'Tầng 3'}
+                {currentRoomInfo
+                  ? `${currentRoomInfo.toa || ''} - Tầng ${currentRoomInfo.tang || '--'}`
+                  : 'Chưa được xếp phòng'}
               </span>
             </div>
           </div>
@@ -224,8 +262,12 @@ export default function StudentDashboard({ user, onNavigate }) {
           onClick={() =>
             setActiveModal({
               title: 'Danh sách thành viên phòng',
-              desc: `Hiện có ${currentRoomInfo.thanh_vien || '6/8 người'} sinh viên`,
-              detail: 'Phòng đang còn chỗ trống cho đợt tiếp nhận kỳ mới.',
+              desc: currentRoomInfo?.thanh_vien
+                ? `Hiện có ${currentRoomInfo.thanh_vien} sinh viên`
+                : 'Chưa có thông tin phòng',
+              detail: currentRoomInfo
+                ? 'Phòng đang còn chỗ trống cho đợt tiếp nhận kỳ mới.'
+                : 'Bạn chưa được xếp phòng.',
             })
           }
         >
@@ -241,7 +283,7 @@ export default function StudentDashboard({ user, onNavigate }) {
             <div className="student-stat-info">
               <span className="student-stat-label">Số thành viên</span>
               <span className="student-stat-value">
-                {currentRoomInfo.thanh_vien || '6/8 người'}
+                {currentRoomInfo?.thanh_vien || '--'}
               </span>
               <span className="student-stat-subtext">Hiện tại / sức chứa</span>
             </div>
@@ -255,8 +297,10 @@ export default function StudentDashboard({ user, onNavigate }) {
           onClick={() =>
             setActiveModal({
               title: 'Tình trạng phí Ký túc xá',
-              desc: `Số tiền: ${MOCK_STUDENT_DATA.billing.amount}`,
-              detail: 'Bạn đã hoàn tất nộp phí lưu trú năm học 2026 - 2027. Không có công nợ tồn đọng.',
+              desc: billing ? `Số tiền: ${billing.amount}` : 'Chưa có thông tin phí',
+              detail: billing
+                ? 'Chi tiết phí lưu trú của bạn.'
+                : 'Bạn chưa có hợp đồng lưu trú. Vui lòng đăng ký phòng để xem thông tin phí.',
             })
           }
         >
@@ -271,12 +315,19 @@ export default function StudentDashboard({ user, onNavigate }) {
             <div className="student-stat-info">
               <span className="student-stat-label">Phí KTX</span>
               <span className="student-stat-value">
-                {MOCK_STUDENT_DATA.billing.amount}{' '}
-                <span style={{ fontSize: '11px', fontWeight: 500, color: '#64748B' }}>
-                  {MOCK_STUDENT_DATA.billing.period}
-                </span>
+                {billing ? (
+                  <>{billing.amount}{' '}
+                    <span style={{ fontSize: '11px', fontWeight: 500, color: '#64748B' }}>
+                      {billing.period}
+                    </span>
+                  </>
+                ) : '--'}
               </span>
-              <span className="student-stat-badge">{MOCK_STUDENT_DATA.billing.status}</span>
+              {billing ? (
+                <span className="student-stat-badge">{billing.status}</span>
+              ) : (
+                <span className="student-stat-subtext">Chưa có thông tin</span>
+              )}
             </div>
           </div>
           <span className="student-stat-arrow">›</span>
@@ -305,9 +356,9 @@ export default function StudentDashboard({ user, onNavigate }) {
             </div>
             <div className="student-stat-info">
               <span className="student-stat-label">Phản ánh</span>
-              <span className="student-stat-value">{MOCK_STUDENT_DATA.complaints.total}</span>
+              <span className="student-stat-value">{complaints.total}</span>
               <span className="student-stat-subtext">
-                Đang xử lý: {MOCK_STUDENT_DATA.complaints.processing} | Đã xử lý: {MOCK_STUDENT_DATA.complaints.resolved}
+                Đang xử lý: {complaints.processing} | Đã xử lý: {complaints.resolved}
               </span>
             </div>
           </div>
@@ -347,7 +398,7 @@ export default function StudentDashboard({ user, onNavigate }) {
 
           {/* Grid 3 Cột x 2 Hàng */}
           <div className="student-actions-grid">
-            {MOCK_STUDENT_DATA.services.map((service) => (
+            {SERVICE_LIST.map((service) => (
               <div
                 key={service.id}
                 className={`student-action-card ${service.cardClass}`}
@@ -495,7 +546,57 @@ export default function StudentDashboard({ user, onNavigate }) {
             </div>
 
             <div className="student-notif-list">
-              {MOCK_STUDENT_DATA.notifications.map((item) => (
+              {/* Item đầu tiên: Trạng thái đơn đăng ký — chỉ hiện khi chưa có phòng */}
+              {!currentRoomInfo && (
+                <div
+                  className="student-notif-item"
+                  onClick={() => {
+                    if (registrationStatus) {
+                      onNavigate && onNavigate('/student/history');
+                    } else {
+                      onNavigate && onNavigate('/student/register');
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="student-notif-title-wrap">
+                    <span
+                      className="student-notif-dot"
+                      style={{
+                        backgroundColor:
+                          !registrationStatus ? '#94A3B8' :
+                          registrationStatus.trang_thai === 'CHO_DUYET' ? '#F59E0B' :
+                          registrationStatus.trang_thai === 'DA_DUYET'  ? '#22C55E' :
+                          registrationStatus.trang_thai === 'TU_CHOI'   ? '#EF4444' : '#94A3B8',
+                      }}
+                    />
+                    <span>
+                      {!registrationStatus && 'Đăng ký chỗ ở KTX'}
+                      {registrationStatus?.trang_thai === 'CHO_DUYET' && 'Đơn đăng ký — Đang chờ duyệt'}
+                      {registrationStatus?.trang_thai === 'DA_DUYET'  && 'Đơn đăng ký — Đã được duyệt ✔'}
+                      {registrationStatus?.trang_thai === 'TU_CHOI'   && 'Đơn đăng ký — Bị từ chối'}
+                      {registrationStatus?.trang_thai === 'DA_HUY'    && 'Đơn đăng ký — Đã hủy'}
+                    </span>
+                  </div>
+                  <span className="student-notif-date" style={{
+                    color:
+                      !registrationStatus ? '#94A3B8' :
+                      registrationStatus.trang_thai === 'CHO_DUYET' ? '#F59E0B' :
+                      registrationStatus.trang_thai === 'DA_DUYET'  ? '#22C55E' :
+                      registrationStatus.trang_thai === 'TU_CHOI'   ? '#EF4444' : '#94A3B8',
+                    fontWeight: 600,
+                  }}>
+                    {!registrationStatus && 'Đăng ký ngay'}
+                    {registrationStatus?.trang_thai === 'CHO_DUYET' && 'Chờ duyệt'}
+                    {registrationStatus?.trang_thai === 'DA_DUYET'  && 'Đã duyệt'}
+                    {registrationStatus?.trang_thai === 'TU_CHOI'   && 'Từ chối'}
+                    {registrationStatus?.trang_thai === 'DA_HUY'    && 'Đã hủy'}
+                  </span>
+                </div>
+              )}
+
+              {/* Các thông báo tĩnh */}
+              {STATIC_NOTIFICATIONS.map((item) => (
                 <div
                   key={item.id}
                   className="student-notif-item"
