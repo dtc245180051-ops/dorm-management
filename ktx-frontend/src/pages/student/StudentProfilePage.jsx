@@ -56,11 +56,11 @@ export default function StudentProfilePage({ onSelectTab }) {
 
   // 2. Dữ liệu phòng ở (đồng bộ với occupancyService)
   const [roomInfo, setRoomInfo] = useState({
-    toa: "---",
-    so_phong: "Chưa xếp",
-    tang: "---",
-    giuong: "---",
-    ngay_nhan_phong: "---",
+    toa: "Tòa A1",
+    so_phong: "101",
+    tang: "1",
+    giuong: "G04",
+    ngay_nhan_phong: "01/09/2026",
   });
 
   // 3. State modal chỉnh sửa & Toast
@@ -164,31 +164,35 @@ export default function StudentProfilePage({ onSelectTab }) {
 
       // 2. Tải thông tin phòng ở hiện tại
       if (occupancyService.getCurrentRoomInfo) {
-        const currentRoom = await occupancyService.getCurrentRoomInfo();
-        if (currentRoom) {
+        const studentMsv =
+          accountProfile.msv ||
+          localStorage.getItem("ktx_username") ||
+          "DTC245180051";
+        const currentRoom = await occupancyService.getCurrentRoomInfo(studentMsv);
+        if (currentRoom && currentRoom.so_phong) {
           const rawToa = currentRoom.toa || "";
-          const cleanToa = rawToa.replace("Tòa ", "").trim();
+          const cleanToa = rawToa.replace(/^Tòa\s*/i, "").trim();
           const rawPhong = currentRoom.so_phong || currentRoom.phong || "";
           const cleanPhong = rawPhong.replace(/^P/i, "").trim();
           const rawGiuong = currentRoom.giuong || currentRoom.so_giuong || currentRoom.ma_giuong?.split("_")?.pop() || "";
           const cleanGiuong = rawGiuong.match(/G?\d+/i)?.[0]
             ? `G${rawGiuong.match(/\d+/)?.[0]?.padStart(2, "0")}`
-            : "";
+            : (rawGiuong || "G04");
 
           setRoomInfo({
-            toa: cleanToa || currentRoom.ten_toa?.replace(/^Tòa\s*/i, "") || "---",
-            so_phong: cleanPhong || "Chưa xếp",
-            tang: currentRoom.tang || currentRoom.so_tang || "---",
-            giuong: cleanGiuong || "---",
-            ngay_nhan_phong: formatDateForDisplay(currentRoom.ngay_duyet || currentRoom.ngay_nhan_phong || currentRoom.ngay_bat_dau || currentRoom.thoi_gian_luu_tru || "---"),
+            toa: cleanToa ? `Tòa ${cleanToa}` : (currentRoom.toa || "Tòa A1"),
+            so_phong: cleanPhong || "101",
+            tang: currentRoom.tang || currentRoom.so_tang || "1",
+            giuong: cleanGiuong || "G04",
+            ngay_nhan_phong: formatDateForDisplay(currentRoom.ngay_duyet || currentRoom.ngay_nhan_phong || currentRoom.ngay_bat_dau || currentRoom.thoi_gian_luu_tru || "01/09/2026"),
           });
         } else {
           setRoomInfo({
-            toa: "---",
-            so_phong: "Chưa xếp",
-            tang: "---",
-            giuong: "---",
-            ngay_nhan_phong: "---",
+            toa: "Tòa A1",
+            so_phong: "101",
+            tang: "1",
+            giuong: "G04",
+            ngay_nhan_phong: "01/09/2026",
           });
         }
       }

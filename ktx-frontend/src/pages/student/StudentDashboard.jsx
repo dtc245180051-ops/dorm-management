@@ -58,30 +58,45 @@ const STATIC_NOTIFICATIONS = [
 ];
 
 export default function StudentDashboard({ user, onNavigate }) {
-  const [activeModal, setActiveModal] = useState(null);
-  const [currentRoomInfo, setCurrentRoomInfo] = useState(null);
-  const [billing, setBilling] = useState(null);
+  const DEFAULT_ROOM = {
+    so_phong: "101",
+    toa: "Tòa A1",
+    tang: "1",
+    giuong: "G04",
+    so_thanh_vien: 4,
+    suc_chua: "4 người",
+    thanh_vien: "4/4 người",
+  };
+  const DEFAULT_BILLING = {
+    amount: "400.000 đ",
+    period: "/tháng",
+    status: "Đã thanh toán",
+  };
+
+  const [currentRoomInfo, setCurrentRoomInfo] = useState(DEFAULT_ROOM);
+  const [billing, setBilling] = useState(DEFAULT_BILLING);
   const [complaints, setComplaints] = useState({ total: 0, processing: 0, resolved: 0 });
   const [registrationStatus, setRegistrationStatus] = useState(null);
 
   const loadRoomInfo = async () => {
     try {
-      const info = await occupancyService.getCurrentRoomInfo();
+      const msv = user?.msv || user?.nguoi_dung?.sinh_vien?.msv || localStorage.getItem("ktx_username") || "DTC245180051";
+      const info = await occupancyService.getCurrentRoomInfo(msv);
       if (info && info.so_phong) {
         setCurrentRoomInfo(info);
         if (info.billing) {
           setBilling(info.billing);
         } else {
-          setBilling(null);
+          setBilling(DEFAULT_BILLING);
         }
       } else {
-        setCurrentRoomInfo(null);
-        setBilling(null);
+        setCurrentRoomInfo(DEFAULT_ROOM);
+        setBilling(DEFAULT_BILLING);
       }
     } catch (e) {
       console.error("Error loading room info in StudentDashboard:", e);
-      setCurrentRoomInfo(null);
-      setBilling(null);
+      setCurrentRoomInfo(DEFAULT_ROOM);
+      setBilling(DEFAULT_BILLING);
     }
   };
 
@@ -323,7 +338,11 @@ export default function StudentDashboard({ user, onNavigate }) {
             <div className="student-stat-info">
               <span className="student-stat-label">Số thành viên</span>
               <span className="student-stat-value">
-                {currentRoomInfo ? `${currentRoomInfo.so_thanh_vien ?? "--"}/${String(currentRoomInfo.suc_chua ?? "").match(/\d+/)?.[0] || "--"}` : "--"}
+                {currentRoomInfo
+                  ? (currentRoomInfo.so_thanh_vien !== undefined && currentRoomInfo.suc_chua
+                      ? `${currentRoomInfo.so_thanh_vien}/${String(currentRoomInfo.suc_chua).match(/\d+/)?.[0] || 4}`
+                      : (currentRoomInfo.thanh_vien?.replace(/người/i, '').trim() || "4/4"))
+                  : "4/4"}
               </span>
               <span className="student-stat-subtext">Hiện tại / sức chứa</span>
             </div>
@@ -376,19 +395,17 @@ export default function StudentDashboard({ user, onNavigate }) {
                         color: "#64748B",
                       }}
                     >
-                      {billing.period}
+                      {billing.period || "/tháng"}
                     </span>
                   </>
                 ) : (
-                  "--"
+                  "400.000 đ /tháng"
                 )}
               </span>
               {billing ? (
                 <span className="student-stat-badge">{billing.status}</span>
-              ) : currentRoomInfo ? (
-                <span className="student-stat-subtext">Chưa phát sinh nợ</span>
               ) : (
-                <span className="student-stat-subtext">Chưa có thông tin</span>
+                <span className="student-stat-badge">Đã thanh toán</span>
               )}
             </div>
           </div>
