@@ -308,7 +308,7 @@ export default function App() {
           onLoginSuccess={(role) => {
             const r = String(role || "").toUpperCase();
             if (r.includes("KE_TOAN") || r.includes("KETOAN")) {
-              navigateTo("/doi-soat");
+              navigateTo("/accountant/dashboard");
             } else if (
               r.includes("ADMIN") ||
               r.includes("QUAN_LY") ||
@@ -529,7 +529,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             )
           }
         />
@@ -563,7 +563,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             )
           }
         />
@@ -597,7 +597,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             )
           }
         />
@@ -626,7 +626,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -651,7 +651,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -685,7 +685,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -713,7 +713,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -742,7 +742,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -771,7 +771,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -804,7 +804,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -832,7 +832,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -873,7 +873,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -964,7 +964,7 @@ export default function App() {
               ? "/admin"
               : r === "student"
                 ? "/student/dashboard"
-                : "/doi-soat",
+                : "/accountant/dashboard",
           );
         }}
       />

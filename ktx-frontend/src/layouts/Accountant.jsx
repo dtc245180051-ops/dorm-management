@@ -10,7 +10,7 @@ import { authService } from '../services/authService';
 export default function AccountantLayout({
   user,
   onLogout,
-  activeMenu = 'billing',
+  activeMenu = 'dashboard',
   onMenuChange,
   searchTerm = '',
   onSearchChange,
