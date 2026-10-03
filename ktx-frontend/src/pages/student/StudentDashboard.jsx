@@ -73,6 +73,7 @@ export default function StudentDashboard({ user, onNavigate }) {
     status: "Đã thanh toán",
   };
 
+  const [activeModal, setActiveModal] = useState(null);
   const [currentRoomInfo, setCurrentRoomInfo] = useState(DEFAULT_ROOM);
   const [billing, setBilling] = useState(DEFAULT_BILLING);
   const [complaints, setComplaints] = useState({ total: 0, processing: 0, resolved: 0 });
