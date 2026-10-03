@@ -621,43 +621,112 @@ class InvoiceService:
                     calculated_amount = c.tong_tien
                 note_str = request.ghi_chu or f"Hóa đơn tiền điện nước {request.thang} (Phòng {c.so_phong} - {c.toa_nha})"
 
-            new_invoice = HoaDon(
-                ma_hoa_don=ma_hd,
-                ma_hop_dong=None,
-                msv=None,
-                ho_ten=None,
-                ma_phong=c.ma_phong,
-                so_phong=f"{c.so_phong} - {c.toa_nha}",
-                loai_hoa_don=LoaiHoaDon.DIEN_NUOC.value,
-                ky_thanh_toan=request.thang,
-                so_tien=calculated_amount,
-                ngay_lap=datetime.date.today(),
-                han_thanh_toan=request.han_thanh_toan,
-                trang_thai=TrangThaiHoaDon.CHUA_THANH_TOAN.value,
-                ghi_chu=note_str,
-                nguoi_tao=creator_username,
-                ngay_tao=datetime.datetime.now(),
+            # Tìm danh sách sinh viên đang lưu trú tại phòng này (Hợp đồng ACTIVE / DANG_O)
+            active_contracts = (
+                db.query(HopDong)
+                .join(Giuong, HopDong.ma_giuong == Giuong.ma_giuong)
+                .filter(
+                    Giuong.ma_phong == c.ma_phong,
+                    HopDong.trang_thai.in_(["ACTIVE", "DANG_O"]),
+                )
+                .all()
             )
-            db.add(new_invoice)
 
-            # Tạo bản ghi vào bảng so_cong_no
-            so_cong_no_rec = SoCongNo(
-                ma_hoa_don=new_invoice.ma_hoa_don,
-                msv=None,
-                so_phong=new_invoice.so_phong,
-                loai_cong_no=new_invoice.loai_hoa_don,
-                ky_thanh_toan=new_invoice.ky_thanh_toan,
-                tong_tien=new_invoice.so_tien,
-                da_tra=0.0,
-                con_thieu=new_invoice.so_tien,
-                han_thanh_toan=new_invoice.han_thanh_toan,
-                trang_thai="CON_NO",
-                ghi_chu=new_invoice.ghi_chu or f"Công nợ tiền điện nước {new_invoice.ky_thanh_toan}",
-                ngay_cap_nhat=datetime.datetime.now(),
-            )
-            db.add(so_cong_no_rec)
+            seen_msvs = set()
+            unique_contracts = []
+            for hd in active_contracts:
+                if hd.msv and hd.msv.upper() not in seen_msvs:
+                    seen_msvs.add(hd.msv.upper())
+                    unique_contracts.append(hd)
+            num_occupants = len(unique_contracts)
 
-            created_invoices.append(new_invoice)
+            if num_occupants > 0:
+                # Phương án A: Chia đều tiền điện nước của cả phòng cho từng sinh viên đang ở
+                per_person_amount = round(calculated_amount / num_occupants)
+
+                for hd in unique_contracts:
+                    u_suffix = uuid.uuid4().hex[:6].upper()
+                    ma_hd = f"HDDN-{today_str}-{u_suffix}"
+                    student_name = (
+                        hd.sinh_vien.nguoi_dung.ho_ten
+                        if (hd.sinh_vien and hd.sinh_vien.nguoi_dung and hd.sinh_vien.nguoi_dung.ho_ten)
+                        else hd.msv
+                    )
+                    indiv_note = f"{note_str} - {student_name} ({hd.msv})"
+
+                    new_invoice = HoaDon(
+                        ma_hoa_don=ma_hd,
+                        ma_hop_dong=hd.ma_hop_dong,
+                        msv=hd.msv,
+                        ho_ten=student_name,
+                        ma_phong=c.ma_phong,
+                        so_phong=f"{c.so_phong} - {c.toa_nha}",
+                        loai_hoa_don=LoaiHoaDon.DIEN_NUOC.value,
+                        ky_thanh_toan=request.thang,
+                        so_tien=per_person_amount,
+                        ngay_lap=datetime.date.today(),
+                        han_thanh_toan=request.han_thanh_toan,
+                        trang_thai=TrangThaiHoaDon.CHUA_THANH_TOAN.value,
+                        ghi_chu=indiv_note,
+                        nguoi_tao=creator_username,
+                        ngay_tao=datetime.datetime.now(),
+                    )
+                    db.add(new_invoice)
+
+                    # Tạo bản ghi vào bảng so_cong_no cho sinh viên
+                    so_cong_no_rec = SoCongNo(
+                        ma_hoa_don=new_invoice.ma_hoa_don,
+                        msv=hd.msv,
+                        so_phong=new_invoice.so_phong,
+                        loai_cong_no=new_invoice.loai_hoa_don,
+                        ky_thanh_toan=new_invoice.ky_thanh_toan,
+                        tong_tien=new_invoice.so_tien,
+                        da_tra=0.0,
+                        con_thieu=new_invoice.so_tien,
+                        han_thanh_toan=new_invoice.han_thanh_toan,
+                        trang_thai="CON_NO",
+                        ghi_chu=new_invoice.ghi_chu or f"Công nợ tiền điện nước {new_invoice.ky_thanh_toan}",
+                        ngay_cap_nhat=datetime.datetime.now(),
+                    )
+                    db.add(so_cong_no_rec)
+                    created_invoices.append(new_invoice)
+            else:
+                # Phòng chưa có sinh viên ở -> Giữ hóa đơn chung cho phòng
+                new_invoice = HoaDon(
+                    ma_hoa_don=ma_hd,
+                    ma_hop_dong=None,
+                    msv=None,
+                    ho_ten=None,
+                    ma_phong=c.ma_phong,
+                    so_phong=f"{c.so_phong} - {c.toa_nha}",
+                    loai_hoa_don=LoaiHoaDon.DIEN_NUOC.value,
+                    ky_thanh_toan=request.thang,
+                    so_tien=calculated_amount,
+                    ngay_lap=datetime.date.today(),
+                    han_thanh_toan=request.han_thanh_toan,
+                    trang_thai=TrangThaiHoaDon.CHUA_THANH_TOAN.value,
+                    ghi_chu=note_str,
+                    nguoi_tao=creator_username,
+                    ngay_tao=datetime.datetime.now(),
+                )
+                db.add(new_invoice)
+
+                so_cong_no_rec = SoCongNo(
+                    ma_hoa_don=new_invoice.ma_hoa_don,
+                    msv=None,
+                    so_phong=new_invoice.so_phong,
+                    loai_cong_no=new_invoice.loai_hoa_don,
+                    ky_thanh_toan=new_invoice.ky_thanh_toan,
+                    tong_tien=new_invoice.so_tien,
+                    da_tra=0.0,
+                    con_thieu=new_invoice.so_tien,
+                    han_thanh_toan=new_invoice.han_thanh_toan,
+                    trang_thai="CON_NO",
+                    ghi_chu=new_invoice.ghi_chu or f"Công nợ tiền điện nước {new_invoice.ky_thanh_toan}",
+                    ngay_cap_nhat=datetime.datetime.now(),
+                )
+                db.add(so_cong_no_rec)
+                created_invoices.append(new_invoice)
 
         if not created_invoices:
             if already_issued_rooms:

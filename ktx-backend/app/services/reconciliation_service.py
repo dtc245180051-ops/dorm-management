@@ -63,9 +63,25 @@ class ReconciliationService:
             if any(c.isdigit() for c in code) and len(code) >= 4:
                 return "TIEN_PHONG", code, None
 
-        # Regex tiền điện nước: bắt đầu hoặc có từ khóa DN / DIEN NUOC / DIENNUOC / TIEN NUOC rồi đến số phòng
+        # Regex tiền điện nước:
+        # Hỗ trợ cả 2 dạng cú pháp:
+        # Dạng 1: 'DN <số phòng> <mã sinh viên>' (Ví dụ: DN 101 DTC245180051, DN P101 DTC245180051)
+        # Dạng 2: 'DN <số phòng>' (Ví dụ: DN 101, DN P101, DN 101-A1)
+        pattern_util_with_student = re.compile(
+            r"^\s*(?:DN|DIEN\s*NUOC|DIENNUOC|TIEN\s*NUOC|TIEN\s*DIEN(?:\s*NUOC)?)\s*[:\-_]?(?:\s*|\b)([A-Za-z0-9_\-]+)[\s_\-]+([A-Za-z0-9]+)",
+            re.IGNORECASE,
+        )
+        m_dns = pattern_util_with_student.search(raw)
+        if m_dns:
+            room = m_dns.group(1).strip()
+            student_code = m_dns.group(2).strip().upper()
+            stopwords = {"TIEN", "NUOC", "DIEN", "KTX", "NOP", "THANG", "T09", "T10", "T11", "T12"}
+            if room.upper() not in stopwords and any(c.isdigit() for c in student_code) and len(student_code) >= 4:
+                return "DIEN_NUOC", student_code, room
+
+        # Regex tiền điện nước dạng truyền thống: 'DN <số phòng>'
         pattern_util = re.compile(
-            r"^\s*(?:DN|DIEN\s*NUOC|DIENNUOC|TIEN\s*NUOC|TIEN\s*DIEN(?:\s*NUOC)?)\s*[:\-]?(?:\s*|\b)([A-Za-z0-9_\-]+)",
+            r"^\s*(?:DN|DIEN\s*NUOC|DIENNUOC|TIEN\s*NUOC|TIEN\s*DIEN(?:\s*NUOC)?)\s*[:\-_]?(?:\s*|\b)([A-Za-z0-9_\-]+)",
             re.IGNORECASE,
         )
         m_dn = pattern_util.search(raw)
@@ -245,10 +261,13 @@ class ReconciliationService:
                 tx.ghi_chu_doi_soat = "Sai cú pháp"
             return
 
-        # 3. Xử lý TIỀN ĐIỆN NƯỚC (DN <số phòng>)
+        # 3. Xử lý TIỀN ĐIỆN NƯỚC (DN <số phòng> <mã sinh viên> hoặc DN <số phòng>)
         if fee_type == "DIEN_NUOC" and room_code:
+            if student_code:
+                tx.msv = student_code
+
             # Tìm các hóa đơn tiền điện nước chưa thanh toán
-            unpaid_util = (
+            unpaid_query = (
                 db.query(HoaDon)
                 .filter(
                     HoaDon.loai_hoa_don == LoaiHoaDon.DIEN_NUOC.value,
@@ -258,14 +277,26 @@ class ReconciliationService:
                     ]),
                 )
                 .order_by(HoaDon.han_thanh_toan.asc())
-                .all()
             )
+            if student_code:
+                unpaid_util = unpaid_query.filter(
+                    or_(
+                        HoaDon.msv.ilike(student_code),
+                        HoaDon.msv.is_(None),
+                    )
+                ).all()
+            else:
+                unpaid_util = unpaid_query.all()
 
-            # Lọc danh sách hóa đơn khớp với phòng (hỗ trợ cả P203 khớp A203 / 203 - Tòa A1)
-            candidate_invoices = [
-                inv for inv in unpaid_util
-                if cls.is_room_match(room_code, inv.ma_phong, getattr(inv, "so_phong", ""))
-            ]
+            # Lọc danh sách hóa đơn khớp với phòng (hỗ trợ cả P203 khớp A203 / 203 - Tòa A1) và sinh viên
+            candidate_invoices = []
+            for inv in unpaid_util:
+                room_ok = cls.is_room_match(room_code, inv.ma_phong, getattr(inv, "so_phong", ""))
+                sv_ok = True
+                if student_code and inv.msv:
+                    sv_ok = (inv.msv.strip().upper() == student_code.strip().upper())
+                if room_ok and sv_ok:
+                    candidate_invoices.append(inv)
 
             matching_invoice = next(
                 (inv for inv in candidate_invoices if abs(float(inv.so_tien) - float(tx.so_tien)) < 1.0),
@@ -273,19 +304,31 @@ class ReconciliationService:
             )
 
             if not matching_invoice:
-                paid_util = (
+                paid_query = (
                     db.query(HoaDon)
                     .filter(
                         HoaDon.loai_hoa_don == LoaiHoaDon.DIEN_NUOC.value,
                         HoaDon.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value,
                     )
-                    .all()
                 )
+                if student_code:
+                    paid_util = paid_query.filter(
+                        or_(
+                            HoaDon.msv.ilike(student_code),
+                            HoaDon.msv.is_(None),
+                        )
+                    ).all()
+                else:
+                    paid_util = paid_query.all()
+
                 for inv in paid_util:
-                    if cls.is_room_match(room_code, inv.ma_phong, getattr(inv, "so_phong", "")):
-                        if abs(float(inv.so_tien) - float(tx.so_tien)) < 1.0:
-                            matching_invoice = inv
-                            break
+                    room_ok = cls.is_room_match(room_code, inv.ma_phong, getattr(inv, "so_phong", ""))
+                    sv_ok = True
+                    if student_code and inv.msv:
+                        sv_ok = (inv.msv.strip().upper() == student_code.strip().upper())
+                    if room_ok and sv_ok and abs(float(inv.so_tien) - float(tx.so_tien)) < 1.0:
+                        matching_invoice = inv
+                        break
 
             if matching_invoice:
                 # Khớp thành công -> TỰ ĐỘNG GẠCH NỢ
@@ -298,8 +341,9 @@ class ReconciliationService:
                     cong_no.ngay_cap_nhat = datetime.datetime.now()
 
                 tx.ma_hoa_don = matching_invoice.ma_hoa_don
-                sv_exists = db.query(SinhVien).filter(SinhVien.msv == matching_invoice.msv).first() if matching_invoice.msv else None
-                tx.msv = sv_exists.msv if sv_exists else None
+                code_to_set = matching_invoice.msv or student_code
+                sv_exists = db.query(SinhVien).filter(SinhVien.msv == code_to_set).first() if code_to_set else None
+                tx.msv = sv_exists.msv if sv_exists else code_to_set
                 tx.trang_thai = TrangThaiDoiSoat.AUTO_MATCHED.value
                 tx.ghi_chu_doi_soat = f"Khớp tự động với hóa đơn {matching_invoice.ma_hoa_don}"
                 tx.nguoi_xu_ly = "Hệ thống"

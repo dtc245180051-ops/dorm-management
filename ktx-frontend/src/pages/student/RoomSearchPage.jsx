@@ -354,6 +354,16 @@ export default function RoomSearchPage({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 {paginatedRooms?.map((room) => {
                   const isFull = room.trang_thai === 'DA_DAY';
+                  const roomTang = room.tang
+                    ? String(room.tang).replace(/t\?ng/gi, 'Tầng').replace(/^(\d+)$/, 'Tầng $1')
+                    : (room.so_tang ? `Tầng ${room.so_tang}` : '');
+                  const roomSiSo = room.si_so
+                    ? String(room.si_so).replace(/ng\?\?i/gi, 'người')
+                    : `${room.da_o ?? 0}/${room.suc_chua ?? 0} người`;
+                  const roomGiaThue = room.gia_thue
+                    ? String(room.gia_thue).replace(/\?\s*\/\s*n\?m/gi, 'đ / năm').replace(/\?/g, 'đ')
+                    : (room.gia_tien_nam != null ? `${Number(room.gia_tien_nam).toLocaleString('vi-VN')} đ / năm` : '');
+
                   return (
                     <div
                       key={room.id}
@@ -401,13 +411,13 @@ export default function RoomSearchPage({
                           {/* Dòng 2: Tầng (Icon Layers) */}
                           <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 truncate">
                             <Layers className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span className="truncate">{room.tang}</span>
+                            <span className="truncate">{roomTang}</span>
                           </div>
 
                           {/* Dòng 3: Sĩ số hiện tại (Icon Users) */}
                           <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 truncate">
                             <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span className="truncate">{room.si_so}</span>
+                            <span className="truncate">{roomSiSo}</span>
                           </div>
 
                           {/* Dòng 4: Loại phòng (Icon Tag) */}
@@ -425,7 +435,7 @@ export default function RoomSearchPage({
                           className={`font-black text-xs sm:text-sm tracking-tight ${isFull ? 'text-slate-400' : 'text-[#0f3b79]'
                             }`}
                         >
-                          {room.gia_thue}
+                          {roomGiaThue}
                         </div>
 
                         {/* Nút Xem chi tiết */}

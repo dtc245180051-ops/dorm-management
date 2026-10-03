@@ -82,13 +82,13 @@ def get_current_user_optional(
     db: Session = Depends(get_db),
 ) -> Optional[TaiKhoan]:
     """
-    Xác thực JWT token nếu có. Nếu không có token hoặc token không hợp lệ, trả về None thay vì ném ngoại lệ 401.
+    Xác thực người dùng tùy chọn (không bắt buộc).
+    Nếu không có token hoặc token không hợp lệ, trả về None thay vì ném lỗi 401.
     """
     try:
-        return get_current_user(request, token, db)
+        return get_current_user(request=request, token=token, db=db)
     except Exception:
         return None
-
 
 
 class RoleChecker:
