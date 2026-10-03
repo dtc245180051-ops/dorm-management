@@ -20,6 +20,7 @@ import TransactionReconciliation from './pages/accountant/TransactionReconciliat
 import PeriodicBilling from './pages/accountant/PeriodicBilling';
 import DebtLedger from './pages/accountant/DebtLedger';
 import AccountantDashboard from './pages/accountant/AccountantDashboard';
+import PeriodicReports from './pages/accountant/PeriodicReports';
 import occupancyService from './services/occupancyService';
 import { API_BASE_URL } from './services/authService';
 import { getStudentAccount } from './services/studentAccountService';
@@ -137,10 +138,12 @@ export default function App() {
           currentPath === "/doi-soat" ||
           currentPath === "/lap-hoa-don" ||
           currentPath === "/so-cong-no" ||
+          currentPath === "/bao-cao" ||
           currentPath.startsWith("/accountant") ||
           currentPath === "/reconciliation" ||
           currentPath === "/billing" ||
-          currentPath === "/debt";
+          currentPath === "/debt" ||
+          currentPath === "/reports";
         if (!isAccRoute) {
           navigateTo("/accountant/dashboard");
         }
@@ -275,6 +278,8 @@ export default function App() {
       navigateTo("/accountant/billing");
     } else if (menuKey === "debt-book") {
       navigateTo("/accountant/debt");
+    } else if (menuKey === "reports" || menuKey === "report") {
+      navigateTo("/accountant/reports");
     }
   };
 
@@ -460,6 +465,34 @@ export default function App() {
           onSearchChange={setAccountantSearchTerm}
         >
           <DebtLedger searchTerm={accountantSearchTerm} />
+        </AccountantLayout>
+        <RoleSwitcher currentRole="accountant" onSwitchRole={navigateTo} />
+      </div>
+    );
+  }
+
+  if (
+    currentPath === "/bao-cao" ||
+    currentPath === "/accountant/reports" ||
+    currentPath === "/reports"
+  ) {
+    return (
+      <div className="relative">
+        <AccountantLayout
+          user={{
+            username: localStorage.getItem('ktx_fullname') || localStorage.getItem('ktx_username') || 'Phòng Kế Toán',
+            role: 'KeToan'
+          }}
+          onLogout={() => {
+            localStorage.clear();
+            navigateTo("/");
+          }}
+          activeMenu="reports"
+          onMenuChange={handleAccountantMenuChange}
+          searchTerm={accountantSearchTerm}
+          onSearchChange={setAccountantSearchTerm}
+        >
+          <PeriodicReports searchTerm={accountantSearchTerm} />
         </AccountantLayout>
         <RoleSwitcher currentRole="accountant" onSwitchRole={navigateTo} />
       </div>

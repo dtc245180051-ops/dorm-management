@@ -151,6 +151,168 @@ export const financeService = {
       };
     }
   },
+
+  /**
+   * Lấy danh sách các kỳ thanh toán có trong hệ thống
+   */
+  async getPeriods() {
+    try {
+      const headers = await this.getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/finance/periods`, {
+        method: 'GET',
+        headers,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) && data.length > 0 ? data : ['Tháng 09/2026', 'Tháng 10/2026'];
+      }
+    } catch (err) {
+      console.warn('Lỗi gọi /finance/periods, dùng dữ liệu mặc định:', err);
+    }
+    return ['Tháng 09/2026', 'Tháng 10/2026'];
+  },
+
+  /**
+   * Lấy báo cáo tài chính chi tiết theo bộ lọc (Kỳ, Loại phí, Trạng thái, Từ khóa)
+   */
+  async getFinancialReport(params = {}) {
+    try {
+      const headers = await this.getAuthHeaders();
+      const q = new URLSearchParams();
+      if (params.period && params.period !== 'ALL') q.append('thang', params.period);
+      if (params.feeType && params.feeType !== 'ALL') q.append('loai_hoa_don', params.feeType);
+      if (params.status && params.status !== 'ALL') q.append('trang_thai', params.status);
+      if (params.keyword && params.keyword.trim()) q.append('keyword', params.keyword.trim());
+
+      const url = `${API_BASE_URL}/finance/report${q.toString() ? `?${q.toString()}` : ''}`;
+      const res = await fetch(url, { method: 'GET', headers });
+      if (res.ok) {
+        const data = await res.json();
+        return { success: true, data };
+      }
+    } catch (err) {
+      console.warn('Lỗi gọi /finance/report:', err);
+    }
+
+    return {
+      success: false,
+      data: {
+        summary: {
+          totalInvoiced: 0,
+          totalCollected: 0,
+          totalOutstanding: 0,
+          totalOverdue: 0,
+          roomRevenueStandard: 0,
+          roomRevenueService: 0,
+          utilityRevenue: 0,
+          collectionRate: 0,
+          invoiceCount: 0,
+          paidInvoiceCount: 0,
+          unpaidStudentsCount: 0,
+        },
+        items: [],
+      },
+    };
+  },
+
+  /**
+   * Lấy danh sách các biên bản báo cáo định kỳ đã lưu
+   */
+  async getPeriodicReports() {
+    try {
+      const headers = await this.getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/finance/periodic-reports`, {
+        method: 'GET',
+        headers,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { success: true, data: data.items || [] };
+      }
+    } catch (err) {
+      console.warn('Lỗi gọi GET /finance/periodic-reports:', err);
+    }
+
+    // Fallback: LocalStorage
+    try {
+      const cached = JSON.parse(localStorage.getItem('ktx_saved_periodic_reports') || '[]');
+      return { success: true, data: cached };
+    } catch (_) {
+      return { success: true, data: [] };
+    }
+  },
+
+  /**
+   * Lưu biên bản báo cáo định kỳ mới
+   */
+  async createPeriodicReport(payload) {
+    try {
+      const headers = await this.getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/finance/periodic-reports`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Đồng bộ thêm vào cache
+        try {
+          const cached = JSON.parse(localStorage.getItem('ktx_saved_periodic_reports') || '[]');
+          localStorage.setItem('ktx_saved_periodic_reports', JSON.stringify([data, ...cached]));
+        } catch (_) {}
+        return { success: true, data };
+      }
+    } catch (err) {
+      console.warn('Lỗi gọi POST /finance/periodic-reports:', err);
+    }
+
+    // Fallback nếu mạng lỗi
+    const newRecord = {
+      id: Date.now(),
+      reportCode: payload.reportCode || `BC-TC/${new Date().getFullYear()}/${Date.now().toString().slice(-3)}`,
+      title: payload.title,
+      period: payload.period,
+      reportType: payload.reportType || 'THANG',
+      creatorName: payload.creatorName,
+      approverName: payload.approverName || 'Trưởng ban QL KTX',
+      createdDate: payload.createdDate || new Date().toLocaleDateString('vi-VN'),
+      totalInvoiced: payload.summary?.totalInvoiced || 0,
+      totalCollected: payload.summary?.totalCollected || 0,
+      collectionRate: payload.summary?.collectionRate || 0,
+      totalOutstanding: payload.summary?.totalOutstanding || 0,
+      unpaidStudentsCount: payload.summary?.unpaidStudentsCount || 0,
+      totalOverdue: payload.summary?.totalOverdue || 0,
+      notes: payload.notes || '',
+      recommendations: payload.recommendations || '',
+      createdAt: new Date().toLocaleString('vi-VN'),
+    };
+    try {
+      const cached = JSON.parse(localStorage.getItem('ktx_saved_periodic_reports') || '[]');
+      localStorage.setItem('ktx_saved_periodic_reports', JSON.stringify([newRecord, ...cached]));
+    } catch (_) {}
+    return { success: true, data: newRecord };
+  },
+
+  /**
+   * Xóa biên bản báo cáo định kỳ
+   */
+  async deletePeriodicReport(reportId) {
+    try {
+      const headers = await this.getAuthHeaders();
+      await fetch(`${API_BASE_URL}/finance/periodic-reports/${reportId}`, {
+        method: 'DELETE',
+        headers,
+      });
+    } catch (err) {
+      console.warn('Lỗi gọi DELETE /finance/periodic-reports:', err);
+    }
+    try {
+      const cached = JSON.parse(localStorage.getItem('ktx_saved_periodic_reports') || '[]');
+      const filtered = cached.filter((r) => r.id !== reportId);
+      localStorage.setItem('ktx_saved_periodic_reports', JSON.stringify(filtered));
+    } catch (_) {}
+    return { success: true };
+  },
 };
 
 export default financeService;

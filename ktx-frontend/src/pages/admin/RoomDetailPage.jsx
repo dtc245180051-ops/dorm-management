@@ -286,17 +286,34 @@ export default function RoomDetailPage({
                         student?.ma_hop_dong && /^HD\d{2}-[A-Za-z0-9]+-G\d+$/.test(student.ma_hop_dong)
                           ? student.ma_hop_dong
                           : autoCode;
+                      const emergencyContact = student?.sdt_nguoi_giam_ho
+                        ? `${student.sdt_nguoi_giam_ho}${
+                            student.moi_quan_he || student.nguoi_giam_ho
+                              ? ` (${[student.moi_quan_he, student.nguoi_giam_ho].filter(Boolean).join(' - ')})`
+                              : ''
+                          }`
+                        : student?.nguoi_giam_ho || '';
+
                       setViewingContract({
                         bedNumber: idx + 1,
                         bedId: bed.ma_giuong,
-                        studentName: student?.ho_ten || 'Hoàng Đông Huy',
-                        msv: student?.msv || 'LNS26012113',
+                        studentName: student?.ho_ten || '',
+                        ho_ten: student?.ho_ten || '',
+                        msv: student?.msv || '',
+                        gioi_tinh: student?.gioi_tinh || 'Nam',
+                        ngay_sinh: student?.ngay_sinh || '',
+                        cccd: student?.cccd || '',
+                        so_dien_thoai: student?.so_dien_thoai || '',
+                        email: student?.email || (student?.msv ? `${student.msv.toLowerCase()}@ictu.edu.vn` : ''),
+                        khoa: student?.khoa || 'Công nghệ thông tin',
+                        lop: student?.lop || '',
+                        dia_chi: student?.dia_chi || '',
+                        lien_he_khan_cap: emergencyContact,
                         contractId: validCode,
                         ma_hop_dong: validCode,
                         roomNumber: room.so_phong,
                         floorNumber: floorNumber,
                         buildingName: buildingName,
-                        lop: student?.lop || 'KTMT K23A',
                         ngay_bat_dau: student?.ngay_bat_dau || '01/09/2026',
                         ngay_ket_thuc: student?.ngay_ket_thuc || '30/06/2027',
                       });

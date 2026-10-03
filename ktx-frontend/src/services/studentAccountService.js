@@ -6,16 +6,18 @@
 const STORAGE_KEY = "ktx_student_account";
 
 export const DEFAULT_STUDENT_ACCOUNT = {
-  studentId: "",
-  fullName: "",
+  studentId: "dtc245180051",
+  fullName: "Nguyễn Thị Ánh",
   currentResidence: {
-    isActive: false, // false nếu chưa có phòng hoặc hợp đồng đã kết thúc
-    building: "",
-    roomNumber: "",
-    roomType: "",
-    contractStatus: "EXPIRED", // "ACTIVE" (Đang hiệu lực), "EXPIRED" (Đã kết thúc)
-    startDate: "",
-    endDate: "",
+    isActive: true,
+    building: "Tòa A1",
+    roomNumber: "101",
+    roomType: "Phòng tiêu chuẩn",
+    contractStatus: "ACTIVE",
+    startDate: "01/09/2026",
+    endDate: "30/06/2027",
+    bed: "G04",
+    members: "4/4",
   },
   registrationHistory: [],
   residenceHistory: [],
@@ -64,17 +66,25 @@ export function getStudentAccount(studentId) {
  * Chuẩn hóa object tài khoản đảm bảo đúng 100% schema và không thiếu trường
  */
 function normalizeAccount(acc) {
+  const isDefaultStudent = !acc?.studentId || String(acc?.studentId).toLowerCase() === "dtc245180051";
+  const defRes = DEFAULT_STUDENT_ACCOUNT.currentResidence;
+
   const normalized = {
-    studentId: String(acc?.studentId || "").toLowerCase(),
-    fullName: acc?.fullName || "",
+    studentId: String(acc?.studentId || "dtc245180051").toLowerCase(),
+    fullName: acc?.fullName || (isDefaultStudent ? "Nguyễn Thị Ánh" : ""),
     currentResidence: {
-      isActive: Boolean(acc?.currentResidence?.isActive),
-      building: acc?.currentResidence?.building || "",
-      roomNumber: acc?.currentResidence?.roomNumber || "",
-      roomType: acc?.currentResidence?.roomType || "",
-      contractStatus: acc?.currentResidence?.contractStatus || (acc?.currentResidence?.isActive ? "ACTIVE" : "EXPIRED"),
-      startDate: acc?.currentResidence?.startDate || "",
-      endDate: acc?.currentResidence?.endDate || "",
+      isActive: acc?.currentResidence?.isActive !== undefined 
+        ? Boolean(acc.currentResidence.isActive) 
+        : (isDefaultStudent ? true : false),
+      building: acc?.currentResidence?.building || (isDefaultStudent ? defRes.building : ""),
+      roomNumber: acc?.currentResidence?.roomNumber || (isDefaultStudent ? defRes.roomNumber : ""),
+      floor: acc?.currentResidence?.floor || (isDefaultStudent ? "1" : ""),
+      bed: acc?.currentResidence?.bed || (isDefaultStudent ? defRes.bed : "G04"),
+      members: acc?.currentResidence?.members || (isDefaultStudent ? defRes.members : "4/4"),
+      roomType: acc?.currentResidence?.roomType || (isDefaultStudent ? defRes.roomType : ""),
+      contractStatus: acc?.currentResidence?.contractStatus || (isDefaultStudent ? "ACTIVE" : (acc?.currentResidence?.isActive ? "ACTIVE" : "EXPIRED")),
+      startDate: acc?.currentResidence?.startDate || (isDefaultStudent ? defRes.startDate : ""),
+      endDate: acc?.currentResidence?.endDate || (isDefaultStudent ? defRes.endDate : ""),
     },
     registrationHistory: Array.isArray(acc?.registrationHistory) ? acc.registrationHistory : [],
     residenceHistory: Array.isArray(acc?.residenceHistory) ? acc.residenceHistory : [],

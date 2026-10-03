@@ -6,6 +6,8 @@ from app.models.invoice import HoaDon, LoaiHoaDon, TrangThaiHoaDon
 from app.models.reconciliation import GiaoDichNganHang, TrangThaiDoiSoat
 from app.models.user import KeToan, NguoiDung, QuanLy, SinhVien, TaiKhoan, VaiTro
 
+from app.models.report import BaoCaoDinhKy
+
 __all__ = [
     # User & Identity
     "VaiTro",
@@ -28,6 +30,7 @@ __all__ = [
     "LoaiHoaDon",
     "TrangThaiHoaDon",
     "SoCongNo",
+    "BaoCaoDinhKy",
     # Bank Reconciliation
     "GiaoDichNganHang",
     "TrangThaiDoiSoat",

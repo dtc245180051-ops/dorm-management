@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Building,
   Users,
+  BarChart3,
 } from 'lucide-react';
 import financeService from '../../services/financeService';
 
@@ -381,24 +382,6 @@ export default function AccountantDashboard({ onNavigate }) {
               </div>
             </div>
 
-            {/* Thống kê bổ sung 2 loại phòng niêm yết */}
-            {/* <div className="grid grid-cols-2 gap-3 mt-5">
-              <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-100 flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-blue-900/80 font-medium">Phòng tiêu chuẩn</div>
-                  <div className="text-xs font-bold text-blue-950 mt-0.5">350.000 VNĐ / tháng</div>
-                </div>
-                <Building className="w-4 h-4 text-blue-500" />
-              </div>
-
-              <div className="p-3 rounded-xl bg-purple-50/50 border border-purple-100 flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-purple-900/80 font-medium">Phòng dịch vụ</div>
-                  <div className="text-xs font-bold text-purple-950 mt-0.5">650.000 VNĐ / tháng</div>
-                </div>
-                <Building className="w-4 h-4 text-purple-500" />
-              </div>
-            </div> */}
           </div>
 
           <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">

@@ -71,7 +71,7 @@ def seed():
         # -------------------------------------------------------------
         student_bed_map = [
             # P101 (3/4 occupied)
-            ("DTC245180008", "Nguyễn Văn Dũng", "A1_T1_P101_G01", "HD26-A1101-G01"),
+            ("DTC245180008", "Lê Quang Vinh", "A1_T1_P101_G01", "HD26-A1101-G01"),
             ("DTC245180086", "Trần Đình Trọng", "A1_T1_P101_G02", "HD26-A1101-G02"),
             ("DTC245180096", "Lê Văn Hùng", "A1_T1_P101_G03", "HD26-A1101-G03"),
             # P201 (3/4 occupied)
@@ -128,9 +128,17 @@ def seed():
                 s_sv = SinhVien(
                     msv=msv,
                     ma_nguoi_dung=s_nd.ma_nguoi_dung,
-                    lop="CNTTK24A",
+                    lop="CNTTK24A" if msv != "DTC245180008" else "DTC-KTX",
                     khoa="Công nghệ thông tin",
                     gioi_tinh="Nam",
+                    ngay_sinh="21/01/2006",
+                    cccd="019206001234",
+                    que_quan="Thái Nguyên",
+                    dia_chi="Số 45, Đường Hoàng Văn Thụ, Thái Nguyên",
+                    doi_tuong_uu_tien="Không thuộc diện ưu tiên",
+                    nguoi_giam_ho="Hoàng Văn Hùng" if msv != "DTC245180008" else "Lê Quang Hùng",
+                    moi_quan_he="Bố",
+                    sdt_nguoi_giam_ho="0988 765 432",
                 )
                 db.add(s_sv)
                 db.flush()

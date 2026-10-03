@@ -90,26 +90,33 @@ export default function StudentDetailPage({
   // Xử lý xem hợp đồng
   const handleViewContract = () => {
     const roomInfo = student.thong_tin_phong_hien_tai;
+    const emergencyContact = student.sdt_nguoi_giam_ho
+      ? `${student.sdt_nguoi_giam_ho}${
+          student.moi_quan_he || student.nguoi_giam_ho
+            ? ` (${[student.moi_quan_he, student.nguoi_giam_ho].filter(Boolean).join(' - ')})`
+            : ''
+        }`
+      : student.nguoi_giam_ho || '';
+
     const contractObj = {
       ma_hop_dong: roomInfo?.ma_hop_dong || `HD26-${student.msv}-G1`,
-      ho_ten: student.ho_ten,
-      msv: student.msv,
-      gioi_tinh: student.gioi_tinh,
-      ngay_sinh: student.ngay_sinh || '21/01/2006',
-      cccd: student.cccd || '019206001234',
-      so_dien_thoai: student.so_dien_thoai || '0331 131 211',
-      email: student.email || `${student.msv}@lns.edu.vn`,
+      ho_ten: student.ho_ten || '',
+      studentName: student.ho_ten || '',
+      msv: student.msv || '',
+      gioi_tinh: student.gioi_tinh || 'Nam',
+      ngay_sinh: student.ngay_sinh || '',
+      cccd: student.cccd || '',
+      so_dien_thoai: student.so_dien_thoai || '',
+      email: student.email || (student.msv ? `${student.msv.toLowerCase()}@ictu.edu.vn` : ''),
       khoa: student.khoa || 'Công nghệ thông tin',
-      lop: student.lop || 'CNTTK24M',
-      lien_he_khan_cap: student.sdt_nguoi_giam_ho
-        ? `${student.sdt_nguoi_giam_ho} (${student.moi_quan_he || 'Người thân'})`
-        : '0988 765 432 (Bố)',
-      dia_chi: student.dia_chi || 'Số 45, Đường Hoàng Văn Thụ, Thái Nguyên',
+      lop: student.lop || '',
+      lien_he_khan_cap: emergencyContact,
+      dia_chi: student.dia_chi || '',
       phong_giuong: roomInfo
-        ? `${roomInfo.ten_toa || 'Tòa A1'} – Phòng ${roomInfo.so_phong || '102'} – ${roomInfo.ten_giuong || 'Giường 1'}`
-        : 'Tòa A – Phòng 102 – Giường 1',
-      ngay_bat_dau: roomInfo?.ngay_bat_dau ? roomInfo.ngay_bat_dau.split('-').reverse().join('/') : '',
-      ngay_ket_thuc: roomInfo?.ngay_ket_thuc ? roomInfo.ngay_ket_thuc.split('-').reverse().join('/') : '',
+        ? `${roomInfo.ten_toa || 'Tòa A1'} – Phòng ${roomInfo.so_phong || '101'} – ${roomInfo.ten_giuong || 'Giường 1'}`
+        : '',
+      ngay_bat_dau: roomInfo?.ngay_bat_dau ? roomInfo.ngay_bat_dau.split('-').reverse().join('/') : '01/09/2026',
+      ngay_ket_thuc: roomInfo?.ngay_ket_thuc ? roomInfo.ngay_ket_thuc.split('-').reverse().join('/') : '30/06/2027',
       trang_thai: 'ACTIVE',
       ma_giuong: roomInfo?.ma_giuong || '',
     };
@@ -265,31 +272,31 @@ export default function StudentDetailPage({
               <div className="px-5 py-3 flex items-center justify-between text-sm">
                 <span className="text-slate-600 font-medium">Số điện thoại</span>
                 <span className="text-slate-800 font-medium">
-                  {student.so_dien_thoai || '0331 131 211'}
+                  {student.so_dien_thoai || 'Chưa cập nhật'}
                 </span>
               </div>
               <div className="px-5 py-3 flex items-center justify-between text-sm">
                 <span className="text-slate-600 font-medium">Ngày sinh</span>
                 <span className="text-slate-800 font-medium">
-                  {student.ngay_sinh ? formatDateDisplay(student.ngay_sinh) : '21/01/2006'}
+                  {student.ngay_sinh ? formatDateDisplay(student.ngay_sinh) : 'Chưa cập nhật'}
                 </span>
               </div>
               <div className="px-5 py-3 flex items-center justify-between text-sm">
                 <span className="text-slate-600 font-medium">Số CCCD / Định danh</span>
                 <span className="text-slate-800 font-medium">
-                  {student.cccd || '019206001234'}
+                  {student.cccd || 'Chưa cập nhật'}
                 </span>
               </div>
               <div className="px-5 py-3 flex items-center justify-between text-sm">
                 <span className="text-slate-600 font-medium">Quê quán</span>
                 <span className="text-slate-800 font-medium">
-                  {student.que_quan || 'Thái Nguyên'}
+                  {student.que_quan || 'Chưa cập nhật'}
                 </span>
               </div>
               <div className="px-5 py-3 flex items-center justify-between text-sm">
                 <span className="text-slate-600 font-medium">Địa chỉ</span>
                 <span className="text-slate-800 font-medium">
-                  {student.dia_chi || 'Số 45, Đường Hoàng Văn Thụ, Thái Nguyên'}
+                  {student.dia_chi || 'Chưa cập nhật'}
                 </span>
               </div>
               <div className="px-5 py-3 flex items-center justify-between text-sm">
@@ -315,7 +322,7 @@ export default function StudentDetailPage({
                       }`
                     : student.nguoi_giam_ho
                     ? `${student.nguoi_giam_ho}${student.moi_quan_he ? ` (${student.moi_quan_he})` : ''}`
-                    : '0988 765 432 (Bố - Hoàng Văn Hùng)'}
+                    : 'Chưa cập nhật'}
                 </span>
               </div>
             </div>

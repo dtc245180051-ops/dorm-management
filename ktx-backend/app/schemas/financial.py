@@ -14,6 +14,7 @@ class DashboardKPIs(BaseModel):
     totalTransactions: int
     matchedTransactions: int
     unmatchedTransactions: int
+    unpaidStudentsCount: int = 0
 
 
 class PeriodRevenue(BaseModel):
@@ -76,6 +77,7 @@ class FinancialSummary(BaseModel):
     collectionRate: float
     invoiceCount: int
     paidInvoiceCount: int
+    unpaidStudentsCount: int = 0
 
 
 class FinancialReportItem(BaseModel):
@@ -99,3 +101,46 @@ class FinancialReportItem(BaseModel):
 class FinancialReportResponse(BaseModel):
     summary: FinancialSummary
     items: List[FinancialReportItem]
+
+
+# =========================================================================
+# BÁO CÁO THỐNG KÊ ĐỊNH KỲ (PERIODIC STATISTICAL REPORT) SCHEMAS
+# =========================================================================
+
+class PeriodicReportCreate(BaseModel):
+    reportCode: Optional[str] = None
+    title: str
+    period: str
+    reportType: str = "THANG"  # THANG, QUY, NAM, DOT_XUAT
+    creatorName: str
+    approverName: Optional[str] = None
+    createdDate: Optional[str] = None
+    notes: Optional[str] = None
+    recommendations: Optional[str] = None
+    summary: FinancialSummary
+    items: Optional[List[FinancialReportItem]] = None
+
+
+class PeriodicReportRecord(BaseModel):
+    id: int
+    reportCode: str
+    title: str
+    period: str
+    reportType: str
+    creatorName: str
+    approverName: Optional[str] = None
+    createdDate: str
+    totalInvoiced: float
+    totalCollected: float
+    collectionRate: float
+    totalOutstanding: float
+    unpaidStudentsCount: int
+    totalOverdue: float
+    notes: Optional[str] = None
+    recommendations: Optional[str] = None
+    createdAt: str
+
+
+class PeriodicReportListResponse(BaseModel):
+    items: List[PeriodicReportRecord]
+    total: int

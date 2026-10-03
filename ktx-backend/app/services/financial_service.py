@@ -11,6 +11,7 @@ from app.models.reconciliation import GiaoDichNganHang, TrangThaiDoiSoat
 from app.models.dorm import Phong, Giuong
 from app.models.contract import HopDong
 from app.models.user import SinhVien
+from app.models.report import BaoCaoDinhKy
 from app.schemas.financial import (
     DashboardResponse,
     DashboardKPIs,
@@ -21,6 +22,9 @@ from app.schemas.financial import (
     FinancialReportResponse,
     FinancialSummary,
     FinancialReportItem,
+    PeriodicReportCreate,
+    PeriodicReportRecord,
+    PeriodicReportListResponse,
 )
 
 
@@ -105,6 +109,13 @@ class FinancialService:
         unmatched_tx = total_tx - matched_tx
         recon_rate = round((matched_tx / total_tx * 100.0), 1) if total_tx > 0 else 0.0
 
+        # Đồng bộ số liệu công nợ sinh viên với Sổ công nợ (DebtService)
+        from app.services.debt_service import DebtService
+        debt_summary = DebtService.get_debt_summary(db)
+        unpaid_students_count = len(debt_summary.items)
+        if debt_summary.statistics and debt_summary.statistics.totalOutstanding > 0:
+            total_outstanding = debt_summary.statistics.totalOutstanding
+
         kpis = DashboardKPIs(
             totalRevenue=total_revenue,
             collectedRevenue=collected_revenue,
@@ -115,6 +126,7 @@ class FinancialService:
             totalTransactions=total_tx,
             matchedTransactions=matched_tx,
             unmatchedTransactions=unmatched_tx,
+            unpaidStudentsCount=unpaid_students_count,
         )
 
         # Xu hướng theo tháng (Monthly Trend)
@@ -386,6 +398,33 @@ class FinancialService:
         tot_out = max(0.0, tot_inv - tot_col)
         rate = round((tot_col / tot_inv * 100.0), 1) if tot_inv > 0 else 100.0
 
+        # Tính số sinh viên còn nợ trong phạm vi báo cáo
+        unpaid_sv_set = set()
+        for itm in items:
+            if itm.status != "PAID":
+                if itm.studentId:
+                    unpaid_sv_set.add(itm.studentId)
+                elif itm.room:
+                    # Nếu hóa đơn tiền điện nước chia theo phòng, thêm các SV đang ở phòng đó
+                    room_num_match = re.search(r"(\d{3})", itm.room)
+                    if room_num_match:
+                        active_hds = (
+                            db.query(HopDong)
+                            .join(Giuong, HopDong.ma_giuong == Giuong.ma_giuong)
+                            .join(Phong, Giuong.ma_phong == Phong.ma_phong)
+                            .filter(Phong.so_phong.ilike(f"%{room_num_match.group(1)}%"), HopDong.trang_thai == "ACTIVE")
+                            .all()
+                        )
+                        for hd in active_hds:
+                            if hd.msv:
+                                unpaid_sv_set.add(hd.msv)
+
+        unpaid_count = len(unpaid_sv_set)
+        if not thang or thang == "ALL":
+            # Nếu xem toàn bộ, lấy trực tiếp từ DebtService để chuẩn tuyệt đối
+            from app.services.debt_service import DebtService
+            unpaid_count = len(DebtService.get_debt_summary(db).items)
+
         summary = FinancialSummary(
             totalInvoiced=tot_inv,
             totalCollected=tot_col,
@@ -397,6 +436,121 @@ class FinancialService:
             collectionRate=rate,
             invoiceCount=len(invoices),
             paidInvoiceCount=paid_count,
+            unpaidStudentsCount=unpaid_count,
         )
 
         return FinancialReportResponse(summary=summary, items=items)
+
+    @classmethod
+    def save_periodic_report(cls, db: Session, payload: PeriodicReportCreate) -> PeriodicReportRecord:
+        import json
+        today_date = datetime.date.today()
+        created_date_val = today_date
+        if payload.createdDate:
+            try:
+                created_date_val = datetime.datetime.strptime(payload.createdDate, "%Y-%m-%d").date()
+            except Exception:
+                try:
+                    created_date_val = datetime.datetime.strptime(payload.createdDate, "%d/%m/%Y").date()
+                except Exception:
+                    pass
+
+        # Tự sinh mã báo cáo nếu chưa có
+        report_code = payload.reportCode
+        if not report_code or not report_code.strip():
+            count = db.query(BaoCaoDinhKy).count()
+            current_year = today_date.year
+            report_code = f"BC-TC/{current_year}/{count + 1:02d}"
+
+        # Kiểm tra trùng mã
+        existing = db.query(BaoCaoDinhKy).filter(BaoCaoDinhKy.ma_bao_cao == report_code).first()
+        if existing:
+            report_code = f"{report_code}-{datetime.datetime.now().strftime('%H%M%S')}"
+
+        json_data = None
+        try:
+            json_data = json.dumps({
+                "summary": payload.summary.model_dump(),
+                "itemsCount": len(payload.items) if payload.items else 0,
+            }, ensure_ascii=False)
+        except Exception:
+            pass
+
+        report_model = BaoCaoDinhKy(
+            ma_bao_cao=report_code,
+            tieu_de=payload.title,
+            loai_bao_cao=payload.reportType or "THANG",
+            ky_bao_cao=payload.period,
+            nguoi_lap=payload.creatorName,
+            nguoi_duyet=payload.approverName,
+            ngay_lap=created_date_val,
+            tong_thu_du_kien=payload.summary.totalInvoiced,
+            thuc_thu=payload.summary.totalCollected,
+            ty_le_thu=payload.summary.collectionRate,
+            tong_cong_no=payload.summary.totalOutstanding,
+            so_sv_con_no=payload.summary.unpaidStudentsCount,
+            no_qua_han=payload.summary.totalOverdue,
+            nhan_xet=payload.notes,
+            kien_nghi=payload.recommendations,
+            du_lieu_json=json_data,
+        )
+        db.add(report_model)
+        db.commit()
+        db.refresh(report_model)
+
+        return PeriodicReportRecord(
+            id=report_model.id,
+            reportCode=report_model.ma_bao_cao,
+            title=report_model.tieu_de,
+            period=report_model.ky_bao_cao,
+            reportType=report_model.loai_bao_cao,
+            creatorName=report_model.nguoi_lap,
+            approverName=report_model.nguoi_duyet,
+            createdDate=report_model.ngay_lap.strftime("%d/%m/%Y"),
+            totalInvoiced=report_model.tong_thu_du_kien,
+            totalCollected=report_model.thuc_thu,
+            collectionRate=report_model.ty_le_thu,
+            totalOutstanding=report_model.tong_cong_no,
+            unpaidStudentsCount=report_model.so_sv_con_no,
+            totalOverdue=report_model.no_qua_han,
+            notes=report_model.nhan_xet,
+            recommendations=report_model.kien_nghi,
+            createdAt=report_model.ngay_tao.strftime("%d/%m/%Y %H:%M"),
+        )
+
+    @classmethod
+    def get_periodic_reports(cls, db: Session) -> PeriodicReportListResponse:
+        reports = db.query(BaoCaoDinhKy).order_by(BaoCaoDinhKy.ngay_tao.desc()).all()
+        records: List[PeriodicReportRecord] = []
+        for r in reports:
+            records.append(
+                PeriodicReportRecord(
+                    id=r.id,
+                    reportCode=r.ma_bao_cao,
+                    title=r.tieu_de,
+                    period=r.ky_bao_cao,
+                    reportType=r.loai_bao_cao,
+                    creatorName=r.nguoi_lap,
+                    approverName=r.nguoi_duyet,
+                    createdDate=r.ngay_lap.strftime("%d/%m/%Y") if r.ngay_lap else "",
+                    totalInvoiced=r.tong_thu_du_kien,
+                    totalCollected=r.thuc_thu,
+                    collectionRate=r.ty_le_thu,
+                    totalOutstanding=r.tong_cong_no,
+                    unpaidStudentsCount=r.so_sv_con_no,
+                    totalOverdue=r.no_qua_han,
+                    notes=r.nhan_xet,
+                    recommendations=r.kien_nghi,
+                    createdAt=r.ngay_tao.strftime("%d/%m/%Y %H:%M") if r.ngay_tao else "",
+                )
+            )
+        return PeriodicReportListResponse(items=records, total=len(records))
+
+    @classmethod
+    def delete_periodic_report(cls, db: Session, report_id: int) -> bool:
+        r = db.query(BaoCaoDinhKy).filter(BaoCaoDinhKy.id == report_id).first()
+        if r:
+            db.delete(r)
+            db.commit()
+            return True
+        return False

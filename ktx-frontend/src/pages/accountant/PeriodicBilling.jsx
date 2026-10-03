@@ -268,7 +268,8 @@ export default function PeriodicBilling({ searchTerm = '' }) {
         const skipped = allItems.length - items.length;
 
         const mappedRooms = items.map((r) => {
-          const soNguoi = Number(r.so_nguoi) || 0;
+          // API trả số người theo tên trường `so_sinh_vien`.
+          const soNguoi = Number(r.so_sinh_vien ?? r.so_nguoi) || 0;
           return {
             room: `P${r.so_phong} - ${r.toa_nha}`,
             so_phong: r.so_phong,

@@ -152,7 +152,30 @@ def get_contract_detail(db: Session, ma_hop_dong: str) -> HopDongDetailResponse:
         )
 
     if not hd:
-        # Nếu chưa có trong DB, trả về dữ liệu mẫu với mã hợp đồng sinh tự động
+        # Thử tìm theo biến thể mã có/không có số 0 ở giường (VD: HD26-A1101-G01 <-> HD26-A1101-G1)
+        alt_code = None
+        if "-G0" in ma_hop_dong:
+            alt_code = ma_hop_dong.replace("-G0", "-G")
+        elif re.search(r"-G([1-9])$", ma_hop_dong):
+            alt_code = re.sub(r"-G([1-9])$", r"-G0\1", ma_hop_dong)
+        
+        if alt_code:
+            hd = (
+                db.query(HopDong)
+                .options(
+                    joinedload(HopDong.sinh_vien).joinedload(SinhVien.nguoi_dung),
+                    joinedload(HopDong.giuong)
+                    .joinedload(Giuong.phong)
+                    .joinedload(Phong.tang)
+                    .joinedload(Tang.toa_nha),
+                    joinedload(HopDong.phis),
+                )
+                .filter(HopDong.ma_hop_dong == alt_code)
+                .first()
+            )
+
+    if not hd:
+        # Nếu chưa có trong DB, trả về thông tin phòng theo mã hợp đồng
         sample_code = ma_hop_dong if ma_hop_dong.startswith("HD") else generate_contract_code("A1", 1, "101", "1", date(2026, 9, 1))
         parsed = parse_contract_code(sample_code)
         toa_val = parsed.get("toa", "A1")
@@ -162,17 +185,17 @@ def get_contract_detail(db: Session, ma_hop_dong: str) -> HopDongDetailResponse:
 
         return HopDongDetailResponse(
             ma_hop_dong=sample_code,
-            ho_ten="Hoàng Đông Huy",
-            msv="LNS26012113",
+            ho_ten="Chưa cập nhật",
+            msv="",
             gioi_tinh="Nam",
-            ngay_sinh="21/01/2006",
-            cccd="019206001234",
-            so_dien_thoai="0331 131 211",
-            email="LNS26012113@lns.edu.vn",
+            ngay_sinh="",
+            cccd="",
+            so_dien_thoai="",
+            email="",
             khoa="Công nghệ thông tin",
-            lop="KTMT K23A",
-            lien_he_khan_cap="0988 765 432 (Bố)",
-            dia_chi="Số 45, Đường Hoàng Văn Thụ, Phường Hoàng Văn Thụ, Thành phố Thái Nguyên",
+            lop="",
+            lien_he_khan_cap="",
+            dia_chi="",
             phong_giuong=phong_giuong_text,
             ngay_bat_dau="01/09/2026",
             ngay_ket_thuc="30/06/2027",
@@ -216,32 +239,45 @@ def get_contract_detail(db: Session, ma_hop_dong: str) -> HopDongDetailResponse:
     ngay_bd = fmt_date(hd.ngay_bat_dau, "01/09/2026")
     ngay_kt = fmt_date(hd.ngay_ket_thuc, "30/06/2027")
 
-    # Đảm bảo mã hợp đồng chuẩn hóa theo format: HD{YY}-{toa}{phong}-G{bed_num}
-    auto_code = hd.ma_hop_dong
-    if not auto_code or not auto_code.startswith("HD"):
-        auto_code = generate_contract_code(
-            ma_toa=ma_toa,
-            tang=so_tang,
-            so_phong=so_phong,
-            ma_giuong=bed_num,
-            ngay_bat_dau=hd.ngay_bat_dau or date(2026, 9, 1),
-        )
-        hd.ma_hop_dong = auto_code
-        db.commit()
+    # Format ngày sinh
+    ngay_sinh_str = ""
+    if sv and sv.ngay_sinh:
+        ngay_sinh_str = str(sv.ngay_sinh).strip()
+        if "-" in ngay_sinh_str and len(ngay_sinh_str.split("-")) == 3:
+            parts = ngay_sinh_str.split("-")
+            if len(parts[0]) == 4:
+                ngay_sinh_str = f"{parts[2]}/{parts[1]}/{parts[0]}"
+
+    # Format liên hệ khẩn cấp
+    lien_he_str = ""
+    if sv:
+        if sv.sdt_nguoi_giam_ho:
+            rel = [sv.moi_quan_he, sv.nguoi_giam_ho]
+            rel_filtered = [str(r).strip() for r in rel if r and str(r).strip()]
+            if rel_filtered:
+                lien_he_str = f"{sv.sdt_nguoi_giam_ho} ({' - '.join(rel_filtered)})"
+            else:
+                lien_he_str = str(sv.sdt_nguoi_giam_ho)
+        elif sv.nguoi_giam_ho:
+            lien_he_str = f"{sv.nguoi_giam_ho}{f' ({sv.moi_quan_he})' if sv.moi_quan_he else ''}"
+
+    student_name = nd.ho_ten if nd and nd.ho_ten else (sv.msv if sv else "")
+    student_phone = nd.so_dien_thoai if nd and nd.so_dien_thoai else ""
+    student_email = nd.email if nd and nd.email else (f"{hd.msv.lower()}@ictu.edu.vn" if hd.msv else "")
 
     return HopDongDetailResponse(
-        ma_hop_dong=auto_code,
-        ho_ten=nd.ho_ten if nd else "Hoàng Đông Huy",
+        ma_hop_dong=hd.ma_hop_dong,
+        ho_ten=student_name,
         msv=hd.msv,
-        gioi_tinh=sv.gioi_tinh if sv else "Nam",
-        ngay_sinh="21/01/2006",
-        cccd="019206001234",
-        so_dien_thoai=nd.so_dien_thoai if nd and nd.so_dien_thoai else "0331 131 211",
-        email=nd.email if nd and nd.email else f"{hd.msv}@lns.edu.vn",
-        khoa="Công nghệ thông tin",
-        lop=sv.lop if sv else "KTMT K23A",
-        lien_he_khan_cap="0988 765 432 (Bố)",
-        dia_chi="Số 45, Đường Hoàng Văn Thụ, Phường Hoàng Văn Thụ, Thành phố Thái Nguyên",
+        gioi_tinh=sv.gioi_tinh if sv and sv.gioi_tinh else "Nam",
+        ngay_sinh=ngay_sinh_str,
+        cccd=sv.cccd if sv and sv.cccd else "",
+        so_dien_thoai=student_phone,
+        email=student_email,
+        khoa=sv.khoa if sv and sv.khoa else "Công nghệ thông tin",
+        lop=sv.lop if sv and sv.lop else "",
+        lien_he_khan_cap=lien_he_str,
+        dia_chi=sv.dia_chi if sv and sv.dia_chi else "",
         phong_giuong=phong_giuong_str,
         ngay_bat_dau=ngay_bd,
         ngay_ket_thuc=ngay_kt,

@@ -8,7 +8,13 @@ from app.core.database import get_db
 from app.core.deps import require_ke_toan
 from app.models.user import TaiKhoan
 from app.models.invoice import HoaDon
-from app.schemas.financial import DashboardResponse, FinancialReportResponse
+from app.schemas.financial import (
+    DashboardResponse,
+    FinancialReportResponse,
+    PeriodicReportCreate,
+    PeriodicReportRecord,
+    PeriodicReportListResponse,
+)
 from app.services.financial_service import FinancialService
 
 router = APIRouter(prefix="/finance", tags=["Tài chính & Báo cáo (Kế toán)"])
@@ -74,3 +80,42 @@ def get_financial_periods(
     periods = db.query(HoaDon.ky_thanh_toan).distinct().all()
     cleaned = sorted(list(set(p[0] for p in periods if p[0])))
     return cleaned
+
+
+@router.get(
+    "/periodic-reports",
+    response_model=PeriodicReportListResponse,
+    summary="[Kế toán] Danh sách các biên bản báo cáo định kỳ đã lưu",
+)
+def list_periodic_reports(
+    current_user: TaiKhoan = Depends(require_ke_toan),
+    db: Session = Depends(get_db),
+):
+    return FinancialService.get_periodic_reports(db=db)
+
+
+@router.post(
+    "/periodic-reports",
+    response_model=PeriodicReportRecord,
+    status_code=status.HTTP_201_CREATED,
+    summary="[Kế toán] Lưu biên bản báo cáo thống kê định kỳ",
+)
+def create_periodic_report(
+    payload: PeriodicReportCreate,
+    current_user: TaiKhoan = Depends(require_ke_toan),
+    db: Session = Depends(get_db),
+):
+    return FinancialService.save_periodic_report(db=db, payload=payload)
+
+
+@router.delete(
+    "/periodic-reports/{report_id}",
+    summary="[Kế toán] Xóa biên bản báo cáo định kỳ",
+)
+def delete_periodic_report(
+    report_id: int,
+    current_user: TaiKhoan = Depends(require_ke_toan),
+    db: Session = Depends(get_db),
+):
+    success = FinancialService.delete_periodic_report(db=db, report_id=report_id)
+    return {"success": success}

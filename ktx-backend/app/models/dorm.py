@@ -188,11 +188,25 @@ class Giuong(Base):
         if active_contract and active_contract.sinh_vien:
             sv = active_contract.sinh_vien
             user_name = sv.nguoi_dung.ho_ten if sv.nguoi_dung else sv.msv
+            user_phone = sv.nguoi_dung.so_dien_thoai if sv.nguoi_dung else ""
+            user_email = sv.nguoi_dung.email if (sv.nguoi_dung and sv.nguoi_dung.email) else f"{sv.msv.lower()}@ictu.edu.vn"
             return {
                 "msv": sv.msv,
                 "ho_ten": user_name,
                 "ma_hop_dong": active_contract.ma_hop_dong,
-                "lop": sv.lop,
+                "lop": sv.lop or "CNTTK24A",
+                "gioi_tinh": sv.gioi_tinh or "Nam",
+                "khoa": sv.khoa or "Công nghệ thông tin",
+                "ngay_sinh": sv.ngay_sinh or "",
+                "cccd": sv.cccd or "",
+                "so_dien_thoai": user_phone or "",
+                "email": user_email,
+                "que_quan": sv.que_quan or "",
+                "dia_chi": sv.dia_chi or "",
+                "doi_tuong_uu_tien": sv.doi_tuong_uu_tien or "",
+                "nguoi_giam_ho": sv.nguoi_giam_ho or "",
+                "moi_quan_he": sv.moi_quan_he or "",
+                "sdt_nguoi_giam_ho": sv.sdt_nguoi_giam_ho or "",
                 "ngay_bat_dau": active_contract.ngay_bat_dau.strftime("%d/%m/%Y") if active_contract.ngay_bat_dau else "01/09/2026",
                 "ngay_ket_thuc": active_contract.ngay_ket_thuc.strftime("%d/%m/%Y") if active_contract.ngay_ket_thuc else "30/06/2027",
             }

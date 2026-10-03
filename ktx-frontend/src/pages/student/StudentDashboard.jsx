@@ -340,8 +340,8 @@ export default function StudentDashboard({ user, onNavigate }) {
               desc: billing ? `Số tiền: ${billing.amount}` : "Chưa có thông tin phí",
               detail: billing
                 ? (billing.status === "Đã thanh toán"
-                    ? "Bạn đã hoàn tất nộp phí lưu trú. Không có công nợ tồn đọng."
-                    : "Bạn có khoản phí ký túc xá cần thanh toán.")
+                  ? "Bạn đã hoàn tất nộp phí lưu trú. Không có công nợ tồn đọng."
+                  : "Bạn có khoản phí ký túc xá cần thanh toán.")
                 : "Bạn chưa có hợp đồng lưu trú hoặc công nợ phí. Vui lòng kiểm tra lại sau khi được xếp phòng.",
             })
           }
@@ -791,27 +791,7 @@ export default function StudentDashboard({ user, onNavigate }) {
                 </div>
               )}
 
-              {/* Các thông báo tĩnh */}
-              {STATIC_NOTIFICATIONS.map((item) => (
-                <div
-                  key={item.id}
-                  className="student-notif-item"
-                  onClick={() =>
-                    setActiveModal({
-                      title: item.title,
-                      desc: `Ngày đăng: ${item.date}`,
-                      detail:
-                        "Chi tiết thông báo từ Ban quản lý Ký túc xá về kế hoạch công tác và thời hạn đăng ký.",
-                    })
-                  }
-                >
-                  <div className="student-notif-title-wrap">
-                    <span className="student-notif-dot" />
-                    <span>{item.title}</span>
-                  </div>
-                  <span className="student-notif-date">{item.date}</span>
-                </div>
-              ))}
+
             </div>
           </div>
         </div>

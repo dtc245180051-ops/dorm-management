@@ -1,6 +1,38 @@
 {
   "REGISTRATION_REQUESTS": [
     {
+      "id": "DK-11605A",
+      "ma_yeu_cau": "DK-11605A",
+      "msv": "DTC245180000",
+      "ho_ten": "Nguyễn Văn B",
+      "gioi_tinh": "Nam",
+      "ngay_sinh": "2006-10-03",
+      "cccd": "04306011883",
+      "so_dien_thoai": "0393548550",
+      "email": "dtc245180000@ictu.edu.vn",
+      "khoa": "Công nghệ thông tin",
+      "lop": "CNTTK24M",
+      "dia_chi": "Phường A, Quận 8, TP. Hồ Chí Minh",
+      "doi_tuong_uu_tien": "Dân tộc thiểu số vùng sâu vùng xa",
+      "nguoi_giam_ho": "Nguyễn Văn T",
+      "moi_quan_he": "Bố",
+      "sdt_nguoi_giam_ho": "0388 456 780",
+      "loai_phong": "Phòng dịch vụ",
+      "tang_mong_muon": "",
+      "muc_gia_mong_muon": "",
+      "nguyen_vong": "Phòng dịch vụ",
+      "nguyen_vong_phong": "",
+      "nguyen_vong_label": "Phòng dịch vụ",
+      "ngay_dang_ky": "03/10/2026",
+      "ngay_gui": "03/10/2026 15:24",
+      "ngay_gui_time": "03/10/2026 15:24",
+      "nam_hoc": "2026-2027",
+      "trang_thai": "TU_CHOI",
+      "trang_thai_label": "Từ chối",
+      "ma_toa_mong_muon": "",
+      "ly_do_tu_choi": "Không có phòng phù hợp"
+    },
+    {
       "id": "DK-C49B09",
       "ma_yeu_cau": "DK-C49B09",
       "msv": "DTC245180028",
@@ -153,5 +185,60 @@
       "so_giuong": "A1_T3_P301_G01"
     }
   ],
-  "TRANSFER_CHECKOUT_REQUESTS": []
+  "TRANSFER_CHECKOUT_REQUESTS": [
+    {
+      "id": "YC-0232",
+      "ma_yeu_cau": "#YC-0232",
+      "loai_yeu_cau": "Chuyển phòng",
+      "loai_don": "CHUYEN_PHONG",
+      "msv": "dtc245180010",
+      "ho_ten": "Phan Vũ Hoàng Long",
+      "gioi_tinh": "Nam",
+      "khoa": "Công nghệ thông tin",
+      "lop": "DTC-K20",
+      "vi_tri_hien_tai": "Phòng A102 - Giường G01",
+      "cong_no": "Đã hoàn thành toàn bộ phí",
+      "ngay_gui": "03/10/2026",
+      "phong_lien_quan": "P101 → P301",
+      "phong_hien_tai": "P101",
+      "phong_dich": "P301",
+      "ly_do": "Lý do cá nhân khác",
+      "ngay_mong_muon": "04/10/2026",
+      "mo_ta": "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học...",
+      "trang_thai": "CHO_DUYET",
+      "trang_thai_label": "Chờ duyệt",
+      "goi_y": {
+        "ma_toa": "A",
+        "ma_phong": "A203",
+        "ma_giuong": "G04"
+      }
+    },
+    {
+      "id": "YC-0231",
+      "ma_yeu_cau": "#YC-0231",
+      "loai_yeu_cau": "Chuyển phòng",
+      "loai_don": "CHUYEN_PHONG",
+      "msv": "dtc245180010",
+      "ho_ten": "Phan Vũ Hoàng Long",
+      "gioi_tinh": "Nam",
+      "khoa": "Công nghệ thông tin",
+      "lop": "DTC-K20",
+      "vi_tri_hien_tai": "Phòng A102 - Giường G01",
+      "cong_no": "Đã hoàn thành toàn bộ phí",
+      "ngay_gui": "03/10/2026",
+      "phong_lien_quan": "301 → P201",
+      "phong_hien_tai": "301",
+      "phong_dich": "P201",
+      "ly_do": "Lý do cá nhân khác",
+      "ngay_mong_muon": "04/10/2026",
+      "mo_ta": "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học...",
+      "trang_thai": "CHO_DUYET",
+      "trang_thai_label": "Chờ duyệt",
+      "goi_y": {
+        "ma_toa": "A",
+        "ma_phong": "A203",
+        "ma_giuong": "G04"
+      }
+    }
+  ]
 }
