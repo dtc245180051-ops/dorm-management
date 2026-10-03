@@ -45,7 +45,7 @@ export default function AccountantLayout({
       {/* ================= SIDEBAR ================= */}
       <aside className="acc-sidebar">
         {/* Logo iDORM */}
-        <div className="acc-brand" onClick={() => handleSelectMenu('billing')}>
+        <div className="acc-brand" onClick={() => handleSelectMenu('dashboard')}>
           <div className="acc-logo-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
               <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
@@ -63,6 +63,23 @@ export default function AccountantLayout({
         {/* Section: MENU */}
         <div className="acc-nav-section-title">MENU</div>
         <nav className="acc-nav-list">
+          {/* Tổng quan (Dashboard) */}
+          <button
+            type="button"
+            className={`acc-nav-item ${currentMenu === 'dashboard' ? 'active' : ''}`}
+            onClick={() => handleSelectMenu('dashboard')}
+          >
+            <div className="acc-nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="7" height="9" x="3" y="3" rx="1" />
+                <rect width="7" height="5" x="14" y="3" rx="1" />
+                <rect width="7" height="9" x="14" y="12" rx="1" />
+                <rect width="7" height="5" x="3" y="16" rx="1" />
+              </svg>
+            </div>
+            <span>Tổng quan</span>
+          </button>
+
           {/* Lập hóa đơn */}
           <button
             type="button"

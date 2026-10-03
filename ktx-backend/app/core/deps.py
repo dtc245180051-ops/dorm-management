@@ -104,7 +104,7 @@ class RoleChecker:
 
 # Pre-configured role dependencies
 require_quan_ly = RoleChecker(["QuanLy", "Admin"])
-require_ke_toan = RoleChecker(["KeToan"])
+require_ke_toan = RoleChecker(["KeToan", "QuanLy", "Admin"])
 require_sinh_vien = RoleChecker(["SinhVien"])
 require_staff = RoleChecker(["QuanLy", "KeToan", "Admin"])
 

@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.core.deps import RoleChecker, get_current_user
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.models.user import NguoiDung, TaiKhoan, VaiTro
-from app.schemas.auth import Token, UserRegister, UserResponse
+from app.schemas.auth import GoogleAuthRequest, Token, UserRegister, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -26,9 +26,9 @@ def register(
     Tiếp nhận dữ liệu đăng ký, băm mật khẩu, đồng thời tạo bản ghi TaiKhoan và NguoiDung.
     Tương thích với form đăng ký: hỗ trợ tự động xử lý email, số điện thoại, tên đăng nhập và vai trò mặc định.
     """
-    # 0. Tiền xử lý dữ liệu: phân tách email / phone / username
-    email = user_in.email
-    phone = user_in.phone
+    # 0. Tiền xử lý dữ liệu: phân tách email / phone / username / msv
+    email = (user_in.email or "").strip()
+    phone = (user_in.phone or "").strip()
 
     if user_in.email_or_phone:
         raw_val = user_in.email_or_phone.strip()
@@ -39,20 +39,33 @@ def register(
             if not phone:
                 phone = raw_val
 
-    # Tự động gán username nếu người dùng không truyền trực tiếp
-    username = user_in.username.strip()[:50] if user_in.username else None
-    if not username:
-        if email:
-            username = email.split("@")[0][:50]
-        elif phone:
-            username = phone[:50]
-        elif user_in.email_or_phone:
-            username = user_in.email_or_phone.strip()[:50]
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cần cung cấp Email, Số điện thoại hoặc Tên đăng nhập",
-            )
+    # Tự động gán username và mã sinh viên nếu không truyền trực tiếp
+    raw_user = (user_in.ten_dang_nhap or user_in.username or "").strip()
+    if not raw_user and email and "@" in email:
+        raw_user = email.split("@")[0].strip()
+
+    if not raw_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cần cung cấp Email hợp lệ (@ictu.edu.vn) để tự động tạo Tên đăng nhập và Mã sinh viên",
+        )
+
+    username = raw_user.lower()[:50]
+    msv_val = (user_in.msv or raw_user).strip().upper()[:20]
+
+    password_raw = user_in.mat_khau or user_in.password
+    if not password_raw:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vui lòng nhập mật khẩu",
+        )
+
+    full_name_val = (user_in.ho_ten or user_in.full_name or "").strip()
+    if not full_name_val:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vui lòng nhập họ và tên",
+        )
 
     # 1. Kiểm tra tính hợp lệ của vai trò
     valid_roles = {vt.value: vt for vt in VaiTro}
@@ -71,7 +84,7 @@ def register(
     if existing_username:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Tên đăng nhập đã được sử dụng",
+            detail="Tên đăng nhập (hoặc mã sinh viên) đã được sử dụng",
         )
 
     # 3. Kiểm tra email đã tồn tại chưa nếu có cung cấp
@@ -109,7 +122,7 @@ def register(
             )
 
     # 5. Băm mật khẩu bằng bcrypt
-    hashed_password = get_password_hash(user_in.password)
+    hashed_password = get_password_hash(password_raw)
 
     # 6. Khởi tạo thực thể TaiKhoan
     new_account = TaiKhoan(
@@ -123,7 +136,7 @@ def register(
     # 7. Khởi tạo thực thể NguoiDung liên kết 1-1
     new_user = NguoiDung(
         ma_tai_khoan=new_account.ma_tai_khoan,
-        ho_ten=user_in.full_name,
+        ho_ten=full_name_val,
         email=email,
         so_dien_thoai=phone,
     )
@@ -133,13 +146,6 @@ def register(
     # 8. Tự động liên kết vào bảng sinh_vien nếu là vai trò SinhVien
     if new_account.vai_tro == VaiTro.SINH_VIEN:
         from app.models.user import SinhVien
-        email_code = email.split("@", 1)[0] if email and "@" in email else ""
-        student_code = username if username.upper().startswith("DTC") else email_code
-        msv_val = (
-            student_code.upper()
-            if student_code.upper().startswith("DTC")
-            else username.upper()[:20]
-        )
         existing_sv = db.query(SinhVien).filter(SinhVien.msv == msv_val).first()
         if not existing_sv:
             sv = SinhVien(
@@ -169,15 +175,17 @@ def login(
 ):
     """
     Xác thực thông tin đăng nhập với OAuth2PasswordRequestForm.
-    Hỗ trợ đăng nhập linh hoạt bằng: Tên đăng nhập, Email hoặc Số điện thoại.
+    Hỗ trợ đăng nhập linh hoạt bằng: Tên đăng nhập, Mã sinh viên, Email hoặc Số điện thoại.
     Trả về Access Token chứa username (sub) và vai trò (role).
     """
+    from app.models.user import SinhVien
     raw_username = form_data.username.strip()
-    prefix_username = raw_username.split("@")[0] if "@" in raw_username else raw_username
+    prefix_username = raw_username.split("@")[0].strip() if "@" in raw_username else raw_username
 
     account = (
         db.query(TaiKhoan)
         .outerjoin(NguoiDung, TaiKhoan.ma_tai_khoan == NguoiDung.ma_tai_khoan)
+        .outerjoin(SinhVien, NguoiDung.ma_nguoi_dung == SinhVien.ma_nguoi_dung)
         .filter(
             or_(
                 TaiKhoan.ten_dang_nhap == raw_username,
@@ -187,6 +195,10 @@ def login(
                 NguoiDung.email == raw_username,
                 NguoiDung.email.ilike(raw_username),
                 NguoiDung.so_dien_thoai == raw_username,
+                SinhVien.msv == raw_username,
+                SinhVien.msv.ilike(raw_username),
+                SinhVien.msv == prefix_username,
+                SinhVien.msv.ilike(prefix_username),
             )
         )
         .first()
@@ -209,6 +221,111 @@ def login(
     )
 
     full_name_val = account.nguoi_dung.ho_ten if account.nguoi_dung else None
+
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        role=role_value,
+        username=account.ten_dang_nhap,
+        full_name=full_name_val,
+    )
+
+
+@router.post(
+    "/google",
+    response_model=Token,
+    summary="Đăng nhập hoặc Đăng ký nhanh với Google (Chỉ chấp nhận @ictu.edu.vn)",
+)
+def google_auth(
+    payload: GoogleAuthRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Xác thực Google cho sinh viên:
+    - Bắt buộc email kết thúc bằng @ictu.edu.vn
+    - Nếu tài khoản đã tồn tại: Cấp phát JWT token đăng nhập
+    - Nếu tài khoản chưa tồn tại: Tự động đăng ký tài khoản sinh viên mới và đăng nhập
+    """
+    import re
+    email = payload.email.strip().lower()
+
+    # 1. Kiểm tra nghiêm ngặt định dạng email trường ICTU
+    if not re.match(r"^[^@\s]+@ictu\.edu\.vn$", email):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Chỉ chấp nhận tài khoản Google có định dạng email trường (@ictu.edu.vn)",
+        )
+
+    prefix = email.split("@")[0].strip()
+    username = prefix.lower()[:50]
+    msv_val = prefix.upper()[:20]
+
+    # 2. Tìm tài khoản người dùng đã có trong hệ thống
+    from app.models.user import SinhVien
+    account = (
+        db.query(TaiKhoan)
+        .outerjoin(NguoiDung, TaiKhoan.ma_tai_khoan == NguoiDung.ma_tai_khoan)
+        .outerjoin(SinhVien, NguoiDung.ma_nguoi_dung == SinhVien.ma_nguoi_dung)
+        .filter(
+            or_(
+                NguoiDung.email == email,
+                NguoiDung.email.ilike(email),
+                TaiKhoan.ten_dang_nhap == username,
+                TaiKhoan.ten_dang_nhap.ilike(username),
+                SinhVien.msv == msv_val,
+                SinhVien.msv.ilike(msv_val),
+            )
+        )
+        .first()
+    )
+
+    # 3. Nếu chưa có tài khoản, tự động tạo mới
+    if not account:
+        default_pwd = get_password_hash(f"IctuGoogleAuth@{username}")
+        full_name_val = (payload.full_name or "").strip() or username.upper()
+
+        account = TaiKhoan(
+            ten_dang_nhap=username,
+            mat_khau=default_pwd,
+            vai_tro=VaiTro.SINH_VIEN,
+        )
+        db.add(account)
+        db.flush()
+
+        new_user = NguoiDung(
+            ma_tai_khoan=account.ma_tai_khoan,
+            ho_ten=full_name_val,
+            email=email,
+        )
+        db.add(new_user)
+        db.flush()
+
+        existing_sv = db.query(SinhVien).filter(SinhVien.msv == msv_val).first()
+        if not existing_sv:
+            sv = SinhVien(
+                msv=msv_val,
+                ma_nguoi_dung=new_user.ma_nguoi_dung,
+                lop="DTC-KTX",
+                gioi_tinh="Nam",
+            )
+            db.add(sv)
+        elif not existing_sv.ma_nguoi_dung:
+            existing_sv.ma_nguoi_dung = new_user.ma_nguoi_dung
+
+        db.commit()
+        db.refresh(account)
+
+    role_value = (
+        account.vai_tro.value
+        if hasattr(account.vai_tro, "value")
+        else str(account.vai_tro)
+    )
+
+    access_token = create_access_token(
+        data={"sub": account.ten_dang_nhap, "role": role_value}
+    )
+
+    full_name_val = account.nguoi_dung.ho_ten if account.nguoi_dung else account.ten_dang_nhap
 
     return Token(
         access_token=access_token,

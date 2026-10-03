@@ -218,4 +218,29 @@ export const invoiceService = {
       return [];
     }
   },
+
+  /**
+   * Sinh viên lấy danh sách hóa đơn của chính mình
+   */
+  async getMyInvoices(msv) {
+    try {
+      const params = new URLSearchParams();
+      if (msv) params.append('msv', msv);
+
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/invoices/student/my-invoices?${params.toString()}`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Lỗi lấy hóa đơn sinh viên: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.warn('Lỗi getMyInvoices:', error);
+      return [];
+    }
+  },
 };

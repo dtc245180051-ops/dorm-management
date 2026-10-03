@@ -41,7 +41,7 @@ export function getStudentAccount(studentId) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object") {
         const accId = String(parsed.studentId || "").trim().toLowerCase();
-        if (!currentId || !accId || accId === currentId) {
+        if (currentId ? accId === currentId : !accId) {
           return normalizeAccount(parsed);
         }
       }

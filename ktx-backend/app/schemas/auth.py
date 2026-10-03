@@ -17,14 +17,18 @@ class TokenData(BaseModel):
 
 
 class UserRegister(BaseModel):
-    username: Optional[str] = Field(default=None, min_length=3, max_length=50, description="Tên đăng nhập")
-    password: str = Field(..., min_length=6, description="Mật khẩu")
+    username: Optional[str] = Field(default=None, max_length=50, description="Tên đăng nhập")
+    ten_dang_nhap: Optional[str] = Field(default=None, max_length=50, description="Tên đăng nhập")
+    password: Optional[str] = Field(default=None, min_length=6, description="Mật khẩu")
+    mat_khau: Optional[str] = Field(default=None, min_length=6, description="Mật khẩu")
     role: str = Field(default="SinhVien", description="Vai trò: QuanLy, KeToan, SinhVien")
-    full_name: str = Field(..., min_length=2, max_length=100, description="Họ và tên")
+    full_name: Optional[str] = Field(default=None, max_length=100, description="Họ và tên")
+    ho_ten: Optional[str] = Field(default=None, max_length=100, description="Họ và tên")
     email: Optional[str] = Field(default=None, max_length=100, description="Địa chỉ email")
     phone: Optional[str] = Field(default=None, max_length=15, description="Số điện thoại")
     email_or_phone: Optional[str] = Field(default=None, max_length=100, description="Email hoặc số điện thoại")
     gender: Optional[str] = Field(default=None, max_length=10, description="Giới tính (Nam, Nu)")
+    msv: Optional[str] = Field(default=None, max_length=20, description="Mã sinh viên")
 
 
 class NguoiDungResponse(BaseModel):
@@ -43,3 +47,10 @@ class UserResponse(BaseModel):
     nguoi_dung: Optional[NguoiDungResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class GoogleAuthRequest(BaseModel):
+    email: str = Field(..., description="Email Google của sinh viên (chỉ chấp nhận @ictu.edu.vn)")
+    full_name: Optional[str] = Field(default=None, description="Họ và tên")
+    avatar_url: Optional[str] = Field(default=None, description="Ảnh đại diện Google")
+    google_id: Optional[str] = Field(default=None, description="ID hoặc sub từ Google OAuth")

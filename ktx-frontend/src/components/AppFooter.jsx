@@ -28,8 +28,7 @@ export default function AppFooter({ onAction }) {
             </span>
           </div>
           <p className="text-sm leading-6 text-slate-600">
-            Đại học Công nghệ Thông tin và Truyền thông. Cổng dịch vụ nội trú
-            dành cho sinh viên.
+            Cổng dịch vụ nội trú dành cho sinh viên Trường Đại học Công nghệ Thông tin và Truyền thông.
           </p>
           <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
             <span className="h-2 w-2 rounded-full bg-blue-600" />

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import "./Auth.css";
 import { authService } from "../../services/authService";
+import GoogleAuthModal from "./GoogleAuthModal";
 
 /**
  * Kiểm tra định dạng email trường ICTU:
@@ -33,7 +34,6 @@ export default function Login({
   // State form Đăng ký
   const [registerForm, setRegisterForm] = useState({
     fullName: "",
-    username: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -47,6 +47,10 @@ export default function Login({
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" }); // type: 'error' | 'success' | 'info'
   const [, setCurrentUser] = useState(null);
+
+  // State Modal Google Auth
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [googleAuthMode, setGoogleAuthMode] = useState("login");
 
   // Xử lý thay đổi form Đăng nhập
   const handleLoginChange = (e) => {
@@ -92,7 +96,7 @@ export default function Login({
       }
       setMessage({
         type: "success",
-        text: `Đăng nhập thành công! Xin chào ${result.data.username} (${result.data.role}).`,
+        text: `Đăng nhập thành công! Đang chuyển vào trang chủ...`,
       });
       setCurrentUser(result.data);
       authenticatedUser = result.data;
@@ -127,23 +131,32 @@ export default function Login({
   // Submit Đăng ký
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-    const { fullName, username, email, password, confirmPassword } =
-      registerForm;
-    const emailVal = email.trim();
-    const usernameVal = (username || "").trim();
+    const { fullName, email, password, confirmPassword } = registerForm;
+    const fullNameVal = (fullName || "").trim();
+    const emailVal = (email || "").trim();
 
-    if (!fullName.trim() || !usernameVal || !emailVal || !password) {
+    if (!fullNameVal) {
       setMessage({
         type: "error",
-        text: "Vui lòng điền đầy đủ các thông tin bắt buộc.",
+        text: "Vui lòng nhập họ và tên của bạn.",
       });
       return;
     }
 
-    if (!/^[a-zA-Z0-9._-]{3,50}$/.test(usernameVal)) {
+    // Kiểm tra hợp lệ: Email phải chứa ký tự '@' và phần trước '@' không được rỗng
+    if (!emailVal || !emailVal.includes("@")) {
       setMessage({
         type: "error",
-        text: "Username dài 3–50 ký tự, chỉ gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang.",
+        text: "Email không hợp lệ. Vui lòng nhập đúng định dạng email trường (ví dụ: dtc245180001@ictu.edu.vn).",
+      });
+      return;
+    }
+
+    const prefix = emailVal.split("@")[0].trim();
+    if (!prefix) {
+      setMessage({
+        type: "error",
+        text: "Phần tên người dùng trước ký tự '@' không được để trống.",
       });
       return;
     }
@@ -152,12 +165,12 @@ export default function Login({
     if (!isValidSchoolEmail(emailVal)) {
       setMessage({
         type: "error",
-        text: "Email đăng ký phải có định dạng @ictu.edu.vn.",
+        text: "Email đăng ký phải có định dạng @ictu.edu.vn (ví dụ: dtc245180001@ictu.edu.vn).",
       });
       return;
     }
 
-    if (password.length < 6) {
+    if (!password || password.length < 6) {
       setMessage({
         type: "error",
         text: "Mật khẩu phải có độ dài ít nhất 6 ký tự.",
@@ -173,36 +186,47 @@ export default function Login({
       return;
     }
 
+    // Tự động trích xuất Tên đăng nhập và Mã sinh viên
+    const usernameVal = prefix.toLowerCase();
+    const msvVal = usernameVal.toUpperCase();
+
     setLoading(true);
     setMessage({ type: "", text: "" });
 
     const result = await authService.register({
-      fullName,
-      username: usernameVal,
+      fullName: fullNameVal,
       email: emailVal,
       password,
     });
     setLoading(false);
 
     if (result.success) {
-      localStorage.setItem("ktx_fullname", fullName.trim());
-      localStorage.setItem("ktx_email", emailVal);
-      // Tự động đăng nhập tài khoản vừa tạo để lưu token
-      await authService.login(usernameVal, password);
-
-      setMessage({
-        type: "success",
-        text: "Đăng ký tài khoản thành công! Đang chuyển đến trang chủ sinh viên...",
+      // 1. Tự động điền email/tài khoản vừa tạo vào form Đăng nhập
+      setLoginForm({
+        identifier: emailVal,
+        password: "",
       });
 
-      setTimeout(() => {
-        if (onLoginSuccess) {
-          onLoginSuccess("SinhVien");
-        } else {
-          window.history.pushState({}, "", "/student/dashboard");
-          window.dispatchEvent(new PopStateEvent("popstate"));
-        }
-      }, 700);
+      // 2. Xóa dữ liệu trong form Đăng ký
+      setRegisterForm({
+        fullName: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+      });
+
+      // 3. Thông báo "Đăng ký thành công"
+      setMessage({
+        type: "success",
+        text: `Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.`,
+      });
+
+      // 4. Chuyển sang tab Đăng nhập và cập nhật URL
+      setActiveTab("login");
+      if (onTabChange) {
+        onTabChange("login");
+      }
+      window.history.replaceState({}, "", "/login");
     } else {
       setMessage({
         type: "error",
@@ -212,11 +236,25 @@ export default function Login({
     }
   };
 
-  const handleGoogleAuth = () => {
+  const handleOpenGoogleAuth = (mode = "login") => {
+    setGoogleAuthMode(mode);
+    setShowGoogleModal(true);
+  };
+
+  const handleGoogleSuccess = (userData) => {
     setMessage({
-      type: "info",
-      text: "Tính năng Đăng nhập / Đăng ký với Google đang được phát triển.",
+      type: "success",
+      text: `Đăng nhập Google thành công! Xin chào ${userData?.full_name || userData?.username || "bạn"}. Đang chuyển vào trang chủ...`,
     });
+
+    setTimeout(() => {
+      if (onLoginSuccess) {
+        onLoginSuccess(userData?.role || "SinhVien");
+      } else {
+        window.history.pushState({}, "", "/student/dashboard");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      }
+    }, 700);
   };
 
   const handleForgotPassword = () => {
@@ -503,7 +541,7 @@ export default function Login({
                   <button
                     type="button"
                     className="google-btn"
-                    onClick={handleGoogleAuth}
+                    onClick={() => handleOpenGoogleAuth("login")}
                   >
                     <svg className="google-icon-svg" viewBox="0 0 24 24">
                       <path
@@ -550,47 +588,26 @@ export default function Login({
                 onSubmit={handleRegisterSubmit}
               >
                 <div className="form-fields register-fields">
-                  {/* Họ tên & Tên người dùng */}
-                  <div className="form-row-2col-equal">
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="register-fullname">
-                        Họ tên
-                      </label>
-                      <div className="input-wrapper">
-                        <input
-                          id="register-fullname"
-                          name="fullName"
-                          type="text"
-                          className="form-input"
-                          placeholder="Nhập họ và tên"
-                          value={registerForm.fullName}
-                          onChange={handleRegisterChange}
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="register-username">
-                        Tên người dùng
-                      </label>
-                      <div className="input-wrapper">
-                        <input
-                          id="register-username"
-                          name="username"
-                          type="text"
-                          className="form-input"
-                          placeholder="Nhập tên người dùng"
-                          value={registerForm.username}
-                          onChange={handleRegisterChange}
-                          minLength={3}
-                          maxLength={50}
-                          required
-                        />
-                      </div>
+                  {/* Họ tên: Full-width hàng ngang trên cùng */}
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="register-fullname">
+                      Họ tên
+                    </label>
+                    <div className="input-wrapper">
+                      <input
+                        id="register-fullname"
+                        name="fullName"
+                        type="text"
+                        className="form-input"
+                        placeholder="Nhập họ và tên sinh viên"
+                        value={registerForm.fullName}
+                        onChange={handleRegisterChange}
+                        required
+                      />
                     </div>
                   </div>
 
-                  {/* Email */}
+                  {/* Email trường: Full-width */}
                   <div className="form-group">
                     <label className="form-label" htmlFor="register-email">
                       Email
@@ -599,9 +616,9 @@ export default function Login({
                       <input
                         id="register-email"
                         name="email"
-                        type="text"
+                        type="email"
                         className="form-input"
-                        placeholder="@ictu.edu.vn"
+                        placeholder="Ví dụ: dtc245180001@ictu.edu.vn"
                         value={registerForm.email}
                         onChange={handleRegisterChange}
                         required
@@ -743,7 +760,7 @@ export default function Login({
                   <button
                     type="button"
                     className="google-btn"
-                    onClick={handleGoogleAuth}
+                    onClick={() => handleOpenGoogleAuth("register")}
                   >
                     <svg className="google-icon-svg" viewBox="0 0 24 24">
                       <path
@@ -787,6 +804,14 @@ export default function Login({
           </div>
         </div>
       </div>
+
+      {/* Modal Đăng nhập / Đăng ký Google */}
+      <GoogleAuthModal
+        isOpen={showGoogleModal}
+        onClose={() => setShowGoogleModal(false)}
+        mode={googleAuthMode}
+        onSuccess={handleGoogleSuccess}
+      />
     </div>
   );
 }

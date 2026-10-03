@@ -28,40 +28,42 @@ const APPLIED_TARGET_OPTIONS = [
   'Chỉ phòng dịch vụ',
 ];
 
-/**
- * Đơn giá niêm yết theo tháng theo quy định:
- */
-/**
- * Danh sách sinh viên mẫu theo tháng (kèm loại phòng và đơn giá niêm yết)
- */
+/* ================= HELPER NGÀY THÁNG ================= */
+const pad = (n) => String(n).padStart(2, '0');
 
-/**
- * Dữ liệu mẫu hóa đơn điện nước theo tháng
- */
+// yyyy-mm-dd theo giờ local (không dùng toISOString vì lệch múi giờ)
+const toDateStr = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const getTodayStr = () => toDateStr(new Date());
+const getDefaultDeadline = (days = 7) => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return toDateStr(d);
+};
 
-/**
- * Trang "LẬP HÓA ĐƠN ĐỊNH KỲ" (Dành riêng cho Kế Toán)
- * Khớp 100% bản thiết kế Figma với các quy tắc:
- * - Chọn năm học thay vì chọn kỳ
- * - Thời gian ở cố định 11 tháng
- * - Áp dụng: Tất cả SV còn hạn hợp đồng, Sinh viên tòa A1 đến A11
- * - Đơn giá theo năm gồm các phòng: Thường, Tiêu chuẩn
- */
+// Tháng trước, ví dụ hôm nay 03/10/2026 -> "Tháng 09/2026"
+const getPreviousMonthLabel = () => {
+  const d = new Date();
+  d.setDate(1); // tránh lỗi tràn ngày (31/03 -> tháng 2)
+  d.setMonth(d.getMonth() - 1);
+  const label = `Tháng ${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  return MONTH_OPTIONS.includes(label) ? label : MONTH_OPTIONS[0];
+};
+
 export default function PeriodicBilling({ searchTerm = '' }) {
   // Tab hiện tại: 'room' | 'utility'
   const [activeTab, setActiveTab] = useState('room');
 
-  // Form tiền phòng theo tháng
-  const [billingMonth, setBillingMonth] = useState('Tháng 09/2026');
+  // Form tiền phòng theo tháng (mặc định: tháng trước)
+  const billingMonth = useMemo(getPreviousMonthLabel, []);
   const [appliedTarget, setAppliedTarget] = useState('Tất cả phòng (Tiêu chuẩn & Dịch vụ)');
-  const [deadline, setDeadline] = useState('2026-09-15');
+  const [deadline, setDeadline] = useState(() => getDefaultDeadline());
 
-  // Form điện nước theo tháng
-  const [utilityMonth, setUtilityMonth] = useState('Tháng 09/2026');
+  // Form điện nước theo tháng (mặc định: tháng trước)
+  const utilityMonth = useMemo(getPreviousMonthLabel, []);
   const [utilityTarget, setUtilityTarget] = useState('Tất cả các phòng đang có sinh viên');
-  const [utilityDeadline, setUtilityDeadline] = useState('2026-09-20');
-  const [elecRate] = useState('3.000 VND/kWh');
-  const [waterRate] = useState('15.000 VND/m³');
+  const [utilityDeadline, setUtilityDeadline] = useState(() => getDefaultDeadline());
+  const [elecRate] = useState('3.500 VND/kWh');
+  const [waterRate] = useState('20.000 VND/m³');
 
   // Quản lý upload file chỉ số điện nước & tính toán tự động
   const [isUploadingReadings, setIsUploadingReadings] = useState(false);
@@ -90,6 +92,25 @@ export default function PeriodicBilling({ searchTerm = '' }) {
   // Modal xác nhận phát hành
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+
+  // Chống bấm phát hành nhiều lần
+  const [isPublishing, setIsPublishing] = useState(false);
+  const today = getTodayStr();
+
+  const showToast = (msg, ms = 3500) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), ms);
+  };
+
+  // Chặn chọn hạn chốt nhỏ hơn hôm nay
+  const handleDeadlineChange = (value, setter) => {
+    if (!value) return;
+    if (value < today) {
+      showToast('Hạn chốt không được nhỏ hơn ngày hôm nay!');
+      return;
+    }
+    setter(value);
+  };
 
   // 1. Tải danh sách ứng viên tiền phòng từ Backend API khi thay đổi tham số (tháng, phạm vi loại phòng)
   const loadRoomCandidates = useCallback(async () => {
@@ -185,7 +206,8 @@ export default function PeriodicBilling({ searchTerm = '' }) {
 
   // 3. Lọc dữ liệu sinh viên theo loại phòng áp dụng và từ khóa tìm kiếm
   const targetRoomStudents = useMemo(() => {
-    let list = roomStudents;
+    // Bỏ sinh viên đã được lập hóa đơn tiền phòng của kỳ này (mỗi SV chỉ phát hành 1 lần)
+    let list = roomStudents.filter((s) => !s.daLapHoaDon);
 
     // Lọc theo loại phòng áp dụng ("Chỉ phòng tiêu chuẩn" / "Chỉ phòng dịch vụ")
     if (appliedTarget === 'Chỉ phòng tiêu chuẩn') {
@@ -240,28 +262,38 @@ export default function PeriodicBilling({ searchTerm = '' }) {
     try {
       const res = await invoiceService.uploadUtilityReadings(file, utilityMonth, 3000, 15000);
       if (res.success && res.data) {
-        const items = res.data.items || [];
-        const mappedRooms = items.map((r) => ({
-          room: `P${r.so_phong} - ${r.toa_nha}`,
-          so_phong: r.so_phong,
-          toa_nha: r.toa_nha,
-          elecMeter: r.chi_so_dien_cu_moi,
-          elecUsage: `${r.so_dien_kwh} kWh`,
-          waterMeter: r.chi_so_nuoc_cu_moi,
-          waterUsage: `${r.so_nuoc_m3} m³`,
-          totalAmount: `${r.tong_tien.toLocaleString('vi-VN')} VND`,
-          rawAmount: r.tong_tien,
-          so_dien_cu: r.so_dien_cu,
-          so_dien_moi: r.so_dien_moi,
-          so_nuoc_cu: r.so_nuoc_cu,
-          so_nuoc_moi: r.so_nuoc_moi,
-          tien_dien: r.tien_dien,
-          tien_nuoc: r.tien_nuoc,
-        }));
+        const allItems = res.data.items || [];
+        // Bỏ các phòng đã phát hành hóa đơn điện nước của tháng này
+        const items = allItems.filter((r) => !r.da_lap_hoa_don);
+        const skipped = allItems.length - items.length;
+
+        const mappedRooms = items.map((r) => {
+          const soNguoi = Number(r.so_nguoi) || 0;
+          return {
+            room: `P${r.so_phong} - ${r.toa_nha}`,
+            so_phong: r.so_phong,
+            toa_nha: r.toa_nha,
+            elecMeter: r.chi_so_dien_cu_moi,
+            elecUsage: `${r.so_dien_kwh} kWh`,
+            waterMeter: r.chi_so_nuoc_cu_moi,
+            waterUsage: `${r.so_nuoc_m3} m³`,
+            totalAmount: `${r.tong_tien.toLocaleString('vi-VN')} VND`,
+            rawAmount: r.tong_tien,
+            so_dien_cu: r.so_dien_cu,
+            so_dien_moi: r.so_dien_moi,
+            so_nuoc_cu: r.so_nuoc_cu,
+            so_nuoc_moi: r.so_nuoc_moi,
+            tien_dien: r.tien_dien,
+            tien_nuoc: r.tien_nuoc,
+            // Chia đều cho số người trong phòng (phòng chưa có người thì giữ nguyên tổng phòng)
+            soNguoi,
+            perPersonAmount: soNguoi > 0 ? Math.round(r.tong_tien / soNguoi) : r.tong_tien,
+          };
+        });
         const info = {
           fileName: res.data.fileName || file.name,
-          totalRooms: res.data.totalRooms || items.length,
-          totalAmount: res.data.totalAmount || 0,
+          totalRooms: items.length,
+          totalAmount: mappedRooms.reduce((sum, r) => sum + Number(r.rawAmount || 0), 0),
         };
 
         setUploadedCandidates(items);
@@ -281,7 +313,13 @@ export default function PeriodicBilling({ searchTerm = '' }) {
           console.warn('Cannot save uploaded utility cache:', e);
         }
 
-        setToastMessage(`Đã đọc và tính toán thành công điện nước cho ${items.length} phòng từ file!`);
+        if (items.length === 0 && skipped > 0) {
+          setToastMessage(`Tất cả ${skipped} phòng trong file đã được phát hành hóa đơn điện nước ${utilityMonth}!`);
+        } else {
+          setToastMessage(
+            `Đã đọc và tính toán điện nước cho ${items.length} phòng từ file${skipped ? ` (bỏ qua ${skipped} phòng đã phát hành)` : ''}!`
+          );
+        }
       } else {
         setToastMessage(`Lỗi tải file: ${res.message || 'Không thể xử lý file chỉ số'}`);
       }
@@ -297,53 +335,70 @@ export default function PeriodicBilling({ searchTerm = '' }) {
   // 5. Xử lý xác nhận phát hành hóa đơn (gọi API Backend)
   const handleConfirmPublish = async () => {
     setShowConfirmModal(false);
+    if (isPublishing) return;
 
-    if (activeTab === 'room') {
-      const payload = {
-        ky_thanh_toan: billingMonth,
-        ap_dung: appliedTarget,
-        thoi_gian_o_thang: 1,
+    // Kiểm tra lại hạn chốt phòng trường hợp để trang mở qua đêm
+    const currentDeadline = activeTab === 'room' ? deadline : utilityDeadline;
+    if (currentDeadline < getTodayStr()) {
+      showToast('Hạn chốt không được nhỏ hơn ngày hôm nay!');
+      return;
+    }
+    if (activeTab === 'room' && targetRoomStudents.length === 0) {
+      showToast('Không còn sinh viên nào cần phát hành hóa đơn tiền phòng kỳ này!');
+      return;
+    }
 
-        han_thanh_toan: deadline,
-        ghi_chu: `Phát hành hóa đơn tiền phòng ${billingMonth} (${appliedTarget})`,
-      };
+    setIsPublishing(true);
+    try {
+      if (activeTab === 'room') {
+        const payload = {
+          ky_thanh_toan: billingMonth,
+          ap_dung: appliedTarget,
+          thoi_gian_o_thang: 1,
 
-      const result = await invoiceService.publishRoomInvoices(payload);
-      if (result.success) {
-        setToastMessage(result.data?.message || `Đã phát hành thành công hóa đơn tiền phòng ${billingMonth}!`);
-        loadRoomCandidates();
+          han_thanh_toan: deadline,
+          ghi_chu: `Phát hành hóa đơn tiền phòng ${billingMonth} (${appliedTarget})`,
+        };
+
+        const result = await invoiceService.publishRoomInvoices(payload);
+        if (result.success) {
+          setToastMessage(result.data?.message || `Đã phát hành thành công hóa đơn tiền phòng ${billingMonth}!`);
+          loadRoomCandidates();
+        } else {
+          setToastMessage(`Lỗi: ${result.message}`);
+        }
       } else {
-        setToastMessage(`Lỗi: ${result.message}`);
-      }
-    } else {
-      if (utilityRooms.length === 0) {
-        setToastMessage('Chưa có dữ liệu chỉ số điện nước. Vui lòng upload file Excel/CSV trước khi phát hành!');
-        setTimeout(() => setToastMessage(''), 4000);
-        return;
-      }
+        if (utilityRooms.length === 0) {
+          setToastMessage('Chưa có dữ liệu chỉ số điện nước. Vui lòng upload file Excel/CSV trước khi phát hành!');
+          setTimeout(() => setToastMessage(''), 4000);
+          return;
+        }
 
-      const payload = {
-        thang: utilityMonth,
-        han_thanh_toan: utilityDeadline,
-        don_gia_dien: 3000.0,
-        don_gia_nuoc: 15000.0,
-        ghi_chu: `Phát hành hóa đơn điện nước ${utilityMonth}`,
-        chi_tiet_phong: uploadedCandidates || undefined,
-      };
+        const payload = {
+          thang: utilityMonth,
+          han_thanh_toan: utilityDeadline,
+          don_gia_dien: 3500.0,
+          don_gia_nuoc: 20000.0,
+          ghi_chu: `Phát hành hóa đơn điện nước ${utilityMonth}`,
+          chi_tiet_phong: uploadedCandidates || undefined,
+        };
 
-      const result = await invoiceService.publishUtilityInvoices(payload);
-      if (result.success) {
-        setToastMessage(result.data?.message || `Đã phát hành thành công hóa đơn điện nước ${utilityMonth}!`);
-        // Reset sau khi phát hành thành công
-        setUtilityRooms([]);
-        setUploadReadingsInfo(null);
-        setUploadedCandidates(null);
-        try {
-          sessionStorage.removeItem(`ktx_utility_upload_${utilityMonth}`);
-        } catch {}
-      } else {
-        setToastMessage(`Lỗi: ${result.message}`);
+        const result = await invoiceService.publishUtilityInvoices(payload);
+        if (result.success) {
+          setToastMessage(result.data?.message || `Đã phát hành thành công hóa đơn điện nước ${utilityMonth}!`);
+          // Reset sau khi phát hành thành công
+          setUtilityRooms([]);
+          setUploadReadingsInfo(null);
+          setUploadedCandidates(null);
+          try {
+            sessionStorage.removeItem(`ktx_utility_upload_${utilityMonth}`);
+          } catch { }
+        } else {
+          setToastMessage(`Lỗi: ${result.message}`);
+        }
       }
+    } finally {
+      setIsPublishing(false);
     }
 
     setTimeout(() => {
@@ -362,6 +417,10 @@ export default function PeriodicBilling({ searchTerm = '' }) {
       setToastMessage('');
     }, 3000);
   };
+
+  // Trạng thái không còn gì để phát hành
+  const noRoomToIssue = activeTab === 'room' && targetRoomStudents.length === 0;
+  const noUtilityToIssue = activeTab === 'utility' && utilityRooms.length === 0;
 
   return (
     <div className="billing-card">
@@ -397,22 +456,14 @@ export default function PeriodicBilling({ searchTerm = '' }) {
           <div className="billing-form-col">
             {/* Chọn tháng */}
             <div className="billing-control-box">
-              <select
-                className="billing-select"
-                value={billingMonth}
-                onChange={(e) => setBillingMonth(e.target.value)}
-              >
-                {MONTH_OPTIONS.map((month) => (
-                  <option key={month} value={month}>
-                    Chọn tháng: {month.replace('Tháng ', '')}
-                  </option>
-                ))}
-              </select>
-              <span className="billing-box-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </span>
+              <input
+                type="text"
+                className="billing-input"
+                value={`Chọn tháng: ${billingMonth.replace('Tháng ', '')}`}
+                readOnly
+                style={{ cursor: 'not-allowed' }}
+                title="Chỉ được lập hóa đơn cho tháng trước"
+              />
             </div>
 
             {/* Áp dụng: Chỉ áp dụng cho phòng tiêu chuẩn và phòng dịch vụ */}
@@ -450,8 +501,9 @@ export default function PeriodicBilling({ searchTerm = '' }) {
               <input
                 id="room-deadline-picker"
                 type="date"
+                min={today}
                 value={deadline}
-                onChange={(e) => e.target.value && setDeadline(e.target.value)}
+                onChange={(e) => handleDeadlineChange(e.target.value, setDeadline)}
                 style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
               />
               <span
@@ -494,22 +546,14 @@ export default function PeriodicBilling({ searchTerm = '' }) {
           {/* Cột trái */}
           <div className="billing-form-col">
             <div className="billing-control-box">
-              <select
-                className="billing-select"
-                value={utilityMonth}
-                onChange={(e) => setUtilityMonth(e.target.value)}
-              >
-                {MONTH_OPTIONS.map((m) => (
-                  <option key={m} value={m}>
-                    Chọn tháng: {m.replace('Tháng ', '')}
-                  </option>
-                ))}
-              </select>
-              <span className="billing-box-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </span>
+              <input
+                type="text"
+                className="billing-input"
+                value={`Chọn tháng: ${utilityMonth.replace('Tháng ', '')}`}
+                readOnly
+                style={{ cursor: 'not-allowed' }}
+                title="Chỉ được lập hóa đơn cho tháng trước"
+              />
             </div>
 
             <div className="billing-control-box">
@@ -543,8 +587,9 @@ export default function PeriodicBilling({ searchTerm = '' }) {
               <input
                 id="util-deadline-picker"
                 type="date"
+                min={today}
                 value={utilityDeadline}
-                onChange={(e) => e.target.value && setUtilityDeadline(e.target.value)}
+                onChange={(e) => handleDeadlineChange(e.target.value, setUtilityDeadline)}
                 style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
               />
               <span
@@ -697,7 +742,7 @@ export default function PeriodicBilling({ searchTerm = '' }) {
                 <th style={{ width: '15%' }}>Tiêu thụ (kWh)</th>
                 <th style={{ width: '20%' }}>Chỉ số nước (cũ - mới)</th>
                 <th style={{ width: '15%' }}>Tiêu thụ (m³)</th>
-                <th style={{ width: '15%' }}>Tổng tiền</th>
+                <th style={{ width: '15%' }}>Tổng tiền/người</th>
               </tr>
             </thead>
             <tbody>
@@ -728,7 +773,14 @@ export default function PeriodicBilling({ searchTerm = '' }) {
                     <td className="col-room">{item.elecUsage}</td>
                     <td className="col-term">{item.waterMeter}</td>
                     <td className="col-room">{item.waterUsage}</td>
-                    <td className="col-amount" style={{ fontWeight: 600, color: '#0084ff' }}>{item.totalAmount}</td>
+                    <td className="col-amount" style={{ fontWeight: 600, color: '#0084ff' }}>
+                      {Number(item.perPersonAmount ?? item.rawAmount).toLocaleString('vi-VN')} VND
+                      {/* <div style={{ fontSize: '12px', fontWeight: 400, color: '#64748b' }}>
+                        {item.soNguoi > 0
+                          ? `Phòng ${item.soNguoi} người · Tổng ${item.totalAmount}`
+                          : `Chưa rõ số người · Tổng ${item.totalAmount}`}
+                      </div> */}
+                    </td>
                   </tr>
                 ))
               ) : (
@@ -761,17 +813,16 @@ export default function PeriodicBilling({ searchTerm = '' }) {
         {/* Button Phát hành hóa đơn */}
         <button
           type="button"
-          className={`billing-publish-btn ${activeTab === 'utility' && utilityRooms.length === 0 ? 'billing-btn-disabled' : ''}`}
-          disabled={activeTab === 'utility' && utilityRooms.length === 0}
-          onClick={() => {
-            if (activeTab === 'utility' && utilityRooms.length === 0) {
-              setToastMessage('Vui lòng upload file chỉ số điện nước trước khi phát hành!');
-              setTimeout(() => setToastMessage(''), 3000);
-              return;
-            }
-            setShowConfirmModal(true);
-          }}
-          title={activeTab === 'utility' && utilityRooms.length === 0 ? 'Vui lòng upload file chỉ số trước khi phát hành' : ''}
+          className={`billing-publish-btn ${(noRoomToIssue || noUtilityToIssue) ? 'billing-btn-disabled' : ''}`}
+          disabled={isPublishing || noRoomToIssue || noUtilityToIssue}
+          onClick={() => setShowConfirmModal(true)}
+          title={
+            noUtilityToIssue
+              ? 'Vui lòng upload file chỉ số trước khi phát hành'
+              : noRoomToIssue
+                ? 'Không còn sinh viên nào cần phát hành hóa đơn kỳ này'
+                : ''
+          }
         >
           {activeTab === 'room'
             ? 'Phát hành hóa đơn tiền phòng'
@@ -843,7 +894,7 @@ export default function PeriodicBilling({ searchTerm = '' }) {
                     </div>
                     <div className="billing-summary-row">
                       <span className="label">Số phòng áp dụng:</span>
-                      <span className="value">{filteredUtilityRooms.length} phòng</span>
+                      <span className="value">{utilityRooms.length} phòng</span>
                     </div>
                     <div className="billing-summary-row">
                       <span className="label">Hạn chốt nộp tiền:</span>

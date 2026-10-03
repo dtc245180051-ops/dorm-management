@@ -81,6 +81,12 @@ try:
                 except Exception:
                     pass
             conn.commit()
+    if "sinh_vien" in inspector.get_table_names():
+        sv_cols = [c["name"] for c in inspector.get_columns("sinh_vien")]
+        with engine.connect() as conn:
+            if "anh_hop_dong" not in sv_cols:
+                conn.execute(text("ALTER TABLE sinh_vien ADD COLUMN anh_hop_dong VARCHAR(255) NULL"))
+                conn.commit()
     Base.metadata.create_all(bind=engine)
 except Exception as e:
     print(f"Warning on database startup/migration: {e}")

@@ -19,6 +19,7 @@ import StudentDashboard from './pages/student/StudentDashboard';
 import TransactionReconciliation from './pages/accountant/TransactionReconciliation';
 import PeriodicBilling from './pages/accountant/PeriodicBilling';
 import DebtLedger from './pages/accountant/DebtLedger';
+import AccountantDashboard from './pages/accountant/AccountantDashboard';
 import occupancyService from './services/occupancyService';
 import { API_BASE_URL } from './services/authService';
 import { getStudentAccount } from './services/studentAccountService';
@@ -120,7 +121,13 @@ export default function App() {
         roleStr.includes("QUANLY") ||
         roleStr.includes("ADMIN")
       ) {
-        if (!currentPath.startsWith("/admin")) {
+        const isAllowedForAdmin =
+          currentPath.startsWith("/admin") ||
+          currentPath.startsWith("/accountant") ||
+          currentPath === "/doi-soat" ||
+          currentPath === "/lap-hoa-don" ||
+          currentPath === "/so-cong-no";
+        if (!isAllowedForAdmin) {
           navigateTo("/admin");
         }
       }
@@ -135,7 +142,7 @@ export default function App() {
           currentPath === "/billing" ||
           currentPath === "/debt";
         if (!isAccRoute) {
-          navigateTo("/doi-soat");
+          navigateTo("/accountant/dashboard");
         }
       }
       // 3. Sinh viên: Chỉ được truy cập các trang sinh viên
@@ -260,12 +267,14 @@ export default function App() {
 
   const handleAccountantMenuChange = (menuKey) => {
     setAccountantActiveMenu(menuKey);
-    if (menuKey === "reconciliation") {
-      navigateTo("/doi-soat");
+    if (menuKey === "dashboard") {
+      navigateTo("/accountant/dashboard");
+    } else if (menuKey === "reconciliation") {
+      navigateTo("/accountant/reconciliation");
     } else if (menuKey === "billing") {
-      navigateTo("/lap-hoa-don");
+      navigateTo("/accountant/billing");
     } else if (menuKey === "debt-book") {
-      navigateTo("/so-cong-no");
+      navigateTo("/accountant/debt");
     }
   };
 
@@ -323,7 +332,20 @@ export default function App() {
               tab === "register" ? "/register" : "/login",
             );
           }}
-          onLoginSuccess={() => navigateTo("/student/dashboard")}
+          onLoginSuccess={(role) => {
+            const r = String(role || "").toUpperCase();
+            if (r.includes("KE_TOAN") || r.includes("KETOAN")) {
+              navigateTo("/accountant/dashboard");
+            } else if (
+              r.includes("ADMIN") ||
+              r.includes("QUAN_LY") ||
+              r.includes("QUANLY")
+            ) {
+              navigateTo("/admin");
+            } else {
+              navigateTo("/student/dashboard");
+            }
+          }}
         />
       </main>
     );
@@ -332,6 +354,34 @@ export default function App() {
   // =========================================================================
   // PHÂN HỆ KẾ TOÁN (Accountant)
   // =========================================================================
+  if (
+    currentPath === "/accountant" ||
+    currentPath === "/accountant/dashboard" ||
+    currentPath === "/tong-quan-ke-toan"
+  ) {
+    return (
+      <div className="relative">
+        <AccountantLayout
+          user={{
+            username: localStorage.getItem('ktx_fullname') || localStorage.getItem('ktx_username') || 'Phòng Kế Toán',
+            role: 'KeToan'
+          }}
+          onLogout={() => {
+            localStorage.clear();
+            navigateTo("/");
+          }}
+          activeMenu="dashboard"
+          onMenuChange={handleAccountantMenuChange}
+          searchTerm={accountantSearchTerm}
+          onSearchChange={setAccountantSearchTerm}
+        >
+          <AccountantDashboard onNavigate={navigateTo} />
+        </AccountantLayout>
+        <RoleSwitcher currentRole="accountant" onSwitchRole={navigateTo} />
+      </div>
+    );
+  }
+
   if (
     currentPath === "/doi-soat" ||
     currentPath === "/accountant/reconciliation" ||

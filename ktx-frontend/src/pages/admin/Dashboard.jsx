@@ -113,11 +113,18 @@ const getBuildingStats = (building) => {
     if (beds.length) {
       hasBedData = true;
       capacity += beds.length;
-      occupied += beds.filter((bed) =>
-        ["DA_THUE", "DANG_O", "DA_O", "OCCUPIED"].includes(
-          String(bed.trang_thai || "").toUpperCase(),
-        ),
-      ).length;
+      occupied += beds.filter((bed) => {
+        const st = String(bed.trang_thai || "").toUpperCase();
+        return (
+          st === "DA_CO_NGUOI" ||
+          st === "DA_THUE" ||
+          st === "DANG_O" ||
+          st === "DA_O" ||
+          st === "OCCUPIED" ||
+          bed.sinh_vien != null ||
+          (st !== "TRONG" && st !== "BAO_TRI" && st !== "")
+        );
+      }).length;
       return;
     }
     const roomCapacity = Number(room.suc_chua || 0);

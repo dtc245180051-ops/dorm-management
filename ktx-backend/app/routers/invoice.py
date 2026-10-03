@@ -3,10 +3,11 @@ from __future__ import annotations
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import require_ke_toan
+from app.core.deps import get_current_user, require_ke_toan
 from app.models.user import TaiKhoan
 from app.schemas.invoice import (
     HoaDonResponse,
@@ -204,6 +205,57 @@ def get_all_invoices(
         msv=msv,
         ma_phong=ma_phong,
     )
+
+
+@router.get(
+    "/student/my-invoices",
+    response_model=List[HoaDonResponse],
+    summary="[Sinh viên] Lấy danh sách hóa đơn của sinh viên đang đăng nhập",
+)
+def get_student_my_invoices(
+    msv: Optional[str] = Query(None, description="Mã sinh viên"),
+    current_user: TaiKhoan = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.models.contract import HopDong
+    from app.models.dorm import Giuong
+    from app.models.invoice import HoaDon
+    from app.models.user import NguoiDung, SinhVien
+
+    clean_code = (msv or current_user.ten_dang_nhap or "").strip().upper()
+    sv = (
+        db.query(SinhVien)
+        .outerjoin(NguoiDung, SinhVien.ma_nguoi_dung == NguoiDung.ma_nguoi_dung)
+        .filter(
+            or_(
+                SinhVien.msv.ilike(clean_code),
+                NguoiDung.ma_tai_khoan == current_user.ma_tai_khoan,
+            )
+        )
+        .first()
+    )
+    student_msv = sv.msv if sv else clean_code
+
+    active_hd = (
+        db.query(HopDong)
+        .filter(HopDong.msv == student_msv, HopDong.trang_thai == "ACTIVE")
+        .first()
+    )
+    ma_phong = None
+    if active_hd and active_hd.giuong:
+        ma_phong = active_hd.giuong.ma_phong
+
+    conditions = [HoaDon.msv.ilike(student_msv)]
+    if ma_phong:
+        conditions.append(and_(HoaDon.ma_phong == ma_phong, HoaDon.loai_hoa_don == "DIEN_NUOC"))
+
+    invoices = (
+        db.query(HoaDon)
+        .filter(or_(*conditions))
+        .order_by(HoaDon.han_thanh_toan.desc(), HoaDon.ngay_tao.desc())
+        .all()
+    )
+    return invoices
 
 
 @router.get(

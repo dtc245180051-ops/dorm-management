@@ -14,11 +14,22 @@ import { STUDENT_STATUS } from "../services/studentStatusService";
  */
 export default function FeatureLockedNotice({
   featureName = "Tính năng nội trú",
+  title,
   status = STUDENT_STATUS.NOT_REGISTERED,
   onNavigate,
   onSelectTab,
 }) {
   const isPending = status === STUDENT_STATUS.PENDING_APPROVAL;
+  const isFinance =
+    featureName.toLowerCase().includes("thanh toán") ||
+    featureName.toLowerCase().includes("tài chính") ||
+    featureName.toLowerCase().includes("phí");
+
+  const displayTitle =
+    title ||
+    (isFinance
+      ? "Tính năng tài chính chỉ mở sau khi bạn hoàn tất đăng ký và được duyệt phòng KTX"
+      : "Tính năng chỉ mở sau khi bạn hoàn tất đăng ký hoặc được xếp phòng KTX");
 
   const handleGoToRegister = () => {
     if (onNavigate) {
@@ -69,13 +80,15 @@ export default function FeatureLockedNotice({
 
       {/* Tiêu đề chuẩn theo yêu cầu nghiệp vụ */}
       <h3 className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight mb-2.5 max-w-xl">
-        Tính năng chỉ mở sau khi bạn hoàn tất đăng ký hoặc được xếp phòng KTX
+        {displayTitle}
       </h3>
 
       {/* Mô tả chi tiết phân theo trạng thái */}
       <p className="text-sm text-slate-500 max-w-lg leading-relaxed mb-7">
         {isPending
           ? "Đơn đăng ký của bạn đang chờ Ban Quản lý xét duyệt. Sau khi quản lý phê duyệt và xếp phòng chính thức, toàn bộ tiện ích nội trú sẽ được tự động kích hoạt."
+          : isFinance
+          ? "Bạn hiện chưa nộp đơn đăng ký phòng hoặc chưa được duyệt xếp phòng KTX. Vui lòng hoàn tất đăng ký và được duyệt phòng để sử dụng tính năng tài chính."
           : "Bạn hiện chưa nộp đơn đăng ký phòng hoặc chưa được xếp phòng lưu trú KTX. Vui lòng hoàn tất đăng ký phòng để sử dụng tính năng này."}
       </p>
 

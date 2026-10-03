@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import calendar
 import csv
 import datetime
@@ -8,6 +7,9 @@ import re
 import unicodedata
 import uuid
 from typing import List, Optional
+import calendar
+from datetime import date
+from sqlalchemy import text
 
 from fastapi import HTTPException, status
 try:
@@ -1039,3 +1041,28 @@ class InvoiceService:
             ghi_chu=inv.ghi_chu,
             nguoi_tao=inv.nguoi_tao,
         )
+
+
+def khoang_ngay_cua_thang(thang: str):
+    # "Tháng 09/2026" -> (date(2026,9,1), date(2026,9,30))
+    from datetime import date
+    mm, yyyy = thang.replace("Tháng ", "").split("/")
+    mm, yyyy = int(mm), int(yyyy)
+    last = calendar.monthrange(yyyy, mm)[1]
+    return date(yyyy, mm, 1), date(yyyy, mm, last)
+
+def lay_so_nguoi_theo_phong(db, thang: str) -> dict:
+    dau, cuoi = khoang_ngay_cua_thang(thang)
+    rows = db.execute(
+        text("""
+            SELECT g.ma_phong, COUNT(DISTINCT hd.msv) AS so_nguoi
+            FROM hop_dong hd
+            JOIN giuong g ON g.ma_giuong = hd.ma_giuong
+            WHERE hd.trang_thai = 'ACTIVE'
+              AND hd.ngay_bat_dau <= :cuoi_thang
+              AND hd.ngay_ket_thuc >= :dau_thang
+            GROUP BY g.ma_phong
+        """),
+        {"dau_thang": dau, "cuoi_thang": cuoi},
+    ).all()
+    return {ma_phong: n for ma_phong, n in rows}
