@@ -7,7 +7,7 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, require_ke_toan
+from app.core.deps import get_current_user, get_current_user_optional, require_ke_toan
 from app.models.user import TaiKhoan
 from app.schemas.invoice import (
     HoaDonResponse,
@@ -214,7 +214,7 @@ def get_all_invoices(
 )
 def get_student_my_invoices(
     msv: Optional[str] = Query(None, description="Mã sinh viên"),
-    current_user: TaiKhoan = Depends(get_current_user),
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     from app.models.contract import HopDong
@@ -222,16 +222,18 @@ def get_student_my_invoices(
     from app.models.invoice import HoaDon
     from app.models.user import NguoiDung, SinhVien
 
-    clean_code = (msv or current_user.ten_dang_nhap or "").strip().upper()
+    clean_code = (msv or (current_user.ten_dang_nhap if current_user else "") or "").strip().upper()
+    if not clean_code:
+        return []
+
+    sv_filter = [SinhVien.msv.ilike(clean_code)]
+    if current_user:
+        sv_filter.append(NguoiDung.ma_tai_khoan == current_user.ma_tai_khoan)
+
     sv = (
         db.query(SinhVien)
         .outerjoin(NguoiDung, SinhVien.ma_nguoi_dung == NguoiDung.ma_nguoi_dung)
-        .filter(
-            or_(
-                SinhVien.msv.ilike(clean_code),
-                NguoiDung.ma_tai_khoan == current_user.ma_tai_khoan,
-            )
-        )
+        .filter(or_(*sv_filter))
         .first()
     )
     student_msv = sv.msv if sv else clean_code
@@ -247,14 +249,40 @@ def get_student_my_invoices(
 
     conditions = [HoaDon.msv.ilike(student_msv)]
     if ma_phong:
-        conditions.append(and_(HoaDon.ma_phong == ma_phong, HoaDon.loai_hoa_don == "DIEN_NUOC"))
+        conditions.append(and_(HoaDon.ma_phong == ma_phong, HoaDon.loai_hoa_don == "DIEN_NUOC", HoaDon.msv.is_(None)))
 
-    invoices = (
+    raw_invoices = (
         db.query(HoaDon)
         .filter(or_(*conditions))
         .order_by(HoaDon.han_thanh_toan.desc(), HoaDon.ngay_tao.desc())
         .all()
     )
+
+    # Đếm số người ở thực tế trong phòng để chia đều nếu còn hóa đơn điện nước chung
+    occupants_count = 1
+    if ma_phong:
+        occupants_count = max(
+            1,
+            db.query(HopDong)
+            .join(Giuong, HopDong.ma_giuong == Giuong.ma_giuong)
+            .filter(Giuong.ma_phong == ma_phong, HopDong.trang_thai == "ACTIVE")
+            .count()
+        )
+
+    invoices = []
+    for inv in raw_invoices:
+        if inv.loai_hoa_don == "DIEN_NUOC" and inv.msv is None:
+            # Hóa đơn chung của cả phòng -> Tự động tính số tiền cá nhân theo đầu người
+            split_amount = round(float(inv.so_tien) / occupants_count)
+            inv_dict = {
+                c.name: getattr(inv, c.name) for c in inv.__table__.columns
+            }
+            inv_dict["so_tien"] = split_amount
+            inv_dict["msv"] = student_msv
+            invoices.append(HoaDonResponse(**inv_dict))
+        else:
+            invoices.append(inv)
+
     return invoices
 
 

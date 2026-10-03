@@ -282,11 +282,11 @@ export const occupancyService = {
               id: room.ma_phong,
               toa: building.ten_toa,
               ma_toa: building.ma_toa,
-              tang: `T?ng ${floor.so_tang}`,
+              tang: `Tầng ${floor.so_tang}`,
               so_tang: floor.so_tang,
               da_o: occupied,
-              si_so: `${occupied}/${capacity} ng??i`,
-              gia_thue: room.gia_tien_nam == null ? '' : `${Number(room.gia_tien_nam).toLocaleString('vi-VN')} ? / n?m`,
+              si_so: `${occupied}/${capacity} người`,
+              gia_thue: room.gia_tien_nam == null ? '' : `${Number(room.gia_tien_nam).toLocaleString('vi-VN')} đ / năm`,
               trang_thai: occupied >= capacity ? 'DA_DAY' : 'CON_CHO',
               giuongs: beds,
               giuong_trong: beds.filter((bed) => bed.trang_thai === 'TRONG').map((bed) => bed.ma_giuong),
@@ -295,7 +295,7 @@ export const occupancyService = {
         ),
       );
     } catch (error) {
-      console.error('Kh?ng th? t?i danh s?ch ph?ng t? API:', error);
+      console.error('Không thể tải danh sách phòng từ API:', error);
       return [];
     }
   },
@@ -618,7 +618,7 @@ export const occupancyService = {
       return foundReg;
     }
 
-    throw new Error("Kh?ng t?m th?y ??n y?u c?u");
+    throw new Error("Không tìm thấy đơn yêu cầu");
   },
 
   /**

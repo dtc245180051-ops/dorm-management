@@ -76,6 +76,21 @@ def get_current_user(
     return user
 
 
+def get_current_user_optional(
+    request: Request,
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> Optional[TaiKhoan]:
+    """
+    Xác thực người dùng tùy chọn (không bắt buộc).
+    Nếu không có token hoặc token không hợp lệ, trả về None thay vì ném lỗi 401.
+    """
+    try:
+        return get_current_user(request=request, token=token, db=db)
+    except Exception:
+        return None
+
+
 class RoleChecker:
     """
     Dependency kiểm tra quyền truy cập dựa trên danh sách các vai trò cho phép (RBAC).

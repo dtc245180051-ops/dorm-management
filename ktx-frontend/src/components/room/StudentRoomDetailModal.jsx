@@ -66,6 +66,19 @@ export default function StudentRoomDetailModal({
     return <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />;
   };
 
+  // Chuẩn hóa và làm sạch phông chữ tiếng Việt hiển thị
+  const displayTang = room.tang
+    ? String(room.tang).replace(/t\?ng/gi, 'Tầng').replace(/^(\d+)$/, 'Tầng $1')
+    : (room.so_tang ? `Tầng ${room.so_tang}` : '');
+
+  const displaySiSo = room.si_so
+    ? String(room.si_so).replace(/ng\?\?i/gi, 'người')
+    : `${room.da_o ?? 0}/${room.suc_chua ?? 0} người`;
+
+  const displayGiaThue = room.gia_thue
+    ? String(room.gia_thue).replace(/\?\s*\/\s*n\?m/gi, 'đ / năm').replace(/\?/g, 'đ')
+    : (room.gia_tien_nam != null ? `${Number(room.gia_tien_nam).toLocaleString('vi-VN')} đ / năm` : '');
+
   return (
     <div
       className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
@@ -82,7 +95,7 @@ export default function StudentRoomDetailModal({
               Phòng {room.so_phong}
             </h2>
             <span className="text-sm font-semibold text-slate-500">
-              ({room.toa} - {room.tang})
+              ({room.toa} - {displayTang})
             </span>
             {isFull ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#e2e8f0] text-slate-500">
@@ -190,7 +203,7 @@ export default function StudentRoomDetailModal({
               <Layers className="w-3.5 h-3.5 text-slate-400" />
               Tầng
             </span>
-            <span className="text-sm font-black text-slate-800">{room.tang}</span>
+            <span className="text-sm font-black text-slate-800">{displayTang}</span>
           </div>
 
           <div className="bg-[#f8fafc] border border-slate-200/80 rounded-2xl p-3 flex flex-col gap-1">
@@ -198,7 +211,7 @@ export default function StudentRoomDetailModal({
               <Users className="w-3.5 h-3.5 text-slate-400" />
               Sĩ số
             </span>
-            <span className="text-sm font-black text-slate-800">{room.si_so}</span>
+            <span className="text-sm font-black text-slate-800">{displaySiSo}</span>
           </div>
 
           <div className="bg-[#f8fafc] border border-slate-200/80 rounded-2xl p-3 flex flex-col gap-1">
@@ -217,7 +230,7 @@ export default function StudentRoomDetailModal({
               Mức giá thuê trọn gói
             </span>
             <span className="text-lg sm:text-2xl font-black text-[#0f3b79]">
-              {room.gia_thue}
+              {displayGiaThue}
             </span>
           </div>
           <span className="text-xs text-slate-500 font-medium">

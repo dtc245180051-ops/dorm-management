@@ -305,6 +305,6 @@ export const reconciliationService = {
     }
 
     // Fallback xử lý file trực tiếp không để bị chặn bởi lỗi Not Found
-    return { success: false, data: { items: [], totalTransactions: 0, statistics: { totalTransactions: 0, autoMatched: 0, manualRequired: 0 } }, message: 'Kh?ng th? t?i sao k? l?n m?y ch?.' };
+    return { success: false, data: { items: [], totalTransactions: 0, statistics: { totalTransactions: 0, autoMatched: 0, manualRequired: 0 } }, message: 'Không thể tải sao kê lên máy chủ.' };
   },
 };
