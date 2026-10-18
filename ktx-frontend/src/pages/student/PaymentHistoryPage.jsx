@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+﻿import React, { useEffect, useState, useMemo } from "react";
 import StudentLayout from "../../layouts/Student";
 import FeatureLockedNotice from "../../components/FeatureLockedNotice";
 import { resolveStudentStatus, STUDENT_STATUS } from "../../services/studentStatusService";
@@ -271,7 +271,7 @@ function InvoiceModal({ invoice, studentName, studentId, room, onClose }) {
             {invoice?.status === "paid" || invoice?.status === "DA_THANH_TOAN"
               ? "Hóa đơn điện tử được xác nhận bởi Ban Quản lý KTX ICTU."
               : invoice?.status === "pending" || invoice?.status === "CHO_XAC_NHAN"
-              ? "Giao dịch đang chờ Ban Quản lý KTX ICTU đối soát và gạch nợ."
+              ? "Giao dịch đang chờ Kế toán KTX ICTU đối soát và gạch nợ."
               : invoice?.status === "overdue" || invoice?.status === "QUA_HAN"
               ? "Vui lòng quét mã QR thanh toán sớm để đảm bảo quyền lợi nội trú."
               : "Vui lòng chuyển khoản đúng cú pháp để hệ thống tự động gạch nợ."}
@@ -438,9 +438,11 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
       const localPaymentStatus = localStorage.getItem(PAYMENT_STATUS_STORAGE_KEY);
       const localPaymentDate = localStorage.getItem(PAYMENT_DATE_STORAGE_KEY) || formatDisplayDate(new Date());
 
+      let isApiSuccess = false;
       try {
         const apiInvoices = await invoiceService.getMyInvoices(currentCode);
-        if (Array.isArray(apiInvoices) && apiInvoices.length > 0) {
+        if (Array.isArray(apiInvoices)) {
+          isApiSuccess = true;
           list = apiInvoices.map((inv, idx) => {
             const isDbPaid =
               inv?.trang_thai === "DA_THANH_TOAN" ||
@@ -517,8 +519,8 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
         console.warn("Lỗi khi tải hóa đơn từ API:", err);
       }
 
-      // Fallback thêm các hóa đơn trong local accountData.bills nếu chưa có từ API
-      if (list.length === 0 && Array.isArray(acc?.bills) && acc.bills.length > 0) {
+      // Fallback thêm các hóa đơn trong local accountData.bills nếu API gặp lỗi kết nối
+      if (!isApiSuccess && list.length === 0 && Array.isArray(acc?.bills) && acc.bills.length > 0) {
         list = acc.bills.map((bill, index) => {
           const isBillPaid = bill?.status === "PAID" || bill?.trang_thai === "DA_THANH_TOAN";
           const isPending = localPaymentStatus === "pending" && !isBillPaid;
@@ -896,3 +898,4 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
     </StudentLayout>
   );
 }
+

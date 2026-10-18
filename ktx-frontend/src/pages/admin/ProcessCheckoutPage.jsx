@@ -205,7 +205,7 @@ export default function ProcessCheckoutPage({
                       Họ và tên
                     </span>
                     <span className="font-bold text-slate-900">
-                      {requestData?.ho_ten || "Nguyễn Quốc Huy"}
+                      {requestData?.ho_ten || "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
@@ -213,7 +213,7 @@ export default function ProcessCheckoutPage({
                       Giới tính
                     </span>
                     <span className="text-slate-900 font-medium">
-                      {requestData?.gioi_tinh || "Nam"}
+                      {requestData?.gioi_tinh || "—"}
                     </span>
                   </div>
                 </div>
@@ -226,13 +226,13 @@ export default function ProcessCheckoutPage({
                     </span>
                     <span className="font-semibold text-slate-900">
                       {requestData?.vi_tri_hien_tai ||
-                        "Phòng A102 - Giường G01"}
+                        (requestData?.phong_hien_tai ? `Phòng ${requestData.phong_hien_tai}` : "Chưa xếp phòng")}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
                     <span className="text-slate-600 font-medium">Công nợ</span>
                     <span className="font-bold text-emerald-600">
-                      {requestData?.cong_no || "Đã hoàn thành toàn bộ phí"}
+                      {requestData?.cong_no || "Đã kiểm tra"}
                     </span>
                   </div>
                 </div>
@@ -248,7 +248,7 @@ export default function ProcessCheckoutPage({
                 "
                 {requestData?.mo_ta ||
                   requestData?.ly_do ||
-                  "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học..."}
+                  "Không có mô tả chi tiết"}
                 "
               </div>
             </div>

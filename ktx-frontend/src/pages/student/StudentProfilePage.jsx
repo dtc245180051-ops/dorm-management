@@ -56,11 +56,11 @@ export default function StudentProfilePage({ onSelectTab }) {
 
   // 2. Dữ liệu phòng ở (đồng bộ với occupancyService)
   const [roomInfo, setRoomInfo] = useState({
-    toa: "Tòa A1",
-    so_phong: "101",
-    tang: "1",
-    giuong: "G04",
-    ngay_nhan_phong: "01/09/2026",
+    toa: "",
+    so_phong: "",
+    tang: "",
+    giuong: "",
+    ngay_nhan_phong: "",
   });
 
   // 3. State modal chỉnh sửa & Toast
@@ -128,8 +128,13 @@ export default function StudentProfilePage({ onSelectTab }) {
       }
 
       // 1. Tải hồ sơ sinh viên
+      const currentStudentMsv =
+        accountProfile.msv ||
+        localStorage.getItem("ktx_username") ||
+        "";
+
       if (occupancyService.getStudentProfile) {
-        const student = await occupancyService.getStudentProfile();
+        const student = await occupancyService.getStudentProfile(currentStudentMsv);
         if (student) {
           const savedAvatar = localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY);
           const profileEmail = accountProfile.email || student.email || "";
@@ -164,11 +169,7 @@ export default function StudentProfilePage({ onSelectTab }) {
 
       // 2. Tải thông tin phòng ở hiện tại
       if (occupancyService.getCurrentRoomInfo) {
-        const studentMsv =
-          accountProfile.msv ||
-          localStorage.getItem("ktx_username") ||
-          "DTC245180051";
-        const currentRoom = await occupancyService.getCurrentRoomInfo(studentMsv);
+        const currentRoom = await occupancyService.getCurrentRoomInfo(currentStudentMsv);
         if (currentRoom && currentRoom.so_phong) {
           const rawToa = currentRoom.toa || "";
           const cleanToa = rawToa.replace(/^Tòa\s*/i, "").trim();
@@ -177,22 +178,22 @@ export default function StudentProfilePage({ onSelectTab }) {
           const rawGiuong = currentRoom.giuong || currentRoom.so_giuong || currentRoom.ma_giuong?.split("_")?.pop() || "";
           const cleanGiuong = rawGiuong.match(/G?\d+/i)?.[0]
             ? `G${rawGiuong.match(/\d+/)?.[0]?.padStart(2, "0")}`
-            : (rawGiuong || "G04");
+            : (rawGiuong || "");
 
           setRoomInfo({
-            toa: cleanToa ? `Tòa ${cleanToa}` : (currentRoom.toa || "Tòa A1"),
-            so_phong: cleanPhong || "101",
-            tang: currentRoom.tang || currentRoom.so_tang || "1",
-            giuong: cleanGiuong || "G04",
-            ngay_nhan_phong: formatDateForDisplay(currentRoom.ngay_duyet || currentRoom.ngay_nhan_phong || currentRoom.ngay_bat_dau || currentRoom.thoi_gian_luu_tru || "01/09/2026"),
+            toa: cleanToa ? `Tòa ${cleanToa}` : (currentRoom.toa || ""),
+            so_phong: cleanPhong || "",
+            tang: currentRoom.tang || currentRoom.so_tang || "",
+            giuong: cleanGiuong || "",
+            ngay_nhan_phong: formatDateForDisplay(currentRoom.ngay_duyet || currentRoom.ngay_nhan_phong || currentRoom.ngay_bat_dau || currentRoom.thoi_gian_luu_tru || ""),
           });
         } else {
           setRoomInfo({
-            toa: "Tòa A1",
-            so_phong: "101",
-            tang: "1",
-            giuong: "G04",
-            ngay_nhan_phong: "01/09/2026",
+            toa: "",
+            so_phong: "",
+            tang: "",
+            giuong: "",
+            ngay_nhan_phong: "",
           });
         }
       }
@@ -544,61 +545,96 @@ export default function StudentProfilePage({ onSelectTab }) {
         {/* 4. KHỐI THÔNG TIN PHÒNG Ở (ROOM INFORMATION)                               */}
         {/* ========================================================================= */}
         <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-7 shadow-xs">
-          <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-5 tracking-tight">
-            Thông tin phòng ở
-          </h3>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 text-left">
-            {/* Tòa KTX */}
-            <div>
-              <span className="text-xs text-slate-400 block mb-1.5 font-medium">
-                Tòa KTX
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+              Thông tin phòng ở
+            </h3>
+            {!roomInfo.so_phong && (
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200/70 select-none">
+                Chưa xếp phòng
               </span>
-              <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
-                {roomInfo.toa}
-              </span>
-            </div>
-
-            {/* Phòng */}
-            <div>
-              <span className="text-xs text-slate-400 block mb-1.5 font-medium">
-                Phòng
-              </span>
-              <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
-                {roomInfo.so_phong}
-              </span>
-            </div>
-
-            {/* Tầng */}
-            <div>
-              <span className="text-xs text-slate-400 block mb-1.5 font-medium">
-                Tầng
-              </span>
-              <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
-                {roomInfo.tang}
-              </span>
-            </div>
-
-            {/* Giường */}
-            <div>
-              <span className="text-xs text-slate-400 block mb-1.5 font-medium">
-                Giường
-              </span>
-              <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
-                {roomInfo.giuong}
-              </span>
-            </div>
-
-            {/* Ngày nhận phòng */}
-            <div>
-              <span className="text-xs text-slate-400 block mb-1.5 font-medium">
-                Ngày nhận phòng
-              </span>
-              <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
-                {roomInfo.ngay_nhan_phong}
-              </span>
-            </div>
+            )}
           </div>
+
+          {roomInfo.so_phong ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 text-left">
+              {/* Tòa KTX */}
+              <div>
+                <span className="text-xs text-slate-400 block mb-1.5 font-medium">
+                  Tòa KTX
+                </span>
+                <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
+                  {roomInfo.toa}
+                </span>
+              </div>
+
+              {/* Phòng */}
+              <div>
+                <span className="text-xs text-slate-400 block mb-1.5 font-medium">
+                  Phòng
+                </span>
+                <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
+                  {roomInfo.so_phong}
+                </span>
+              </div>
+
+              {/* Tầng */}
+              <div>
+                <span className="text-xs text-slate-400 block mb-1.5 font-medium">
+                  Tầng
+                </span>
+                <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
+                  {roomInfo.tang}
+                </span>
+              </div>
+
+              {/* Giường */}
+              <div>
+                <span className="text-xs text-slate-400 block mb-1.5 font-medium">
+                  Giường
+                </span>
+                <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
+                  {roomInfo.giuong}
+                </span>
+              </div>
+
+              {/* Ngày nhận phòng */}
+              <div>
+                <span className="text-xs text-slate-400 block mb-1.5 font-medium">
+                  Ngày nhận phòng
+                </span>
+                <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
+                  {roomInfo.ngay_nhan_phong}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="py-6 flex flex-col items-center justify-center text-center">
+              <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 mb-3 shadow-2xs">
+                <Home className="w-6 h-6 stroke-[1.8]" />
+              </div>
+              <p className="text-sm font-semibold text-slate-700 mb-1">
+                Hiện tại bạn chưa lưu trú tại phòng nào trong KTX
+              </p>
+              <p className="text-xs text-slate-500 max-w-sm mb-4 leading-relaxed">
+                Thông tin phòng, giường và tòa nhà sẽ hiển thị tự động tại đây ngay sau khi đơn đăng ký phòng của bạn được Ban Quản lý phê duyệt.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onSelectTab) {
+                    onSelectTab("register");
+                  } else {
+                    window.history.pushState({}, "", "/student/register");
+                    window.dispatchEvent(new PopStateEvent("popstate"));
+                  }
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition shadow-xs cursor-pointer"
+              >
+                Đăng ký phòng ngay
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

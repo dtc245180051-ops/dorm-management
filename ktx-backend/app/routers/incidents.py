@@ -1,4 +1,5 @@
 import datetime
+import json
 import uuid
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
@@ -18,43 +19,148 @@ router = APIRouter(prefix="/incidents", tags=["Phản ánh và Báo hỏng KTX"]
 @router.get("/violations")
 def list_violations(db: Session = Depends(get_db)):
     records = db.query(ViPham).order_by(ViPham.ngay_vi_pham.desc()).all()
-    return [
-        {
+    results = []
+    for item in records:
+        phong_str = ""
+        sdt_str = ""
+        if item.sinh_vien:
+            if item.sinh_vien.nguoi_dung and item.sinh_vien.nguoi_dung.so_dien_thoai:
+                sdt_str = item.sinh_vien.nguoi_dung.so_dien_thoai
+            if item.sinh_vien.hop_dongs:
+                active_hd = next((h for h in item.sinh_vien.hop_dongs if h.trang_thai == "ACTIVE"), None)
+                if active_hd and active_hd.giuong and active_hd.giuong.phong:
+                    p = active_hd.giuong.phong
+                    toa_code = p.ma_toa.replace("TOA_", "").replace("toa_", "") if p.ma_toa else ""
+                    toa_str = f" - Tòa {toa_code}" if toa_code else ""
+                    phong_str = f"P{p.so_phong}{toa_str}"
+
+        # Đếm số lần vi phạm lũy kế của sinh viên này
+        so_lan_luy_ke = db.query(ViPham).filter(ViPham.msv == item.msv).count()
+
+        # Parse danh sách file bằng chứng đính kèm
+        bang_chung_list = []
+        if item.bang_chung:
+            try:
+                bang_chung_list = json.loads(item.bang_chung)
+                if not isinstance(bang_chung_list, list):
+                    bang_chung_list = [str(bang_chung_list)]
+            except Exception:
+                bang_chung_list = [f.strip() for f in item.bang_chung.split(",") if f.strip()]
+
+        status_val = getattr(item, "trang_thai", None) or "CHO_XU_LY"
+        sub_status_val = getattr(item, "sub_status", None) or ("DA_XU_LY_DUT_DIEM" if status_val == "DA_XU_LY" else "CHO_GIAI_TRINH")
+
+        results.append({
             "id": item.ma_vi_pham,
             "ma_bb": item.ma_vi_pham,
             "msv": item.msv,
             "ho_ten": item.sinh_vien.nguoi_dung.ho_ten if item.sinh_vien and item.sinh_vien.nguoi_dung else item.msv,
-            "phong": "",
+            "phong": phong_str,
+            "phong_ngan": phong_str,
+            "sdt": sdt_str,
             "hanh_vi": item.mo_ta,
+            "mo_ta": item.mo_ta,
+            "nhom_vi_pham": getattr(item, "nhom_vi_pham", None) or "Vi phạm nội quy KTX",
+            "thoi_diem": getattr(item, "thoi_diem", None) or (item.ngay_vi_pham.strftime("%d/%m/%Y") if item.ngay_vi_pham else ""),
+            "dia_diem": getattr(item, "dia_diem", None) or (f"Phòng {phong_str}" if phong_str else "Ký túc xá"),
+            "so_lan_luy_ke": f"{so_lan_luy_ke} lần",
+            "bang_chung": bang_chung_list,
             "hinh_thuc_xu_ly": item.hinh_thuc_xu_ly,
-            "ngay_lap": item.ngay_vi_pham.isoformat(),
-            "trang_thai": "DA_XU_LY" if item.hinh_thuc_xu_ly else "CHO_XU_LY",
-        }
-        for item in records
-    ]
+            "quyet_dinh": getattr(item, "quyet_dinh", None) or item.hinh_thuc_xu_ly,
+            "ghi_chu": getattr(item, "ghi_chu", None) or "",
+            "nguoi_lap": getattr(item, "nguoi_lap", None) or "Ban quản lý KTX",
+            "ngay_lap": item.ngay_vi_pham.strftime("%d/%m/%Y") if item.ngay_vi_pham else "",
+            "trang_thai": status_val,
+            "sub_status": sub_status_val,
+        })
+    return results
 
 
 class CreateViolationRequest(BaseModel):
     msv: str
     mo_ta: str
-    hinh_thuc_xu_ly: str = "Đang xem xét"
+    ho_ten: Optional[str] = None
+    phong: Optional[str] = None
+    thoi_gian: Optional[str] = None
+    thoi_diem: Optional[str] = None
+    dia_diem: Optional[str] = None
+    nhom_hanh_vi: Optional[str] = None
+    nhom_vi_pham: Optional[str] = None
+    dinh_kem: Optional[List[str]] = None
+    bang_chung: Optional[List[str]] = None
+    hinh_thuc_xu_ly: Optional[str] = "Đang xem xét"
+    trang_thai: Optional[str] = "CHO_XU_LY"
+    nguoi_lap: Optional[str] = "Ban quản lý KTX"
 
 
 @router.post("/violations", status_code=status.HTTP_201_CREATED)
 def create_violation(req: CreateViolationRequest, db: Session = Depends(get_db)):
-    if not db.query(SinhVien).filter(SinhVien.msv == req.msv).first():
+    student = db.query(SinhVien).filter(SinhVien.msv == req.msv).first()
+    if not student:
         raise HTTPException(status_code=404, detail="Không tìm thấy sinh viên trong cơ sở dữ liệu")
+
+    attachments = req.dinh_kem or req.bang_chung or []
+    bang_chung_str = json.dumps(attachments, ensure_ascii=False) if attachments else None
+
     item = ViPham(
         ma_vi_pham=f"VP-{uuid.uuid4().hex[:12].upper()}",
         msv=req.msv,
         mo_ta=req.mo_ta,
         ngay_vi_pham=datetime.date.today(),
-        hinh_thuc_xu_ly=req.hinh_thuc_xu_ly,
+        hinh_thuc_xu_ly=req.hinh_thuc_xu_ly or "Đang xem xét",
+        trang_thai=req.trang_thai or "CHO_XU_LY",
+        dia_diem=req.dia_diem,
+        thoi_diem=req.thoi_diem or req.thoi_gian or datetime.date.today().strftime("%d/%m/%Y"),
+        nhom_vi_pham=req.nhom_vi_pham or req.nhom_hanh_vi or "Vi phạm nội quy KTX",
+        bang_chung=bang_chung_str,
+        nguoi_lap=req.nguoi_lap or "Ban quản lý KTX",
+        sub_status="CHO_GIAI_TRINH",
     )
     db.add(item)
     db.commit()
     db.refresh(item)
-    return {"id": item.ma_vi_pham, "ma_bb": item.ma_vi_pham, "msv": item.msv, "hanh_vi": item.mo_ta}
+    return {
+        "id": item.ma_vi_pham,
+        "ma_bb": item.ma_vi_pham,
+        "msv": item.msv,
+        "hanh_vi": item.mo_ta,
+        "trang_thai": item.trang_thai,
+    }
+
+
+class UpdateViolationStatusRequest(BaseModel):
+    trang_thai: Optional[str] = None
+    sub_status: Optional[str] = None
+    hinh_thuc_xu_ly: Optional[str] = None
+    quyet_dinh: Optional[str] = None
+    ghi_chu: Optional[str] = None
+
+
+@router.put("/violations/{ma_vi_pham}")
+def update_violation(ma_vi_pham: str, req: UpdateViolationStatusRequest, db: Session = Depends(get_db)):
+    item = db.query(ViPham).filter(ViPham.ma_vi_pham == ma_vi_pham).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Không tìm thấy biên bản vi phạm")
+    if req.trang_thai:
+        item.trang_thai = req.trang_thai
+    if req.sub_status:
+        item.sub_status = req.sub_status
+    if req.hinh_thuc_xu_ly or req.quyet_dinh:
+        item.hinh_thuc_xu_ly = req.hinh_thuc_xu_ly or req.quyet_dinh
+        item.quyet_dinh = req.quyet_dinh or req.hinh_thuc_xu_ly
+    if req.ghi_chu is not None:
+        item.ghi_chu = req.ghi_chu
+    db.commit()
+    db.refresh(item)
+    return {
+        "id": item.ma_vi_pham,
+        "ma_bb": item.ma_vi_pham,
+        "trang_thai": item.trang_thai,
+        "sub_status": item.sub_status,
+        "hinh_thuc_xu_ly": item.hinh_thuc_xu_ly,
+        "quyet_dinh": item.quyet_dinh,
+        "ghi_chu": item.ghi_chu,
+    }
 
 
 class CreateIncidentRequest(BaseModel):

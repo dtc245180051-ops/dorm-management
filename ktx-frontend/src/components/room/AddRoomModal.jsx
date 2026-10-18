@@ -13,16 +13,12 @@ import {
 import { dormService } from '../../services/api';
 
 // Ràng buộc khoảng giá theo loại phòng
-const STANDARD_MAX_PRICE = 6000000; // Tối đa 6 triệu/năm cho phòng tiêu chuẩn
-const SERVICE_MIN_PRICE = 7000000;  // Tối thiểu 7 triệu/năm cho phòng dịch vụ
+const STANDARD_PRICE = 4800000; // 4.8 triệu/năm cho phòng tiêu chuẩn
+const SERVICE_PRICE = 8200000;  // 8.2 triệu/năm cho phòng dịch vụ
 
 const PRICE_CHIPS = [
-  { label: '3.6 tr', value: 3600000, category: 'Phòng tiêu chuẩn' },
   { label: '4.8 tr (Tiêu chuẩn)', value: 4800000, category: 'Phòng tiêu chuẩn' },
-  { label: '6.0 tr', value: 6000000, category: 'Phòng tiêu chuẩn' },
-  { label: '7.2 tr', value: 7200000, category: 'Phòng dịch vụ' },
-  { label: '9.6 tr (Dịch vụ)', value: 9600000, category: 'Phòng dịch vụ' },
-  { label: '12 tr', value: 12000000, category: 'Phòng dịch vụ' },
+  { label: '8.2 tr (Dịch vụ)', value: 8200000, category: 'Phòng dịch vụ' },
 ];
 
 export default function AddRoomModal({
@@ -124,31 +120,28 @@ export default function AddRoomModal({
 
   // Kiểm tra lỗi giá tương ứng loại phòng
   let priceValidationError = '';
-  if (!isService && currentPrice > STANDARD_MAX_PRICE) {
-    priceValidationError = `Phòng tiêu chuẩn không được nhập giá cao hơn phòng dịch vụ (tối đa ${STANDARD_MAX_PRICE.toLocaleString('vi-VN')} đ/năm).`;
-  } else if (isService && currentPrice < SERVICE_MIN_PRICE && currentPrice > 0) {
-    priceValidationError = `Phòng dịch vụ không được nhập giá thấp hơn phòng tiêu chuẩn (tối thiểu ${SERVICE_MIN_PRICE.toLocaleString('vi-VN')} đ/năm).`;
+  if (!isService && currentPrice !== STANDARD_PRICE && currentPrice > 0) {
+    priceValidationError = `Phòng tiêu chuẩn có giá quy định là 4.800.000 VNĐ/năm (~${Math.round(STANDARD_PRICE / 11).toLocaleString('vi-VN')} đ/tháng x 11 tháng).`;
+  } else if (isService && currentPrice !== SERVICE_PRICE && currentPrice > 0) {
+    priceValidationError = `Phòng dịch vụ có giá quy định là 8.200.000 VNĐ/năm (~${Math.round(SERVICE_PRICE / 11).toLocaleString('vi-VN')} đ/tháng x 11 tháng).`;
   }
 
   // Đổi loại phòng và gợi ý giá tương ứng
   const handleRoomTypeChange = (newType) => {
-    setFormData((prev) => {
-      let suggestedPrice = prev.gia_tien_nam;
-      if (newType === 'Phòng dịch vụ') {
-        if (!suggestedPrice || Number(suggestedPrice) < SERVICE_MIN_PRICE) {
-          suggestedPrice = 9600000;
-        }
-      } else {
-        if (!suggestedPrice || Number(suggestedPrice) > STANDARD_MAX_PRICE) {
-          suggestedPrice = 4800000;
-        }
-      }
-      return {
-        ...prev,
-        loai_phong: newType,
-        gia_tien_nam: suggestedPrice,
-      };
-    });
+    const newPrice = newType === 'Phòng dịch vụ' ? SERVICE_PRICE : STANDARD_PRICE;
+    setFormData((prev) => ({
+      ...prev,
+      loai_phong: newType,
+      gia_tien_nam: newPrice,
+    }));
+  };
+
+  const handleSelectChip = (chip) => {
+    setFormData((prev) => ({
+      ...prev,
+      loai_phong: chip.category,
+      gia_tien_nam: chip.value,
+    }));
   };
 
   // Xử lý chọn tệp hình ảnh từ máy tính
@@ -229,15 +222,15 @@ export default function AddRoomModal({
     }
 
     // Kiểm tra ràng buộc khoảng giá theo loại phòng
-    if (!isService && Number(formData.gia_tien_nam) > STANDARD_MAX_PRICE) {
+    if (!isService && Number(formData.gia_tien_nam) !== STANDARD_PRICE) {
       setErrorMsg(
-        `Phòng tiêu chuẩn không được nhập giá cao hơn phòng dịch vụ (tối đa ${STANDARD_MAX_PRICE.toLocaleString('vi-VN')} đ/năm).`
+        `Phòng tiêu chuẩn có giá cố định là ${STANDARD_PRICE.toLocaleString('vi-VN')} đ/năm (~${Math.round(STANDARD_PRICE / 11).toLocaleString('vi-VN')} đ/tháng x 11 tháng).`
       );
       return;
     }
-    if (isService && Number(formData.gia_tien_nam) < SERVICE_MIN_PRICE) {
+    if (isService && Number(formData.gia_tien_nam) !== SERVICE_PRICE) {
       setErrorMsg(
-        `Phòng dịch vụ không được nhập giá thấp hơn phòng tiêu chuẩn (tối thiểu ${SERVICE_MIN_PRICE.toLocaleString('vi-VN')} đ/năm).`
+        `Phòng dịch vụ có giá cố định là ${SERVICE_PRICE.toLocaleString('vi-VN')} đ/năm (~${Math.round(SERVICE_PRICE / 11).toLocaleString('vi-VN')} đ/tháng x 11 tháng).`
       );
       return;
     }
@@ -587,20 +580,13 @@ export default function AddRoomModal({
                   {isService ? '(Tối thiểu 7.000.000 đ)' : '(Tối đa 6.000.000 đ)'}
                 </span>
               </label>
-              {currentPrice > 0 && (
-                <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200/60 px-2 py-0.5 rounded-md">
-                  ~{Math.round(currentPrice / 12).toLocaleString('vi-VN')} đ/tháng
-                </span>
-              )}
             </div>
 
             <div className="relative">
               <input
                 type="number"
-                min={isService ? SERVICE_MIN_PRICE : 1000000}
-                max={!isService ? STANDARD_MAX_PRICE : 30000000}
                 step="100000"
-                placeholder={isService ? 'VD: 9600000' : 'VD: 4800000'}
+                placeholder={isService ? 'VD: 8200000' : 'VD: 4800000'}
                 value={formData.gia_tien_nam}
                 onChange={(e) =>
                   setFormData({
@@ -629,40 +615,19 @@ export default function AddRoomModal({
 
             {/* Khung gợi ý nhanh theo quy định loại phòng */}
             <div className="mt-2.5">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] text-slate-500 font-semibold">Gợi ý mức giá chuẩn:</span>
-                <span className="text-[10px] text-slate-400 italic">
-                  {isService
-                    ? '✨ Phòng dịch vụ: từ 7.000.000 đ trở lên'
-                    : '💡 Phòng tiêu chuẩn: tối đa 6.000.000 đ'}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-2">
                 {PRICE_CHIPS.map((chip) => {
-                  const isMatchingType = chip.category === formData.loai_phong;
-                  const isSelected = Number(formData.gia_tien_nam) === chip.value;
-
-                  if (!isMatchingType) {
-                    // Mức giá không thuộc loại phòng hiện tại: bị khóa, không được chọn
-                    return (
-                      <span
-                        key={chip.value}
-                        title={`Không được chọn mức này cho ${formData.loai_phong}`}
-                        className="text-[11px] px-2 py-0.5 rounded-lg border border-slate-200/70 bg-slate-100/80 text-slate-400 opacity-40 cursor-not-allowed select-none line-through"
-                      >
-                        {chip.label}
-                      </span>
-                    );
-                  }
+                  const isSelected =
+                    Number(formData.gia_tien_nam) === chip.value &&
+                    formData.loai_phong === chip.category;
 
                   return (
                     <button
                       key={chip.value}
                       type="button"
-                      onClick={() => setFormData({ ...formData, gia_tien_nam: chip.value })}
-                      className={`text-[11px] px-2.5 py-0.5 rounded-lg border transition font-medium cursor-pointer ${isSelected
-                          ? 'bg-blue-600 border-blue-600 text-white font-semibold shadow-2xs'
+                      onClick={() => handleSelectChip(chip)}
+                      className={`text-xs px-3 py-1.5 rounded-xl border transition font-semibold cursor-pointer ${isSelected
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-2xs'
                           : 'bg-white hover:bg-blue-50 text-slate-700 border-slate-300'
                         }`}
                     >

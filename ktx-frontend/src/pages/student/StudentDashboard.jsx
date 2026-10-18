@@ -58,46 +58,32 @@ const STATIC_NOTIFICATIONS = [
 ];
 
 export default function StudentDashboard({ user, onNavigate }) {
-  const DEFAULT_ROOM = {
-    so_phong: "101",
-    toa: "Tòa A1",
-    tang: "1",
-    giuong: "G04",
-    so_thanh_vien: 4,
-    suc_chua: "4 người",
-    thanh_vien: "4/4 người",
-  };
-  const DEFAULT_BILLING = {
-    amount: "400.000 đ",
-    period: "/tháng",
-    status: "Đã thanh toán",
-  };
-
   const [activeModal, setActiveModal] = useState(null);
-  const [currentRoomInfo, setCurrentRoomInfo] = useState(DEFAULT_ROOM);
-  const [billing, setBilling] = useState(DEFAULT_BILLING);
+  const [currentRoomInfo, setCurrentRoomInfo] = useState(null);
+  const [billing, setBilling] = useState(null);
   const [complaints, setComplaints] = useState({ total: 0, processing: 0, resolved: 0 });
   const [registrationStatus, setRegistrationStatus] = useState(null);
 
   const loadRoomInfo = async () => {
     try {
-      const msv = user?.msv || user?.nguoi_dung?.sinh_vien?.msv || localStorage.getItem("ktx_username") || "DTC245180051";
+      const msv = user?.msv || user?.nguoi_dung?.sinh_vien?.msv || localStorage.getItem("ktx_username") || "";
+      if (!msv) {
+        setCurrentRoomInfo(null);
+        setBilling(null);
+        return;
+      }
       const info = await occupancyService.getCurrentRoomInfo(msv);
       if (info && info.so_phong) {
         setCurrentRoomInfo(info);
-        if (info.billing) {
-          setBilling(info.billing);
-        } else {
-          setBilling(DEFAULT_BILLING);
-        }
+        setBilling(info.billing || null);
       } else {
-        setCurrentRoomInfo(DEFAULT_ROOM);
-        setBilling(DEFAULT_BILLING);
+        setCurrentRoomInfo(null);
+        setBilling(null);
       }
     } catch (e) {
       console.error("Error loading room info in StudentDashboard:", e);
-      setCurrentRoomInfo(DEFAULT_ROOM);
-      setBilling(DEFAULT_BILLING);
+      setCurrentRoomInfo(null);
+      setBilling(null);
     }
   };
 
@@ -114,19 +100,23 @@ export default function StudentDashboard({ user, onNavigate }) {
     }
   };
 
-  const loadRegistrationStatus = () => {
+  const loadRegistrationStatus = async () => {
     try {
+      const msv = user?.msv || user?.nguoi_dung?.sinh_vien?.msv || localStorage.getItem("ktx_username") || "";
+      if (msv) {
+        const reqs = await occupancyService.getMyRequests(msv);
+        if (Array.isArray(reqs) && reqs.length > 0) {
+          setRegistrationStatus(reqs[0]);
+          return;
+        }
+      }
       const raw = localStorage.getItem("dorm_registration_requests");
       if (raw) {
         const list = JSON.parse(raw);
         const real = list.find(
           (r) => r.msv && !r.msv.includes("xxxxxxxx") && !r.msv.includes("XXXXXX")
         );
-        if (real) {
-          setRegistrationStatus(real);
-        } else {
-          setRegistrationStatus(null);
-        }
+        setRegistrationStatus(real || null);
       } else {
         setRegistrationStatus(null);
       }
@@ -343,9 +333,11 @@ export default function StudentDashboard({ user, onNavigate }) {
                   ? (currentRoomInfo.so_thanh_vien !== undefined && currentRoomInfo.suc_chua
                       ? `${currentRoomInfo.so_thanh_vien}/${String(currentRoomInfo.suc_chua).match(/\d+/)?.[0] || 4}`
                       : (currentRoomInfo.thanh_vien?.replace(/người/i, '').trim() || "4/4"))
-                  : "4/4"}
+                  : "—"}
               </span>
-              <span className="student-stat-subtext">Hiện tại / sức chứa</span>
+              <span className="student-stat-subtext">
+                {currentRoomInfo ? "Hiện tại / sức chứa" : "Chưa xếp phòng"}
+              </span>
             </div>
           </div>
           <span className="student-stat-arrow">›</span>
@@ -396,17 +388,17 @@ export default function StudentDashboard({ user, onNavigate }) {
                         color: "#64748B",
                       }}
                     >
-                      {billing.period || "/tháng"}
+                      {billing.period?.replace("/tháng", "/năm") || "/năm"}
                     </span>
                   </>
                 ) : (
-                  "400.000 đ /tháng"
+                  "0 đ"
                 )}
               </span>
               {billing ? (
                 <span className="student-stat-badge">{billing.status}</span>
               ) : (
-                <span className="student-stat-badge">Đã thanh toán</span>
+                <span className="student-stat-subtext">Chưa phát sinh</span>
               )}
             </div>
           </div>

@@ -51,48 +51,10 @@ export default function ProcessTransferPage({
 
         setRequestData(detail);
 
-        const tree = bedsData || [
-          {
-            ma_toa: 'A',
-            ten_toa: 'Tòa A',
-            rooms: [
-              {
-                ma_phong: 'A203',
-                so_phong: '203',
-                label: 'Phòng A203',
-                beds: [
-                  { ma_giuong: 'G01', label: 'Giường G01' },
-                  { ma_giuong: 'G02', label: 'Giường G02' },
-                  { ma_giuong: 'G04', label: 'Giường G04' },
-                ],
-              },
-              {
-                ma_phong: 'A204',
-                so_phong: '204',
-                label: 'Phòng A204',
-                beds: [
-                  { ma_giuong: 'G01', label: 'Giường G01' },
-                  { ma_giuong: 'G03', label: 'Giường G03' },
-                ],
-              },
-            ],
-          },
-          {
-            ma_toa: 'B',
-            ten_toa: 'Tòa B',
-            rooms: [
-              {
-                ma_phong: 'B101',
-                so_phong: '101',
-                label: 'Phòng B101',
-                beds: [{ ma_giuong: 'G01', label: 'Giường G01' }],
-              },
-            ],
-          },
-        ];
+        const tree = Array.isArray(bedsData) && bedsData.length > 0 ? bedsData : [];
         setBuildingTree(tree);
 
-        // Khớp Tòa - Phòng - Giường theo gợi ý hoặc chuẩn Figma (Tòa A, Phòng A203, Giường G04)
+        // Khớp Tòa - Phòng - Giường theo gợi ý
         if (tree.length > 0) {
           const targetBuilding =
             tree.find((b) => b.ma_toa === 'A' || b.ma_toa.includes('A')) || tree[0];
@@ -274,13 +236,13 @@ export default function ProcessTransferPage({
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
                     <span className="text-slate-600 font-medium">Họ và tên</span>
                     <span className="font-bold text-slate-900">
-                      {requestData?.ho_ten || 'Nguyễn Quốc Huy'}
+                      {requestData?.ho_ten || '—'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
                     <span className="text-slate-600 font-medium">Giới tính</span>
                     <span className="text-slate-900 font-medium">
-                      {requestData?.gioi_tinh || 'Nam'}
+                      {requestData?.gioi_tinh || '—'}
                     </span>
                   </div>
                 </div>
@@ -290,13 +252,13 @@ export default function ProcessTransferPage({
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
                     <span className="text-slate-600 font-medium">Vị trí hiện tại</span>
                     <span className="font-semibold text-slate-900">
-                      {requestData?.vi_tri_hien_tai || 'Phòng A102 - Giường G01'}
+                      {requestData?.vi_tri_hien_tai || (requestData?.phong_hien_tai ? `Phòng ${requestData.phong_hien_tai}` : 'Chưa xếp phòng')}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
                     <span className="text-slate-600 font-medium">Công nợ</span>
                     <span className="font-bold text-emerald-600">
-                      {requestData?.cong_no || 'Đã hoàn thành toàn bộ phí'}
+                      {requestData?.cong_no || 'Đã kiểm tra'}
                     </span>
                   </div>
                 </div>
@@ -309,7 +271,7 @@ export default function ProcessTransferPage({
                 Lý do xin chuyển
               </h3>
               <div className="border border-slate-200 rounded-lg p-4 text-sm text-slate-800 bg-white shadow-2xs leading-relaxed">
-                "{requestData?.mo_ta || requestData?.ly_do || 'Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học...'}"
+                "{requestData?.mo_ta || requestData?.ly_do || 'Không có mô tả chi tiết'}"
               </div>
             </div>
 

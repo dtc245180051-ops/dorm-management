@@ -50,17 +50,45 @@ export async function matchRoomWithGemini(studentInfo, candidateRooms = []) {
   // Thuật toán chọn phòng tối ưu ngoại tuyến (Fallback thông minh phân tích ngữ nghĩa nguyện vọng)
   const getSmartFallback = () => {
     const rawWish = [
-      studentInfo.tang_mong_muon,
       studentInfo.nguyen_vong,
       studentInfo.noi_dung_nguyen_vong,
       studentInfo.nguyen_vong_label,
       studentInfo.chi_tiet_nguyen_vong,
+      studentInfo.ma_toa_mong_muon,
+      studentInfo.nguyen_vong_phong,
+      studentInfo.tang_mong_muon,
     ]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
 
-    // Phân tích nguyện vọng tầng cao / tầng thấp từ văn bản tự do
+    // 1. Phân tích nguyện vọng Tòa nhà (ví dụ: "Tòa A1", "A1", "Tòa A", "Tòa B"...)
+    const wishesToaA1 = /tòa\s*a1\b|toa\s*a1\b|\ba1\b/i.test(rawWish) || String(studentInfo.ma_toa_mong_muon || "").toLowerCase().includes("a1");
+    const wishesToaA = !wishesToaA1 && (/tòa\s*a\b|toa\s*a\b|\ba\b/i.test(rawWish) || String(studentInfo.ma_toa_mong_muon || "").toLowerCase().startsWith("a"));
+    const wishesToaB = /tòa\s*b\b|toa\s*b\b|\bb\b/i.test(rawWish) || String(studentInfo.ma_toa_mong_muon || "").toLowerCase().startsWith("b");
+
+    const matchesBuildingWish = (room) => {
+      const rToa = String(room.toa || "").toLowerCase();
+      const rMa = String(room.ma_toa || "").toLowerCase();
+      if (wishesToaA1) {
+        return rToa.includes("a1") || rMa.includes("a1") || rMa.includes("toa_a1");
+      }
+      if (wishesToaA) {
+        return rToa.includes("a") || rMa.includes("a");
+      }
+      if (wishesToaB) {
+        return rToa.includes("b") || rMa.includes("b");
+      }
+      return true; // Không chỉ định tòa cụ thể
+    };
+
+    const hasExplicitBuildingWish = wishesToaA1 || wishesToaA || wishesToaB;
+
+    // 2. Phân tích nguyện vọng phòng cụ thể
+    const roomMatch = rawWish.match(/phòng\s*([0-9a-z_-]+)|p([0-9a-z_-]+)/i);
+    const specificRoom = roomMatch ? (roomMatch[1] || roomMatch[2]).toLowerCase() : "";
+
+    // 3. Phân tích nguyện vọng tầng cao / tầng thấp từ văn bản tự do
     const wantsHighFloor = /tầng\s*cao|trên\s*cao|tầng\s*[4-9]|lầu\s*cao|ở\s*cao|tầng\s*trên/i.test(rawWish);
     const wantsLowFloor = /tầng\s*thấp|tầng\s*1\b|tầng\s*trệt|ở\s*dưới|dưới\s*thấp|tầng\s*dưới/i.test(rawWish);
 
@@ -70,69 +98,71 @@ export async function matchRoomWithGemini(studentInfo, candidateRooms = []) {
       ? specificFloorMatch[1]
       : (studentInfo.tang_mong_muon ? String(studentInfo.tang_mong_muon).replace(/\D/g, "") : "");
 
-    // Sắp xếp danh sách phòng ứng viên theo mức độ ưu tiên tầng
-    let sortedRooms = [...eligibleRooms];
-    if (specificFloor) {
-      sortedRooms.sort((a, b) => {
-        const aMatch = String(a.so_tang) === specificFloor ? -1 : 1;
-        const bMatch = String(b.so_tang) === specificFloor ? -1 : 1;
-        return aMatch - bMatch;
-      });
-    } else if (wantsHighFloor) {
-      // Ưu tiên tầng cao nhất giảm dần (ví dụ: Tầng 5 -> Tầng 4 -> ...)
-      sortedRooms.sort((a, b) => Number(b.so_tang || 1) - Number(a.so_tang || 1));
-    } else if (wantsLowFloor) {
-      // Ưu tiên tầng thấp nhất tăng dần (ví dụ: Tầng 1 -> Tầng 2 -> ...)
-      sortedRooms.sort((a, b) => Number(a.so_tang || 1) - Number(b.so_tang || 1));
-    }
+    // 4. Tính điểm phù hợp đa tiêu chí cho từng phòng
+    const scoredRooms = eligibleRooms.map((room) => {
+      let score = 50;
+      const reasons = [];
 
-    // 1. Khớp cả Loại phòng & Tầng
-    const matchBoth = sortedRooms.find((r) => {
-      const typeOk =
-        !studentInfo.loai_phong ||
-        (r.loai_phong && r.loai_phong.toLowerCase() === studentInfo.loai_phong.toLowerCase());
-      let floorOk = true;
-      if (specificFloor) {
-        floorOk = String(r.so_tang) === specificFloor;
-      } else if (wantsHighFloor) {
-        floorOk = Number(r.so_tang || 1) >= 3;
-      } else if (wantsLowFloor) {
-        floorOk = Number(r.so_tang || 1) <= 2;
+      // Tiêu chí 1: Khớp Tòa nhà mong muốn (Ưu tiên hàng đầu)
+      if (hasExplicitBuildingWish) {
+        if (matchesBuildingWish(room)) {
+          score += 40;
+          reasons.push(`đúng nguyện vọng ${room.toa}`);
+        } else {
+          score -= 35; // Trừ điểm nặng nếu không đúng tòa sinh viên yêu cầu
+        }
       }
-      return typeOk && floorOk;
+
+      // Tiêu chí 2: Khớp Loại phòng
+      const targetType = studentInfo.loai_phong || (rawWish.includes("dịch vụ") ? "Phòng dịch vụ" : "Phòng tiêu chuẩn");
+      if (room.loai_phong && room.loai_phong.toLowerCase() === targetType.toLowerCase()) {
+        score += 20;
+        reasons.push(`loại phòng ${room.loai_phong}`);
+      }
+
+      // Tiêu chí 3: Khớp Tầng
+      const floorNum = Number(room.so_tang || 1);
+      if (specificFloor) {
+        if (String(floorNum) === specificFloor) {
+          score += 20;
+          reasons.push(`Tầng ${floorNum}`);
+        }
+      } else if (wantsHighFloor) {
+        if (floorNum >= 3) {
+          score += 12 + floorNum * 2;
+          reasons.push(`tầng cao (Tầng ${floorNum})`);
+        }
+      } else if (wantsLowFloor) {
+        if (floorNum <= 2) {
+          score += 12 + (3 - floorNum) * 2;
+          reasons.push(`tầng thấp (Tầng ${floorNum})`);
+        }
+      }
+
+      // Tiêu chí 4: Khớp số phòng cụ thể
+      if (specificRoom) {
+        const rSo = String(room.so_phong || "").toLowerCase();
+        const rMa = String(room.ma_phong || "").toLowerCase();
+        if (rSo === specificRoom || rMa.includes(specificRoom)) {
+          score += 30;
+          reasons.push(`đúng phòng ${room.so_phong || room.ma_phong}`);
+        }
+      }
+
+      return {
+        room,
+        score: Math.min(Math.max(score, 10), 99),
+        reason: `Đề xuất tối ưu theo hệ thống: Phòng ${room.so_phong || room.ten_phong} (${room.toa}) đáp ứng ${reasons.join(", ") || "tiêu chí KTX"}.`,
+      };
     });
 
-    if (matchBoth) {
-      let floorDesc = "";
-      if (wantsHighFloor) floorDesc = ` và nguyện vọng ở tầng cao (Tầng ${matchBoth.so_tang})`;
-      else if (wantsLowFloor) floorDesc = ` và nguyện vọng ở tầng thấp (Tầng ${matchBoth.so_tang})`;
-      else if (specificFloor) floorDesc = ` và nguyện vọng ở Tầng ${matchBoth.so_tang}`;
+    // Sắp xếp theo điểm số giảm dần
+    scoredRooms.sort((a, b) => b.score - a.score);
 
-      return {
-        room: matchBoth,
-        score: 95,
-        reason: `Đề xuất tối ưu theo hệ thống: Phòng ${matchBoth.so_phong || matchBoth.ten_phong} (${matchBoth.toa}) đáp ứng loại phòng ${matchBoth.loai_phong}${floorDesc}, giới tính ${studentInfo.gioi_tinh || ""}.`,
-      };
-    }
-
-    // 2. Khớp Loại phòng (vẫn theo thứ tự ưu tiên tầng đã sắp xếp)
-    const matchType = sortedRooms.find(
-      (r) =>
-        !studentInfo.loai_phong ||
-        (r.loai_phong && r.loai_phong.toLowerCase() === studentInfo.loai_phong.toLowerCase()),
-    );
-    if (matchType) {
-      return {
-        room: matchType,
-        score: 88,
-        reason: `Đề xuất tối ưu theo hệ thống: Phòng ${matchType.so_phong || matchType.ten_phong} (${matchType.toa}) phù hợp với loại phòng ${matchType.loai_phong} và giới tính ${studentInfo.gioi_tinh || ""}.`,
-      };
-    }
-
-    return {
-      room: sortedRooms[0],
+    return scoredRooms[0] || {
+      room: eligibleRooms[0],
       score: 80,
-      reason: `Đề xuất theo hệ thống: Phòng ${sortedRooms[0].so_phong || sortedRooms[0].ten_phong} (${sortedRooms[0].toa}) phù hợp với giới tính ${studentInfo.gioi_tinh || ""}.`,
+      reason: `Đề xuất theo hệ thống: Phòng ${eligibleRooms[0].so_phong || eligibleRooms[0].ten_phong} (${eligibleRooms[0].toa}).`,
     };
   };
 
@@ -156,7 +186,7 @@ export async function matchRoomWithGemini(studentInfo, candidateRooms = []) {
   try {
     const prompt = `
 Bạn là chuyên gia phân bổ chỗ ở Ký túc xá Đại học Công nghệ Thông tin & Truyền thông (ICTU).
-Nhiệm vụ: Phân tích thông tin sinh viên và chọn ra DUY NHẤT 1 phòng cùng 1 giường trống tối ưu nhất từ danh sách phòng ứng viên.
+Nhiệm vụ: Phân tích kỹ nguyện vọng sinh viên và chọn ra DUY NHẤT 1 phòng cùng 1 giường trống tối ưu nhất từ danh sách phòng ứng viên.
 
 1. THÔNG TIN SINH VIÊN:
 - Họ tên: ${studentInfo.ho_ten || studentInfo.fullName || ""} (Giới tính: ${studentInfo.gioi_tinh || studentInfo.gender || ""})
@@ -164,10 +194,11 @@ Nhiệm vụ: Phân tích thông tin sinh viên và chọn ra DUY NHẤT 1 phòn
 - Lớp: ${studentInfo.lop || studentInfo.className || ""}
 - Quê quán: ${studentInfo.que_quan || studentInfo.dia_chi || ""}
 
-2. NGUYỆN VỌNG ĐĂNG KÝ:
+2. NGUYỆN VỌNG ĐĂNG KÝ CỦA SINH VIÊN:
+- Nguyện vọng tự do: "${studentInfo.chi_tiet_nguyen_vong || studentInfo.nguyen_vong || studentInfo.noi_dung_nguyen_vong || studentInfo.nguyen_vong_label || "Không có mô tả thêm"}"
+- Tòa mong muốn: ${studentInfo.ma_toa_mong_muon || "Tự động phân tích từ nguyện vọng tự do"}
 - Loại phòng mong muốn: ${studentInfo.loai_phong || "Phòng tiêu chuẩn"}
 - Tầng mong muốn: ${studentInfo.tang_mong_muon || "Không chỉ định"}
-- Chi tiết nguyện vọng tự do: "${studentInfo.chi_tiet_nguyen_vong || studentInfo.nguyen_vong || studentInfo.noi_dung_nguyen_vong || "Không có mô tả thêm"}"
 
 3. DANH SÁCH PHÒNG CÒN CHỖ TRỐNG (ĐÃ ĐƯỢC LỌC ĐÚNG THEO GIỚI TÍNH):
 ${JSON.stringify(
@@ -185,36 +216,44 @@ ${JSON.stringify(
   2,
 )}
 
-4. QUY TẮC ƯU TIÊN TUYỆT ĐỐI:
-- Ưu tiên 1: Khớp đúng Giới tính và Loại phòng (Phòng tiêu chuẩn / Phòng dịch vụ).
-- Ưu tiên 2: PHÂN TÍCH KỸ NGUYỆN VỌNG TỰ DO CỦA SINH VIÊN VỀ TẦNG:
-  + Nếu sinh viên mong muốn ở "tầng cao", "trên cao", "ở trên": BẮT BUỘC ưu tiên chọn phòng ở tầng cao nhất có thể (ví dụ: Tầng 5, Tầng 4). TUYỆT ĐỐI KHÔNG xếp phòng tầng 1 khi có phòng tầng cao.
-  + Nếu sinh viên mong muốn ở "tầng thấp", "tầng 1", "ở dưới": Ưu tiên chọn tầng thấp nhất (Tầng 1, Tầng 2).
-  + Nếu sinh viên mong muốn số tầng cụ thể: Ưu tiên chọn đúng tầng đó.
-- Ưu tiên 3: Ưu tiên cùng Khoa/Ngành hoặc cùng quê quán, tối ưu tỷ lệ lấp đầy phòng.
+4. QUY TẮC ƯU TIÊN TUYỆT ĐỐI THEO NGUYỆN VỌNG:
+- Ưu tiên 1 (CỰC KỲ QUAN TRỌNG): NGUYỆN VỌNG TỰ DO VỀ TÒA NHÀ & PHÒNG CỤ THỂ:
+  + Nếu nguyện vọng tự do ghi rõ tên tòa (ví dụ: "TÒA A1 Ạ", "Tòa A1", "tòa a", "tòa B"...): BẮT BUỘC phải ưu tiên chọn phòng thuộc tòa mà sinh viên ghi! TUYỆT ĐỐI KHÔNG xếp sang tòa khác khi tòa đó còn phòng trống.
+  + Nếu có nguyện vọng phòng cụ thể: Ưu tiên chọn đúng phòng đó nếu còn giường.
+- Ưu tiên 2: NGUYỆN VỌNG VỀ TẦNG:
+  + Nếu muốn "tầng cao", "trên cao": Chọn phòng ở tầng cao nhất có thể (Tầng 4, Tầng 5).
+  + Nếu muốn "tầng thấp", "tầng 1", "ở dưới": Chọn tầng thấp nhất (Tầng 1, Tầng 2).
+- Ưu tiên 3: Khớp đúng Loại phòng (Phòng tiêu chuẩn / Phòng dịch vụ).
+- Ưu tiên 4: Tối ưu tỷ lệ lấp đầy phòng.
 
 Trả về kết quả ở định dạng JSON thuần túy (không kèm markdown \`\`\`json):
 {
-  "best_room_id": "Mã phòng hoặc Tên phòng (ví dụ: A4_T5_P501 hoặc Phòng 501)",
-  "toa": "Tên tòa (ví dụ: Tòa A4 hoặc A4)",
-  "giuong": "Mã giường hoặc Tên giường trống (ví dụ: A4_T5_P501_G01 hoặc Giường G01)",
+  "best_room_id": "Mã phòng hoặc Tên phòng (ví dụ: P101_A1 hoặc Phòng 101)",
+  "toa": "Tên tòa (ví dụ: Tòa A1 hoặc Tòa B)",
+  "giuong": "Mã giường hoặc Tên giường trống (ví dụ: P101_A1_G03 hoặc Giường G03)",
   "match_score": 95,
-  "ai_reason": "Giải thích ngắn gọn 1-2 câu lý do xếp phòng này (nhấn mạnh sự phù hợp giới tính, loại phòng và đáp ứng đúng nguyện vọng tầng cao/thấp)"
+  "ai_reason": "Giải thích ngắn gọn 1-2 câu lý do xếp phòng này (nhấn mạnh đáp ứng đúng nguyện vọng tòa nhà/tầng/loại phòng của sinh viên)"
 }
 `;
 
     let response;
-    try {
-      response = await ai.models.generateContent({
-        model: "gemini-3.5-flash-lite",
-        contents: prompt,
-      });
-    } catch (modelErr) {
-      console.warn("Thử model gemini-3.5-flash-lite thất bại, thử lại gemini-3.8-flash:", modelErr);
-      response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: prompt,
-      });
+    const modelCandidates = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    let lastError = null;
+
+    for (const m of modelCandidates) {
+      try {
+        response = await ai.models.generateContent({
+          model: m,
+          contents: prompt,
+        });
+        if (response?.text) break;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    if (!response?.text) {
+      throw lastError || new Error("Không thể kết nối mô hình AI");
     }
 
     const cleanText = response.text
@@ -230,7 +269,7 @@ Trả về kết quả ở định dạng JSON thuần túy (không kèm markdow
       ai_reason: parsed.ai_reason || fallbackReason,
     };
   } catch (error) {
-    console.error("Lỗi khi gọi Gemini AI Matching:", error);
+    console.warn("Gemini AI matching fallback:", error);
     return {
       best_room_id: fallbackRoom.ma_phong || fallbackRoom.ten_phong,
       toa: fallbackRoom.toa,
@@ -241,10 +280,51 @@ Trả về kết quả ở định dạng JSON thuần túy (không kèm markdow
   }
 }
 
+/**
+ * Tri thức nghiệp vụ KTX dự phòng thông minh khi offline hoặc hết quota API
+ */
+function getSmartLocalChatbotReply(question) {
+  const q = String(question || "").toLowerCase().trim();
+
+  if (/giờ|mở cổng|đóng cổng|giới nghiêm|về muộn/i.test(q)) {
+    return "⏰ Giờ đóng/mở cổng KTX ICTU:\n- Mùa hè: Mở cổng lúc 05:00, đóng cổng giới nghiêm lúc 23:00.\n- Mùa đông: Mở cổng lúc 05:30, đóng cổng lúc 22:30.\nNếu về muộn vì lý do học tập, bạn cần xuất trình thẻ sinh viên cho cán bộ trực ký túc xá nhé!";
+  }
+
+  if (/nấu ăn|bếp|bếp từ|gas/i.test(q)) {
+    return "🍳 Quy định nấu ăn: Nhằm đảm bảo an toàn phòng cháy chữa cháy, KTX nghiêm cấm nấu ăn bằng bếp gas, bếp từ công suất lớn trong phòng ở. Bạn có thể sử dụng khu vực bếp chung hoặc nhà ăn KTX nhé!";
+  }
+
+  if (/chuyển phòng|đổi phòng|trả phòng/i.test(q)) {
+    return "🔄 Thủ tục chuyển / trả phòng:\nBạn chỉ cần vào mục 'Chuyển / trả phòng' trên menu bên trái, chọn tab Chuyển phòng hoặc Trả phòng, điền lý do và gửi đơn. Ban Quản lý sẽ xét duyệt trực tuyến trong vòng 24 - 48h.";
+  }
+
+  if (/tiền phòng|điện nước|thanh toán|học phí|vietqr|ngân hàng|chi phí/i.test(q)) {
+    return "💳 Thanh toán chi phí KTX:\n- Tiền phòng và tiền điện nước được thanh toán trực tuyến qua mã VietQR tại mục 'Thanh toán phí KTX'.\n- Hạn thanh toán định kỳ: Trước ngày 15 hàng tháng.\n- Hệ thống đối soát tự động cập nhật trạng thái 'Đã hoàn tất' ngay khi ngân hàng khớp lệnh.";
+  }
+
+  if (/hỏng|sự cố|báo hỏng|cháy bóng|mất nước|mất điện|sửa chữa|tắc cống/i.test(q)) {
+    return "🛠️ Báo cáo sự cố cơ sở vật chất:\nBạn hãy vào mục 'Gửi phản ánh' trên thanh menu, nhập mô tả sự cố (kèm hình ảnh nếu có). Trợ lý AI sẽ tự động phân loại và gửi kỹ thuật viên đến sửa chữa ngay cho phòng bạn.";
+  }
+
+  if (/đăng ký|thủ tục ở|thuê phòng|vào ở/i.test(q)) {
+    return "📝 Đăng ký nội trú KTX:\nSinh viên thực hiện nộp đơn tại mục 'Đăng ký phòng'. Hệ thống AI sẽ tự động phân tích nguyện vọng (loại phòng, tầng, giới tính) và gợi ý xếp phòng tối ưu nhất cho bạn.";
+  }
+
+  if (/thú cưng|chó|mèo|động vật/i.test(q)) {
+    return "🐾 Quy định nuôi thú cưng: Theo nội quy Ký túc xá ICTU, sinh viên không được phép nuôi chó, mèo hoặc bất kỳ động vật nào trong phòng nhằm đảm bảo vệ sinh và mỹ quan chung.";
+  }
+
+  if (/liên hệ|hotline|số điện thoại|ban quản lý|văn phòng/i.test(q)) {
+    return "📞 Ban Quản lý KTX ICTU:\n- Địa chỉ: Đường Z115, xã Quyết Thắng, TP. Thái Nguyên\n- Hotline hỗ trợ: 0208.3846.254\n- Giờ hành chính: 08:00 - 17:00 từ Thứ 2 đến Thứ 6.";
+  }
+
+  return "Chào bạn! Mình là Trợ lý AI KTX ICTU. Mình có thể hỗ trợ bạn về:\n- ⏰ Giờ giấc giới nghiêm & đóng/mở cổng KTX\n- 📝 Thủ tục đăng ký, chuyển phòng, trả phòng\n- 💳 Hướng dẫn thanh toán tiền phòng & điện nước qua VietQR\n- 🛠️ Hướng dẫn gửi phản ánh hỏng hóc, sửa chữa điện nước\nBạn có câu hỏi cụ thể nào về KTX không?";
+}
+
 //** 2. HÀM TRẢ LỜI CHATBOT TƯ VẤN KTX */
 export async function askGeminiChatbot(userMessage, conversationHistory = []) {
-  if (!apiKey) {
-    return "Hệ thống AI đang bảo trì hoặc chưa cấu hình API Key. Bạn vui lòng liên hệ Ban Quản lý KTX nhé!";
+  if (!apiKey || !ai) {
+    return getSmartLocalChatbotReply(userMessage);
   }
 
   try {
@@ -260,16 +340,30 @@ Câu hỏi của sinh viên: "${userMessage}"
 Hãy trả lời sinh viên:
 `;
 
-    // Gọi generateContent trực tiếp với prompt tổng hợp
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash-lite",
-      contents: prompt,
-    });
+    const modelCandidates = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    let reply = "";
 
-    return response.text;
+    for (const m of modelCandidates) {
+      try {
+        const response = await ai.models.generateContent({
+          model: m,
+          contents: prompt,
+        });
+        if (response?.text) {
+          reply = response.text;
+          break;
+        }
+      } catch (err) {
+        // Thử model kế tiếp
+      }
+    }
+
+    if (reply) {
+      return reply;
+    }
+    return getSmartLocalChatbotReply(userMessage);
   } catch (error) {
-    console.error("Lỗi Chatbot Gemini chi tiết:", error);
-    // Trả về câu thông báo có kèm thông điệp lỗi để dễ debug nếu muốn
-    return `Đã xảy ra lỗi khi gọi AI: ${error.message || "Vui lòng kiểm tra tab Console (F12)"}`;
+    console.warn("Chatbot Gemini API error, fallback to smart reply:", error);
+    return getSmartLocalChatbotReply(userMessage);
   }
 }

@@ -73,8 +73,24 @@ export default function ProcessRegistrationPage({
 
         // Khớp Tòa, Phòng, Giường với cây dữ liệu thực tế
         if (tree.length > 0) {
-          // 1. Tìm tòa khớp với gợi ý hoặc tòa phù hợp giới tính sinh viên
+          const rawWish = [
+            detail?.nguyen_vong,
+            detail?.noi_dung_nguyen_vong,
+            detail?.nguyen_vong_label,
+            detail?.chi_tiet_nguyen_vong,
+            detail?.ma_toa_mong_muon,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+
+          const wantsA1 = /tòa\s*a1\b|toa\s*a1\b|\ba1\b/i.test(rawWish) || String(detail?.ma_toa_mong_muon || "").toLowerCase().includes("a1");
+          const wantsB = /tòa\s*b\b|toa\s*b\b|\bb\b/i.test(rawWish) || String(detail?.ma_toa_mong_muon || "").toLowerCase().startsWith("b");
+
+          // 1. Tìm tòa khớp với nguyện vọng hoặc tòa phù hợp giới tính sinh viên
           const targetBuilding =
+            (wantsA1 && tree.find((b) => String(b.ma_toa).toLowerCase().includes("a1") || String(b.ten_toa).toLowerCase().includes("a1"))) ||
+            (wantsB && tree.find((b) => String(b.ma_toa).toLowerCase().includes("b") || String(b.ten_toa).toLowerCase().includes("b"))) ||
             tree.find((b) => b.ma_toa === detail?.goi_y?.ma_toa) ||
             tree.find(
               (b) =>
@@ -164,7 +180,9 @@ export default function ProcessRegistrationPage({
               recToa === bMa ||
               recToa === bTen ||
               recToa.includes(bMa) ||
-              bTen.includes(recToa)
+              bTen.includes(recToa) ||
+              (recToa.includes("a1") && (bMa.includes("a1") || bTen.includes("a1"))) ||
+              (recToa.includes("b") && (bMa.includes("b") || bTen.includes("b")))
             );
           }) ||
           buildingTree.find((b) =>
@@ -636,9 +654,17 @@ export default function ProcessRegistrationPage({
 
             {/* 4. GỢI Ý XẾP CHỖ CỦA HỆ THỐNG (3 DROPDOWN LIÊN HOÀN) */}
             <div>
-              <h2 className="text-base font-bold text-slate-900 mb-3">
-                Gợi ý xếp chỗ của hệ thống
-              </h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base font-bold text-slate-900">
+                  Gợi ý xếp chỗ của hệ thống
+                </h2>
+                {isMatching && (
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 animate-pulse">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Đang khớp nguyện vọng...
+                  </span>
+                )}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Dropdown 1: Tòa */}
                 <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg hover:border-slate-300 transition">
@@ -703,20 +729,6 @@ export default function ProcessRegistrationPage({
                   </div>
                 </div>
               </div>
-              {(isMatching || aiRecommendation) && (
-                <div className="mt-3 flex items-start gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3.5 py-3 text-sm text-violet-900">
-                  {isMatching ? (
-                    <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
-                  ) : (
-                    <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
-                  )}
-                  <span>
-                    {isMatching
-                      ? "Gemini AI đang phân tích phương án xếp chỗ..."
-                      : `Gemini AI (Độ phù hợp: ${aiRecommendation.match_score}%): ${aiRecommendation.ai_reason}`}
-                  </span>
-                </div>
-              )}
             </div>
 
             {/* BỘ 2 NÚT HÀNH ĐỘNG DƯỚI CÙNG THEO CHUẨN FIGMA */}

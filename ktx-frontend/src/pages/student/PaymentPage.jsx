@@ -289,18 +289,20 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
 
       // 2. Tải danh sách hóa đơn từ backend API hoặc fallback local account
       let fetchedInvoices = [];
+      let isApiFetched = false;
 
       try {
         const backendInvoices = await invoiceService.getMyInvoices(currentCode);
-        if (Array.isArray(backendInvoices) && backendInvoices.length > 0) {
+        if (Array.isArray(backendInvoices)) {
           fetchedInvoices = backendInvoices;
+          isApiFetched = true;
         }
       } catch (err) {
         console.warn("Lỗi tải hóa đơn từ backend:", err);
       }
 
-      // Fallback tìm trong account bills nếu chưa có từ API
-      if (fetchedInvoices.length === 0 && Array.isArray(acc?.bills) && acc.bills.length > 0) {
+      // Chỉ fallback tìm trong account bills nếu backend API lỗi kết nối
+      if (!isApiFetched && Array.isArray(acc?.bills) && acc.bills.length > 0) {
         fetchedInvoices = acc.bills;
       }
 
@@ -465,7 +467,7 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
 
     window.dispatchEvent(new CustomEvent("ktx-payment-updated"));
     setToastMessage(
-      `Đã ghi nhận giao dịch cho ${selectedInvoice.name}! Ban Quản lý sẽ đối soát và gạch nợ tự động trong 1-3 phút.`,
+      `Đã ghi nhận giao dịch cho ${selectedInvoice.name}! Kế toán sẽ đối soát và gạch nợ tự động trong 1-3 phút.`,
     );
   };
 
@@ -786,7 +788,7 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
                     ) : (
                       <span className="text-xs font-semibold text-amber-700 bg-amber-100/80 px-4 py-2.5 rounded-xl inline-flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
-                        Đang chờ Ban Quản lý đối soát và gạch nợ
+                        Đang chờ Kế toán đối soát và gạch nợ
                       </span>
                     )}
                   </div>

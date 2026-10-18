@@ -62,7 +62,7 @@ const getAssignedRoom = (record) => {
       record.goi_y?.ma_giuong ||
       roomDetails.ma_giuong ||
       roomObject.ma_giuong ||
-      "G01",
+      "",
     so_giuong:
       (
         record.so_giuong ||
@@ -71,28 +71,28 @@ const getAssignedRoom = (record) => {
         roomDetails.so_giuong ||
         roomObject.so_giuong ||
         record.ma_giuong ||
-        "G01"
+        ""
       )
         .toString()
         .split("_")
-        .pop() || "G01",
+        .pop() || "",
     giuong:
       (
         record.giuong ||
         record.so_giuong ||
         record.ma_giuong ||
-        "G01"
+        ""
       )
         .toString()
         .split("_")
-        .pop() || "G01",
+        .pop() || "",
     tang:
       record.so_tang ||
       record.tang ||
       roomDetails.so_tang ||
       roomDetails.tang ||
       roomObject.tang ||
-      5,
+      null,
     toa:
       record.toa_hien_tai ||
       record.toa_nha ||
@@ -103,7 +103,7 @@ const getAssignedRoom = (record) => {
       roomDetails.toa_nha ||
       roomDetails.ma_toa ||
       roomObject.toa ||
-      "Tòa A4",
+      "",
   };
 };
 
@@ -190,10 +190,21 @@ export async function resolveStudentStatus(studentMsv) {
     studentMsv ||
     localStorage.getItem("ktx_username") ||
     localStorage.getItem("ktx_email")?.split("@")[0] ||
-    "dtc245180051"
+    ""
   )
     .trim()
     .toLowerCase();
+
+  if (!code) {
+    return {
+      status: STUDENT_STATUS.NOT_REGISTERED,
+      stage: 1,
+      studentInfo: { msv: "", ho_ten: "Sinh viên", trang_thai_o: "CHUA_XEP" },
+      activeRoom: null,
+      latestRequest: null,
+      account: null,
+    };
+  }
 
   // 1. Kiểm tra nguồn chân lý chuẩn hóa: studentAccountService
   const account = getStudentAccount(code);
