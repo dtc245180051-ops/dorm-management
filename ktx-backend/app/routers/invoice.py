@@ -46,7 +46,7 @@ def get_room_candidates(
         None,
         description="Phạm vi áp dụng (Tất cả hoặc sinh viên tòa A1 đến A11)",
     ),
-    current_user: TaiKhoan = Depends(require_ke_toan),
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     """
@@ -70,7 +70,7 @@ def get_room_candidates(
 )
 def publish_room_invoices(
     payload: RoomInvoicePublishRequest,
-    current_user: TaiKhoan = Depends(require_ke_toan),
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     """
@@ -78,10 +78,11 @@ def publish_room_invoices(
     Tạo và phát hành hóa đơn tiền phòng định kỳ cho sinh viên.
     Kiểm tra ngăn chặn tạo trùng lặp hóa đơn cho cùng đối tượng trong cùng kỳ.
     """
+    creator = current_user.ten_dang_nhap if current_user else "KeToan"
     return InvoiceService.publish_room_invoices(
         db=db,
         request=payload,
-        creator_username=current_user.ten_dang_nhap,
+        creator_username=creator,
     )
 
 
@@ -95,7 +96,7 @@ def get_utility_candidates(
         "Tháng 09/2026",
         description="Tháng cần lập hóa đơn điện nước",
     ),
-    current_user: TaiKhoan = Depends(require_ke_toan),
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     """
@@ -116,7 +117,7 @@ def get_utility_candidates(
 )
 def publish_utility_invoices(
     payload: UtilityInvoicePublishRequest,
-    current_user: TaiKhoan = Depends(require_ke_toan),
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     """
@@ -124,10 +125,11 @@ def publish_utility_invoices(
     Tạo và phát hành hóa đơn điện nước cho các phòng ký túc xá theo tháng.
     Kiểm tra ngăn chặn tạo trùng lặp hóa đơn cho cùng phòng trong cùng tháng.
     """
+    creator = current_user.ten_dang_nhap if current_user else "KeToan"
     return InvoiceService.publish_utility_invoices(
         db=db,
         request=payload,
-        creator_username=current_user.ten_dang_nhap,
+        creator_username=creator,
     )
 
 
@@ -247,41 +249,78 @@ def get_student_my_invoices(
     if active_hd and active_hd.giuong:
         ma_phong = active_hd.giuong.ma_phong
 
-    conditions = [HoaDon.msv.ilike(student_msv)]
-    if ma_phong:
-        conditions.append(and_(HoaDon.ma_phong == ma_phong, HoaDon.loai_hoa_don == "DIEN_NUOC", HoaDon.msv.is_(None)))
-
-    raw_invoices = (
+    # Lấy các hóa đơn phát hành trực tiếp cho sinh viên này
+    student_invoices = (
         db.query(HoaDon)
-        .filter(or_(*conditions))
+        .filter(HoaDon.msv.ilike(student_msv))
         .order_by(HoaDon.han_thanh_toan.desc(), HoaDon.ngay_tao.desc())
         .all()
     )
 
-    # Đếm số người ở thực tế trong phòng để chia đều nếu còn hóa đơn điện nước chung
-    occupants_count = 1
-    if ma_phong:
-        occupants_count = max(
-            1,
-            db.query(HopDong)
-            .join(Giuong, HopDong.ma_giuong == Giuong.ma_giuong)
-            .filter(Giuong.ma_phong == ma_phong, HopDong.trang_thai == "ACTIVE")
-            .count()
+    invoices = list(student_invoices)
+
+    # Trong trường hợp có hóa đơn chung cả phòng (msv is None):
+    # Tuyệt đối không gán hóa đơn cho sinh viên mới đăng ký nếu hóa đơn thuộc kỳ cũ trước khi sinh viên dọn vào ở.
+    # Chỉ chia sẻ cho sinh viên nếu:
+    # 1. Sinh viên có hợp đồng ACTIVE tại phòng này
+    # 2. Sinh viên đã ở trong phòng tại thời điểm phát hành hóa đơn (ngay_tao >= ngay_bat_dau)
+    # 3. Kỳ thanh toán của hóa đơn không phải là kỳ trước thời điểm sinh viên bắt đầu ở
+    if ma_phong and active_hd and active_hd.ngay_bat_dau:
+        import datetime
+        import re
+
+        room_invoices = (
+            db.query(HoaDon)
+            .filter(
+                HoaDon.ma_phong == ma_phong,
+                HoaDon.loai_hoa_don == "DIEN_NUOC",
+                HoaDon.msv.is_(None),
+            )
+            .order_by(HoaDon.han_thanh_toan.desc(), HoaDon.ngay_tao.desc())
+            .all()
         )
 
-    invoices = []
-    for inv in raw_invoices:
-        if inv.loai_hoa_don == "DIEN_NUOC" and inv.msv is None:
-            # Hóa đơn chung của cả phòng -> Tự động tính số tiền cá nhân theo đầu người
-            split_amount = round(float(inv.so_tien) / occupants_count)
-            inv_dict = {
-                c.name: getattr(inv, c.name) for c in inv.__table__.columns
-            }
-            inv_dict["so_tien"] = split_amount
-            inv_dict["msv"] = student_msv
-            invoices.append(HoaDonResponse(**inv_dict))
-        else:
-            invoices.append(inv)
+        c_start = active_hd.ngay_bat_dau
+        if isinstance(c_start, datetime.datetime):
+            c_start = c_start.date()
+
+        valid_room_invoices = []
+        for inv in room_invoices:
+            inv_date = inv.ngay_tao or inv.ngay_lap
+            if inv_date:
+                if isinstance(inv_date, datetime.datetime):
+                    inv_date = inv_date.date()
+                if inv_date < c_start:
+                    continue
+
+            # Kiểm tra kỳ thanh toán ví dụ "Tháng 09/2026"
+            if inv.ky_thanh_toan:
+                match = re.search(r"(\d{1,2})[/-](\d{4})", inv.ky_thanh_toan)
+                if match:
+                    inv_month = int(match.group(1))
+                    inv_year = int(match.group(2))
+                    if (inv_year, inv_month) < (c_start.year, c_start.month):
+                        continue
+
+            valid_room_invoices.append(inv)
+
+        if valid_room_invoices:
+            occupants_count = max(
+                1,
+                db.query(HopDong)
+                .join(Giuong, HopDong.ma_giuong == Giuong.ma_giuong)
+                .filter(Giuong.ma_phong == ma_phong, HopDong.trang_thai == "ACTIVE")
+                .count(),
+            )
+
+            for inv in valid_room_invoices:
+                split_amount = round(float(inv.so_tien) / occupants_count)
+                inv_dict = {
+                    c.name: getattr(inv, c.name) for c in inv.__table__.columns
+                }
+                inv_dict["so_tien"] = split_amount
+                inv_dict["msv"] = student_msv
+                invoices.append(HoaDonResponse(**inv_dict))
 
     return invoices
 

@@ -49,17 +49,26 @@ const getPreviousMonthLabel = () => {
   return MONTH_OPTIONS.includes(label) ? label : MONTH_OPTIONS[0];
 };
 
+// Năm học thực tế hiện tại, ví dụ hôm nay 19/10/2026 -> "2026 - 2027"
+const getCurrentSchoolYear = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1;
+  return month >= 8 ? `${year} - ${year + 1}` : `${year - 1} - ${year}`;
+};
+
 export default function PeriodicBilling({ searchTerm = '' }) {
   // Tab hiện tại: 'room' | 'utility'
   const [activeTab, setActiveTab] = useState('room');
 
-  // Form tiền phòng theo tháng (mặc định: tháng trước)
-  const billingMonth = useMemo(getPreviousMonthLabel, []);
+  // Form tiền phòng theo năm: Năm học thực tế hiện tại (fix cứng ví dụ: 2026 - 2027)
+  const schoolYear = useMemo(() => getCurrentSchoolYear(), []);
+  const billingYear = useMemo(() => `Năm học ${schoolYear}`, [schoolYear]);
   const [appliedTarget, setAppliedTarget] = useState('Tất cả phòng (Tiêu chuẩn & Dịch vụ)');
   const [deadline, setDeadline] = useState(() => getDefaultDeadline());
 
-  // Form điện nước theo tháng (mặc định: tháng trước)
-  const utilityMonth = useMemo(getPreviousMonthLabel, []);
+  // Form điện nước theo tháng: Cho phép chọn kỳ lập hóa đơn
+  const [utilityMonth, setUtilityMonth] = useState(() => getPreviousMonthLabel());
   const [utilityTarget, setUtilityTarget] = useState('Tất cả các phòng đang có sinh viên');
   const [utilityDeadline, setUtilityDeadline] = useState(() => getDefaultDeadline());
   const [elecRate] = useState('3.500 VND/kWh');
@@ -112,24 +121,24 @@ export default function PeriodicBilling({ searchTerm = '' }) {
     setter(value);
   };
 
-  // 1. Tải danh sách ứng viên tiền phòng từ Backend API khi thay đổi tham số (tháng, phạm vi loại phòng)
+  // 1. Tải danh sách ứng viên tiền phòng từ Backend API khi thay đổi tham số (năm học, phạm vi loại phòng)
   const loadRoomCandidates = useCallback(async () => {
     let list = [];
-    const data = await invoiceService.getRoomCandidates(billingMonth, 1, undefined, appliedTarget);
+    const data = await invoiceService.getRoomCandidates(billingYear, 11, undefined, appliedTarget);
     if (data !== null && Array.isArray(data)) {
       list = data.map((c) => {
         const isService =
           String(c.loai_phong || '').toLowerCase().includes('dịch vụ') ||
           String(c.loai_phong || '').toLowerCase().includes('dich vu');
         const roomTypeLabel = c.loai_phong || (isService ? 'Phòng dịch vụ' : 'Phòng tiêu chuẩn');
-        const unitPrice = Number(c.don_gia_thang || 0);
-        const finalAmount = Number(c.so_tien ?? unitPrice);
+        const annualPrice = isService ? 8200000 : 4800000;
+        const finalAmount = Number(c.so_tien ?? annualPrice);
         return {
           id: c.msv,
           name: c.ho_ten,
           room: c.phong,
           roomType: roomTypeLabel,
-          monthlyPrice: Number(c.don_gia_thang || 0),
+          monthlyPrice: Number(c.don_gia_thang || (isService ? 745455 : 436364)),
           rawAmount: finalAmount,
           contractTerm: c.thoi_han_hop_dong || '',
           termAmount: `${finalAmount.toLocaleString('vi-VN')} VND`,
@@ -151,17 +160,19 @@ export default function PeriodicBilling({ searchTerm = '' }) {
           (s) => s.id?.toLowerCase() === studentId.toLowerCase()
         );
         if (!alreadyExists && studentId) {
-          const roomTypeLabel = acc.currentResidence.roomType || 'Phòng tiêu chuẩn';
-          const monthlyPrice = roomTypeLabel.includes('dịch vụ') ? 800000 : 400000;
+          const rawLoai = String(acc.currentResidence.roomType || '').toLowerCase();
+          const isService = rawLoai.includes('dịch vụ') || rawLoai.includes('dich vu');
+          const roomTypeLabel = isService ? 'Phòng dịch vụ' : 'Phòng tiêu chuẩn';
+          const annualPrice = isService ? 8200000 : 4800000;
           list.unshift({
             id: studentId.toUpperCase(),
             name: acc.fullName || localStorage.getItem('ktx_fullname') || 'Sinh viên KTX',
             room: `P${acc.currentResidence.roomNumber}`,
             roomType: roomTypeLabel,
-            monthlyPrice,
-            rawAmount: monthlyPrice,
-            contractTerm: `${acc.currentResidence.startDate || '01/10/2026'} – ${acc.currentResidence.endDate || '30/06/2027'}`,
-            termAmount: `${monthlyPrice.toLocaleString('vi-VN')} VND`,
+            monthlyPrice: isService ? 745455 : 436364,
+            rawAmount: annualPrice,
+            contractTerm: `${acc.currentResidence.startDate || '19/10/2026'} – ${acc.currentResidence.endDate || '19/10/2027'}`,
+            termAmount: `${annualPrice.toLocaleString('vi-VN')} VND`,
             daLapHoaDon: false,
           });
         }
@@ -171,7 +182,7 @@ export default function PeriodicBilling({ searchTerm = '' }) {
     }
 
     setRoomStudents(list);
-  }, [billingMonth, appliedTarget]);
+  }, [billingYear, appliedTarget]);
 
   // 2. Khi đổi tháng điện nước, khôi phục cache nếu tháng đó đã nạp file, ngược lại reset rỗng
   useEffect(() => {
@@ -197,10 +208,12 @@ export default function PeriodicBilling({ searchTerm = '' }) {
     window.addEventListener('occupancy-updated', handleUpdate);
     window.addEventListener('student-account-updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
+    window.addEventListener('focus', handleUpdate);
     return () => {
       window.removeEventListener('occupancy-updated', handleUpdate);
       window.removeEventListener('student-account-updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
+      window.removeEventListener('focus', handleUpdate);
     };
   }, [loadRoomCandidates]);
 
@@ -353,17 +366,16 @@ export default function PeriodicBilling({ searchTerm = '' }) {
     try {
       if (activeTab === 'room') {
         const payload = {
-          ky_thanh_toan: billingMonth,
+          ky_thanh_toan: billingYear,
           ap_dung: appliedTarget,
-          thoi_gian_o_thang: 1,
-
+          thoi_gian_o_thang: 11,
           han_thanh_toan: deadline,
-          ghi_chu: `Phát hành hóa đơn tiền phòng ${billingMonth} (${appliedTarget})`,
+          ghi_chu: `Phát hành hóa đơn tiền phòng ${billingYear} (${appliedTarget})`,
         };
 
         const result = await invoiceService.publishRoomInvoices(payload);
         if (result.success) {
-          setToastMessage(result.data?.message || `Đã phát hành thành công hóa đơn tiền phòng ${billingMonth}!`);
+          setToastMessage(result.data?.message || `Đã phát hành thành công hóa đơn tiền phòng ${billingYear}!`);
           loadRoomCandidates();
         } else {
           setToastMessage(`Lỗi: ${result.message}`);
@@ -430,13 +442,13 @@ export default function PeriodicBilling({ searchTerm = '' }) {
 
       {/* ================= TABS ================= */}
       <div className="billing-tabs-container">
-        {/* Tab 1: HÓA ĐƠN TIỀN PHÒNG THEO THÁNG */}
+        {/* Tab 1: HÓA ĐƠN TIỀN PHÒNG THEO NĂM */}
         <button
           type="button"
           className={`billing-tab-btn ${activeTab === 'room' ? 'active' : 'inactive'}`}
           onClick={() => setActiveTab('room')}
         >
-          HÓA ĐƠN TIỀN PHÒNG THEO THÁNG
+          HÓA ĐƠN TIỀN PHÒNG THEO NĂM
         </button>
 
         {/* Tab 2: HÓA ĐƠN TIỀN ĐIỆN NƯỚC THEO THÁNG */}
@@ -451,20 +463,23 @@ export default function PeriodicBilling({ searchTerm = '' }) {
 
       {/* ================= FORM CONTROLS ================= */}
       {activeTab === 'room' ? (
-        /* Cấu hình tiền phòng theo tháng */
+        /* Cấu hình tiền phòng theo năm */
         <div className="billing-form-grid">
           {/* Cột trái */}
           <div className="billing-form-col">
-            {/* Chọn tháng */}
-            <div className="billing-control-box">
-              <input
-                type="text"
-                className="billing-input"
-                value={`Chọn tháng: ${billingMonth.replace('Tháng ', '')}`}
-                readOnly
-                style={{ cursor: 'not-allowed' }}
-                title="Chỉ được lập hóa đơn cho tháng trước"
-              />
+            {/* 1. Năm học thực tế hiện tại (fix cứng theo yêu cầu) */}
+            <div className="billing-control-box readonly-box" title={`Năm học thực tế hiện tại: ${schoolYear}`}>
+              <span className="billing-static-text">
+                Năm học: {schoolYear}
+              </span>
+              <span className="billing-box-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+              </span>
             </div>
 
             {/* Áp dụng: Chỉ áp dụng cho phòng tiêu chuẩn và phòng dịch vụ */}
@@ -525,15 +540,34 @@ export default function PeriodicBilling({ searchTerm = '' }) {
             </div>
           </div>
 
-          {/* Cột phải: Đơn giá niêm yết cố định & Tổng giá trị đợt phát hành */}
+          {/* Cột phải: 2 ô thông tin giá phòng cố định (fix cứng) & Tổng giá trị đợt phát hành */}
           <div className="billing-form-col">
-            <div className="billing-control-box readonly-box">
+            {/* Ô 1: Phòng tiêu chuẩn: 4.800.000 đ/năm */}
+            <div className="billing-control-box readonly-box" title="Đơn giá cố định phòng tiêu chuẩn: 4.800.000 đ/năm">
+              <span className="billing-static-text">
+                Phòng tiêu chuẩn: 4.800.000 đ/năm
+              </span>
+              <span className="billing-box-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                  <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+              </span>
             </div>
 
-            <div className="billing-control-box readonly-box">
+            {/* Ô 2: Phòng dịch vụ: 8.200.000 đ/năm */}
+            <div className="billing-control-box readonly-box" title="Đơn giá cố định phòng dịch vụ: 8.200.000 đ/năm">
+              <span className="billing-static-text">
+                Phòng dịch vụ: 8.200.000 đ/năm
+              </span>
+              <span className="billing-box-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+              </span>
             </div>
 
-            {/* Đổi ô tổng phải nộp thành tổng giá trị đợt phát hành */}
+            {/* Tổng giá trị đợt phát hành */}
             <div className="billing-total-row">
               <div className="billing-total-badge" title="Tổng giá trị toàn bộ sinh viên trong đợt phát hành này">
                 Tổng giá trị đợt phát hành: {totalBatchAmount.toLocaleString('vi-VN')} VND
@@ -547,14 +581,23 @@ export default function PeriodicBilling({ searchTerm = '' }) {
           {/* Cột trái */}
           <div className="billing-form-col">
             <div className="billing-control-box">
-              <input
-                type="text"
-                className="billing-input"
-                value={`Chọn tháng: ${utilityMonth.replace('Tháng ', '')}`}
-                readOnly
-                style={{ cursor: 'not-allowed' }}
-                title="Chỉ được lập hóa đơn cho tháng trước"
-              />
+              <select
+                className="billing-select"
+                value={utilityMonth}
+                onChange={(e) => setUtilityMonth(e.target.value)}
+                title="Chọn kỳ lập hóa đơn tiền điện nước"
+              >
+                {MONTH_OPTIONS.map((m) => (
+                  <option key={m} value={m}>
+                    Chọn tháng: {m.replace('Tháng ', '')}
+                  </option>
+                ))}
+              </select>
+              <span className="billing-box-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </span>
             </div>
 
             <div className="billing-control-box">
@@ -703,7 +746,7 @@ export default function PeriodicBilling({ searchTerm = '' }) {
                 <th style={{ width: '15%' }}>Phòng</th>
                 <th style={{ width: '17%' }}>Loại phòng</th>
                 <th style={{ width: '16%' }}>Thời hạn hợp đồng</th>
-                <th style={{ width: '12%' }}>Số tiền/tháng</th>
+                <th style={{ width: '12%' }}>Số tiền/năm</th>
               </tr>
             </thead>
             <tbody>
@@ -727,7 +770,7 @@ export default function PeriodicBilling({ searchTerm = '' }) {
                   <td colSpan="6" className="billing-empty-state">
                     {searchTerm.trim()
                       ? `Không tìm thấy sinh viên nào phù hợp với từ khóa "${searchTerm}".`
-                      : `Không có sinh viên nào thuộc ${appliedTarget} cần lập hóa đơn tiền phòng cho ${billingMonth}.`}
+                      : `Không có sinh viên nào thuộc ${appliedTarget} cần lập hóa đơn tiền phòng cho ${billingYear}.`}
                   </td>
                 </tr>
               )}
@@ -847,7 +890,7 @@ export default function PeriodicBilling({ searchTerm = '' }) {
               </div>
               <h2 className="billing-modal-title">
                 {activeTab === 'room'
-                  ? 'Xác nhận phát hành hóa đơn tiền phòng'
+                  ? 'Xác nhận phát hành hóa đơn tiền phòng theo năm'
                   : 'Xác nhận phát hành hóa đơn điện nước'}
               </h2>
             </div>
@@ -862,8 +905,8 @@ export default function PeriodicBilling({ searchTerm = '' }) {
                 {activeTab === 'room' ? (
                   <>
                     <div className="billing-summary-row">
-                      <span className="label">Tháng áp dụng:</span>
-                      <span className="value">{billingMonth}</span>
+                      <span className="label">Năm học áp dụng:</span>
+                      <span className="value">{billingYear}</span>
                     </div>
                     <div className="billing-summary-row">
                       <span className="label">Đối tượng áp dụng:</span>
@@ -871,6 +914,7 @@ export default function PeriodicBilling({ searchTerm = '' }) {
                     </div>
                     <div className="billing-summary-row">
                       <span className="label">Đơn giá niêm yết:</span>
+                      <span className="value">Tiêu chuẩn: 4.800.000 đ/năm | Dịch vụ: 8.200.000 đ/năm</span>
                     </div>
                     <div className="billing-summary-row">
                       <span className="label">Số sinh viên áp dụng:</span>

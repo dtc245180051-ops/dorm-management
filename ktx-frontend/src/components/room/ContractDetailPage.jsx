@@ -141,19 +141,37 @@ export default function ContractDetailPage({
     initialContract?.email ||
     (initialContract?.msv ? `${initialContract.msv.toLowerCase()}@ictu.edu.vn` : '');
 
+  // Lấy dữ liệu dự phòng từ localStorage nếu initialContract thiếu thông tin
+  let fallbackReq = null;
+  try {
+    const rawReqs = localStorage.getItem("dorm_registration_requests");
+    if (rawReqs) {
+      const reqs = JSON.parse(rawReqs);
+      const targetMsv = String(initialContract?.msv || initialContract?.ma_sinh_vien || '').trim().toUpperCase();
+      fallbackReq = reqs.find(
+        (r) =>
+          (targetMsv && String(r.msv || '').trim().toUpperCase() === targetMsv) ||
+          r.ma_hop_dong === currentContractId ||
+          r.id === currentContractId
+      );
+    }
+  } catch (e) {
+    console.warn("Error reading registration fallback:", e);
+  }
+
   const [contractData, setContractData] = useState({
     ma_hop_dong: currentContractId,
-    ho_ten: initialContract?.studentName || initialContract?.ho_ten || '',
-    msv: initialContract?.msv || '',
-    gioi_tinh: initialContract?.gioi_tinh || 'Nam',
-    ngay_sinh: initialContract?.ngay_sinh || '',
-    cccd: initialContract?.cccd || '',
-    so_dien_thoai: initialContract?.so_dien_thoai || '',
-    email: studentEmail,
-    khoa: initialContract?.khoa || 'Công nghệ thông tin',
-    lop: initialContract?.lop || '',
-    lien_he_khan_cap: initialContract?.lien_he_khan_cap || '',
-    dia_chi: initialContract?.dia_chi || '',
+    ho_ten: initialContract?.studentName || initialContract?.ho_ten || fallbackReq?.ho_ten || '',
+    msv: initialContract?.msv || fallbackReq?.msv || '',
+    gioi_tinh: initialContract?.gioi_tinh || fallbackReq?.gioi_tinh || 'Nam',
+    ngay_sinh: initialContract?.ngay_sinh || fallbackReq?.ngay_sinh || '',
+    cccd: initialContract?.cccd || fallbackReq?.cccd || '',
+    so_dien_thoai: initialContract?.so_dien_thoai || fallbackReq?.so_dien_thoai || '',
+    email: studentEmail || fallbackReq?.email || '',
+    khoa: initialContract?.khoa || fallbackReq?.khoa || 'Công nghệ thông tin',
+    lop: initialContract?.lop || fallbackReq?.lop || '',
+    lien_he_khan_cap: initialContract?.lien_he_khan_cap || (fallbackReq?.sdt_nguoi_giam_ho ? `${fallbackReq.sdt_nguoi_giam_ho} (${fallbackReq.moi_quan_he || ''} - ${fallbackReq.nguoi_giam_ho || ''})` : ''),
+    dia_chi: initialContract?.dia_chi || fallbackReq?.dia_chi || '',
     phong_giuong:
       initialContract?.roomNumber && initialContract?.buildingName
         ? `${initialContract.buildingName} - Phòng ${initialContract.roomNumber} - Giường ${initialContract.bedNumber || 1}`
@@ -196,19 +214,49 @@ export default function ContractDetailPage({
       setLoading(true);
       const data = await contractService.getContractDetail(currentContractId);
       if (data) {
+        let finalNgaySinh = data.ngay_sinh || contractData.ngay_sinh || fallbackReq?.ngay_sinh || '';
+        let finalCccd = data.cccd || contractData.cccd || fallbackReq?.cccd || '';
+        let finalSdt = data.so_dien_thoai || contractData.so_dien_thoai || fallbackReq?.so_dien_thoai || '';
+        let finalLienHe = data.lien_he_khan_cap || contractData.lien_he_khan_cap;
+
+        // Nếu thông tin chưa có, quét lại từ localStorage
+        if (!finalNgaySinh || !finalCccd || !finalSdt) {
+          try {
+            const rawReqs = localStorage.getItem("dorm_registration_requests");
+            if (rawReqs) {
+              const reqs = JSON.parse(rawReqs);
+              const targetMsv = String(data.msv || contractData.msv || '').trim().toUpperCase();
+              const found = reqs.find(
+                (r) =>
+                  (targetMsv && String(r.msv || '').trim().toUpperCase() === targetMsv) ||
+                  r.ma_hop_dong === currentContractId ||
+                  r.id === currentContractId
+              );
+              if (found) {
+                if (!finalNgaySinh && found.ngay_sinh) finalNgaySinh = found.ngay_sinh;
+                if (!finalCccd && found.cccd) finalCccd = found.cccd;
+                if (!finalSdt && found.so_dien_thoai) finalSdt = found.so_dien_thoai;
+                if (!finalLienHe && found.sdt_nguoi_giam_ho) {
+                  finalLienHe = `${found.sdt_nguoi_giam_ho} (${found.moi_quan_he || ''} - ${found.nguoi_giam_ho || ''})`;
+                }
+              }
+            }
+          } catch (e) {}
+        }
+
         setContractData((prev) => ({
           ...prev,
           ...data,
           ho_ten: data.ho_ten || prev.ho_ten,
           msv: data.msv || prev.msv,
           gioi_tinh: data.gioi_tinh || prev.gioi_tinh,
-          ngay_sinh: data.ngay_sinh || prev.ngay_sinh,
-          cccd: data.cccd || prev.cccd,
-          so_dien_thoai: data.so_dien_thoai || prev.so_dien_thoai,
+          ngay_sinh: finalNgaySinh,
+          cccd: finalCccd,
+          so_dien_thoai: finalSdt,
           email: data.email || prev.email || (data.msv ? `${data.msv.toLowerCase()}@ictu.edu.vn` : ''),
           khoa: data.khoa || prev.khoa,
           lop: data.lop || prev.lop,
-          lien_he_khan_cap: data.lien_he_khan_cap || prev.lien_he_khan_cap,
+          lien_he_khan_cap: finalLienHe || prev.lien_he_khan_cap,
           dia_chi: data.dia_chi || prev.dia_chi,
           // Đảm bảo mã hợp đồng luôn hiển thị chuẩn: HD26-A1101-G1
           ma_hop_dong:

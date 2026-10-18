@@ -151,10 +151,12 @@ class InvoiceService:
                 raw_loai = (p.loai_phong or "").lower()
                 if "dịch vụ" in raw_loai or "dich vu" in raw_loai or "service" in raw_loai:
                     loai_phong_label = "Phòng dịch vụ"
-                    unit_price = float(p.gia_tien_nam or 0) / 12
+                    gia_nam = float(p.gia_tien_nam) if (p.gia_tien_nam and float(p.gia_tien_nam) > 0) else 8200000.0
+                    unit_price = round(gia_nam / 11)
                 else:
                     loai_phong_label = "Phòng tiêu chuẩn"
-                    unit_price = float(p.gia_tien_nam or 0) / 12
+                    gia_nam = float(p.gia_tien_nam) if (p.gia_tien_nam and float(p.gia_tien_nam) > 0) else 4800000.0
+                    unit_price = round(gia_nam / 11)
 
             # Nếu đơn giá tháng được truyền vào khác mặc định thì áp dụng
             if don_gia_thang is not None and don_gia_thang > 0:
@@ -174,11 +176,6 @@ class InvoiceService:
                     if m and m.group(0).upper() not in phong_str.upper():
                         continue
 
-            # Định dạng thời hạn hợp đồng
-            start_str = hd.ngay_bat_dau.strftime("%d/%m/%Y") if hd.ngay_bat_dau else ""
-            end_str = hd.ngay_ket_thuc.strftime("%d/%m/%Y") if hd.ngay_ket_thuc else "Hiện tại"
-            term_str = f"{start_str} - {end_str}".strip(" -")
-
             # Kiểm tra xem hợp đồng này đã lập hóa đơn chưa cho kỳ này
             existing_inv = (
                 db.query(HoaDon)
@@ -190,7 +187,16 @@ class InvoiceService:
                 .first()
             )
 
-            current_amount = unit_price * thoi_gian_o_thang
+            # Định dạng thời hạn hợp đồng
+            start_str = hd.ngay_bat_dau.strftime("%d/%m/%Y") if hd.ngay_bat_dau else ""
+            end_str = hd.ngay_ket_thuc.strftime("%d/%m/%Y") if hd.ngay_ket_thuc else "Hiện tại"
+            term_str = f"{start_str} - {end_str}".strip(" -")
+
+            is_annual = "năm" in (ky_thanh_toan or "").lower() or "nam" in (ky_thanh_toan or "").lower() or thoi_gian_o_thang >= 10
+            if is_annual:
+                current_amount = gia_nam
+            else:
+                current_amount = unit_price * thoi_gian_o_thang
 
             candidates.append(
                 RoomBillingCandidate(
@@ -316,10 +322,12 @@ class InvoiceService:
                     raw_loai = (p.loai_phong or "").lower()
                     if "dịch vụ" in raw_loai or "dich vu" in raw_loai or "service" in raw_loai:
                         loai_phong_label = "Phòng dịch vụ"
-                        unit_price = float(p.gia_tien_nam or 0) / 12
+                        gia_nam = float(p.gia_tien_nam) if (p.gia_tien_nam and float(p.gia_tien_nam) > 0) else 8200000.0
+                        unit_price = round(gia_nam / 11)
                     else:
                         loai_phong_label = "Phòng tiêu chuẩn"
-                        unit_price = float(p.gia_tien_nam or 0) / 12
+                        gia_nam = float(p.gia_tien_nam) if (p.gia_tien_nam and float(p.gia_tien_nam) > 0) else 4800000.0
+                        unit_price = round(gia_nam / 11)
 
                 # Áp dụng đơn giá tháng nếu có truyền vào khác mặc định
                 if request.don_gia_thang is not None and request.don_gia_thang > 0:
@@ -348,7 +356,11 @@ class InvoiceService:
                     already_issued_info.append(f"{hd.msv} (HĐ: {hd.ma_hop_dong})")
                     continue
 
-                current_student_amount = unit_price * request.thoi_gian_o_thang
+                is_annual = "năm" in (request.ky_thanh_toan or "").lower() or "nam" in (request.ky_thanh_toan or "").lower() or request.thoi_gian_o_thang >= 10
+                if is_annual:
+                    current_student_amount = gia_nam
+                else:
+                    current_student_amount = unit_price * request.thoi_gian_o_thang
 
                 # Sinh mã hóa đơn duy nhất dạng HDTP-YYYYMMDD-UUID4[:6]
                 today_str = datetime.date.today().strftime("%Y%m%d")

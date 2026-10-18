@@ -133,7 +133,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
         "";
 
       const [roomData, historyData, availableOpts, statusRes] = await Promise.all([
-        occupancyService.getCurrentRoomInfo?.(),
+        occupancyService.getCurrentRoomInfo?.(studentMsv),
         occupancyService.getTransferCheckoutRequests?.(),
         occupancyService.getAvailableOptions?.(),
         resolveStudentStatus(studentMsv),

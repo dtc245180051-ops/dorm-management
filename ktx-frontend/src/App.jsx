@@ -77,8 +77,9 @@ export default function App() {
   const loadRoomInfo = useCallback(async () => {
     try {
       if (occupancyService?.getCurrentRoomInfo) {
-        const info = await occupancyService.getCurrentRoomInfo();
-        if (info) setCurrentRoomInfo(info);
+        const studentMsv = localStorage.getItem("ktx_username") || "";
+        const info = await occupancyService.getCurrentRoomInfo(studentMsv);
+        setCurrentRoomInfo(info || null);
       }
     } catch (e) {
       console.error("Error loading current room info:", e);
@@ -112,6 +113,20 @@ export default function App() {
 
   // Phân quyền bảo vệ đường dẫn (Role-Based Access Control - RBAC)
   useEffect(() => {
+    const isPublicAuthRoute =
+      currentPath === "/" ||
+      currentPath === "/home" ||
+      currentPath === "/landing" ||
+      currentPath === "/login" ||
+      currentPath === "/register" ||
+      currentPath === "/signup" ||
+      currentPath === "/auth";
+
+    // Cho phép truy cập trang chủ công khai hoặc màn hình đăng nhập/đăng ký tự do
+    if (isPublicAuthRoute) {
+      return;
+    }
+
     const token = localStorage.getItem("ktx_token");
     const roleStr = (localStorage.getItem("ktx_user_role") || "").toUpperCase();
 
@@ -299,11 +314,9 @@ export default function App() {
         <Login
           initialTab="login"
           onTabChange={(tab) => {
-            window.history.replaceState(
-              {},
-              "",
-              tab === "register" ? "/register" : "/login",
-            );
+            const nextPath = tab === "register" ? "/register" : "/login";
+            window.history.replaceState({}, "", nextPath);
+            setCurrentPath(nextPath);
           }}
           onLoginSuccess={(role) => {
             const r = String(role || "").toUpperCase();
@@ -331,11 +344,9 @@ export default function App() {
         <Login
           initialTab="register"
           onTabChange={(tab) => {
-            window.history.replaceState(
-              {},
-              "",
-              tab === "register" ? "/register" : "/login",
-            );
+            const nextPath = tab === "register" ? "/register" : "/login";
+            window.history.replaceState({}, "", nextPath);
+            setCurrentPath(nextPath);
           }}
           onLoginSuccess={(role) => {
             const r = String(role || "").toUpperCase();

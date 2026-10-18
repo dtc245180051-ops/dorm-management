@@ -118,31 +118,6 @@ export default function QuickActionsBar({
             )}
           </div>
         </div>
-
-        {/* Row 2: Kỳ */}
-        <div className="recon-quick-row">
-          <span className="recon-quick-label">Kỳ</span>
-          <div className="recon-quick-action recon-period-picker">
-            <span
-              style={{
-                fontSize: '13.5px',
-                fontWeight: 600,
-                color: period && period !== '--' ? '#0f172a' : '#94a3b8',
-                paddingRight: '6px',
-              }}
-            >
-              {period && period !== '--' ? period : '--'}
-            </span>
-            <span className="recon-calendar-icon" title="Kỳ đối soát tự động theo file sao kê">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                <line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" />
-                <line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-            </span>
-          </div>
-        </div>
       </div>
     </div>
   );

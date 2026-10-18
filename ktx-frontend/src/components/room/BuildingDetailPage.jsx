@@ -649,7 +649,7 @@ export default function BuildingDetailPage({
                       (phong.loai_phong || '').toLowerCase().includes('dịch vụ') ||
                       (phong.loai_phong || '').toLowerCase().includes('dich vu');
 
-                    const roomPrice = Number(phong.gia_tien_nam) || (isService ? 9600000 : 4800000);
+                    const roomPrice = Number(phong.gia_tien_nam) || (isService ? 8200000 : 4800000);
                     const occupiedBeds = displayBeds.filter((b) => b.trang_thai !== 'TRONG').length;
                     const isRoomFull = occupiedBeds >= capacity;
 

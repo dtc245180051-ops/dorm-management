@@ -76,7 +76,7 @@ export default function FeedbackPage({
           '';
         setRoom(assignedRoom);
       } else {
-        const fallbackRoom = localStorage.getItem('ktx_room') || 'P501';
+        const fallbackRoom = localStorage.getItem('ktx_room') || '';
         setRoom(fallbackRoom);
       }
     });

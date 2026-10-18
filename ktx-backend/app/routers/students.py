@@ -105,7 +105,11 @@ def get_student_by_msv(
     if current_user.nguoi_dung and current_user.nguoi_dung.sinh_vien:
         user_msv = current_user.nguoi_dung.sinh_vien.msv
 
-    if user_role == "SinhVien" and current_user.ten_dang_nhap != msv and user_msv != msv:
+    clean_req_msv = (msv or "").strip().lower()
+    user_login = (current_user.ten_dang_nhap or "").strip().lower()
+    user_student_msv = (user_msv or "").strip().lower()
+
+    if user_role == "SinhVien" and user_login != clean_req_msv and user_student_msv != clean_req_msv:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Bạn chỉ được phép xem thông tin hồ sơ của chính mình.",
@@ -140,7 +144,11 @@ def update_student(
     if current_user.nguoi_dung and current_user.nguoi_dung.sinh_vien:
         user_msv = current_user.nguoi_dung.sinh_vien.msv
 
-    if user_role == "SinhVien" and current_user.ten_dang_nhap != msv and user_msv != msv:
+    clean_req_msv = (msv or "").strip().lower()
+    user_login = (current_user.ten_dang_nhap or "").strip().lower()
+    user_student_msv = (user_msv or "").strip().lower()
+
+    if user_role == "SinhVien" and user_login != clean_req_msv and user_student_msv != clean_req_msv:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Bạn chỉ được phép cập nhật thông tin hồ sơ của chính mình.",

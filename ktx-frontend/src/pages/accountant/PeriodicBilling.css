@@ -106,8 +106,34 @@
 }
 
 .billing-control-box.readonly-box {
-  background-color: #f8fafc;
-  border-color: #e2e8f0;
+  background-color: #ffffff;
+  border: 1.5px solid #d1d5db;
+  cursor: default;
+  user-select: none;
+  outline: none;
+}
+
+.billing-control-box.readonly-box:hover {
+  border-color: #9ca3af;
+}
+
+.billing-control-box.readonly-box:focus,
+.billing-control-box.readonly-box:focus-visible,
+.billing-control-box.readonly-box:focus-within {
+  border-color: #d1d5db;
+  box-shadow: none;
+  outline: none;
+}
+
+.billing-control-box.readonly-box .billing-static-text {
+  color: #1f2937;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.billing-control-box.readonly-box .billing-box-icon {
+  color: #374151;
+  opacity: 1;
 }
 
 .billing-select {
@@ -115,6 +141,7 @@
   height: 100%;
   padding: 0 36px 0 14px;
   border: none;
+  outline: none;
   background: transparent;
   font-size: 14px;
   font-weight: 500;
@@ -124,19 +151,32 @@
   -webkit-appearance: none;
 }
 
+.billing-select:focus {
+  outline: none;
+}
+
 .billing-input {
   width: 100%;
   height: 100%;
   padding: 0 36px 0 14px;
   border: none;
+  outline: none;
   background: transparent;
   font-size: 14px;
   font-weight: 500;
   color: #1f2937;
 }
 
+.billing-input:focus {
+  outline: none;
+}
+
 .billing-static-text {
-  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 36px 0 14px;
   font-size: 14px;
   font-weight: 500;
   color: #1f2937;

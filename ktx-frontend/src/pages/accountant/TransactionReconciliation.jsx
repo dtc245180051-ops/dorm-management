@@ -201,6 +201,11 @@ export default function TransactionReconciliation({ searchTerm = '' }) {
         if (res.data.statistics) setStats(newStats);
         setCurrentPage(1);
 
+        if (Array.isArray(res.data.items)) {
+          setTransactions(res.data.items.slice(0, pageSize));
+          setTotalItems(res.data.totalTransactions || res.data.items.length);
+        }
+
         const cacheObj = {
           isUploaded: true,
           statementFile: fileName,

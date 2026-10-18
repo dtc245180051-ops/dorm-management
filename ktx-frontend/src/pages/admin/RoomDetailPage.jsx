@@ -121,7 +121,7 @@ export default function RoomDetailPage({
   const isMale = genderType.toLowerCase().includes('nam') && !genderType.toLowerCase().includes('nữ');
 
   // Giá phòng
-  const roomPrice = Number(room.gia_tien_nam) || (isService ? 9600000 : 4800000);
+  const roomPrice = Number(room.gia_tien_nam) || (isService ? 8200000 : 4800000);
 
   // Hình ảnh phòng
   const roomImage =
@@ -409,7 +409,7 @@ export default function RoomDetailPage({
                 {roomPrice.toLocaleString('vi-VN')} đ/năm
               </span>
               <span className="text-xs text-slate-400 font-medium ml-1.5">
-                (~{Math.round(roomPrice / 12).toLocaleString('vi-VN')} đ/tháng)
+                (~{Math.round(roomPrice / 11).toLocaleString('vi-VN')} đ/tháng)
               </span>
             </div>
           </div>

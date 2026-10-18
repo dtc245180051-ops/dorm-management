@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 const CACHE_KEY = 'reconciliation_cache_data';
 
@@ -299,12 +299,27 @@ export const reconciliationService = {
           data,
           message: `Đã tải lên và đối soát thành công file ${file.name}`,
         };
+      } else {
+        let errMsg = 'Không thể tải sao kê lên máy chủ.';
+        try {
+          const errData = await response.json();
+          if (errData?.detail) {
+            errMsg = errData.detail;
+          }
+        } catch (_) {}
+        return {
+          success: false,
+          data: null,
+          message: errMsg,
+        };
       }
     } catch (error) {
-      console.warn('Lỗi uploadStatement API, kích hoạt bộ phân tích dữ liệu:', error);
+      console.warn('Lỗi uploadStatement API:', error);
+      return {
+        success: false,
+        data: null,
+        message: 'Lỗi kết nối tới máy chủ khi tải sao kê: ' + error.message,
+      };
     }
-
-    // Fallback xử lý file trực tiếp không để bị chặn bởi lỗi Not Found
-    return { success: false, data: { items: [], totalTransactions: 0, statistics: { totalTransactions: 0, autoMatched: 0, manualRequired: 0 } }, message: 'Không thể tải sao kê lên máy chủ.' };
   },
 };

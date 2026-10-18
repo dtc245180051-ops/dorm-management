@@ -327,6 +327,8 @@
 
 .recon-table {
   width: 100%;
+  min-width: 1050px;
+  table-layout: fixed;
   border-collapse: collapse;
   text-align: left;
   font-size: 14px;
@@ -343,33 +345,34 @@
 }
 
 .recon-th.th-code {
-  width: 160px;
+  width: 17%;
 }
 
 .recon-th.th-time {
-  width: 110px;
+  width: 13%;
 }
 
 .recon-th.th-amount {
-  width: 130px;
+  width: 12%;
 }
 
 .recon-th.th-content {
-  min-width: 260px;
+  width: 25%;
 }
 
 .recon-th.th-invoice {
-  width: 180px;
+  width: 14%;
 }
 
 .recon-th.th-status {
-  width: 130px;
+  width: 11%;
+  text-align: center;
 }
 
 .recon-th.th-action {
-  width: 90px;
+  width: 8%;
   text-align: right;
-  padding-right: 22px;
+  padding-right: 20px;
 }
 
 .recon-tr {
@@ -391,15 +394,24 @@
   vertical-align: middle;
 }
 
+.recon-td.td-status {
+  text-align: center;
+}
+
 .recon-td.td-action {
   text-align: right;
-  padding-right: 22px;
+  padding-right: 20px;
 }
 
 .recon-code-text {
   font-weight: 600;
   color: #1e293b;
   letter-spacing: -0.2px;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .recon-code-text.recon-code-clickable {
@@ -430,11 +442,20 @@
 .recon-content-text {
   color: #1e293b;
   font-weight: 400;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .recon-invoice-matched {
   color: #0f172a;
   font-weight: 500;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .recon-invoice-missing {

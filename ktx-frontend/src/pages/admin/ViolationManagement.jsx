@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import api from "../../services/api";
 import {
   ChevronLeft,
@@ -166,7 +166,7 @@ export default function ViolationManagement({ searchTerm = "" }) {
   };
 
   // Cập nhật trạng thái trực tiếp từ 3 nút ở góc dưới của Chi tiết biên bản
-  const handleQuickChangeSubStatus = (newSubStatus) => {
+  const handleQuickChangeSubStatus = async (newSubStatus) => {
     if (!selectedViolation) return;
 
     let newMainStatus = "CHO_XU_LY";
@@ -192,11 +192,20 @@ export default function ViolationManagement({ searchTerm = "" }) {
       trang_thai: newMainStatus,
     }));
 
+    try {
+      await api.put(`/incidents/violations/${selectedViolation.id}`, {
+        trang_thai: newMainStatus,
+        sub_status: newSubStatus,
+      });
+    } catch (err) {
+      console.warn("Không thể lưu trạng thái vi phạm vào CSDL:", err);
+    }
+
     showToast("Đã cập nhật trạng thái xử lý biên bản thành công!");
   };
 
   // Lưu modal Cập nhật trạng thái
-  const handleSaveStatusModal = (e) => {
+  const handleSaveStatusModal = async (e) => {
     e.preventDefault();
     if (!selectedViolation) return;
 
@@ -215,10 +224,41 @@ export default function ViolationManagement({ searchTerm = "" }) {
     );
     setSelectedViolation(updated);
     setIsUpdateModalOpen(false);
+
+    try {
+      await api.put(`/incidents/violations/${selectedViolation.id}`, {
+        trang_thai: editStatusData.trang_thai,
+        sub_status: editStatusData.sub_status,
+        quyet_dinh: editStatusData.quyet_dinh,
+        ghi_chu: editStatusData.ghi_chu,
+      });
+    } catch (err) {
+      console.warn("Không thể lưu trạng thái vi phạm vào CSDL:", err);
+    }
+
     showToast("Đã cập nhật biên bản thành công!");
   };
 
-  // Xử lý lưu biên bản mới
+  // Tự động điền họ tên và phòng ở khi nhập Mã sinh viên
+  const handleMsvBlur = async () => {
+    const rawMsv = createForm.msv.trim().toUpperCase();
+    if (!rawMsv) return;
+    try {
+      const res = await api.get(`/students/${rawMsv}`);
+      if (res.data) {
+        setCreateForm((prev) => ({
+          ...prev,
+          msv: rawMsv,
+          ho_ten: prev.ho_ten || res.data.ho_ten || "",
+          phong: prev.phong || (res.data.phong ? `P${res.data.phong}` : ""),
+        }));
+      }
+    } catch {
+      // Bỏ qua nếu chưa tìm thấy sinh viên
+    }
+  };
+
+  // Xử lý lưu biên bản mới (Đồng bộ đầy đủ tất cả các trường thông tin sang chi tiết)
   const handleSaveNewTicket = async (e) => {
     if (e?.preventDefault) e.preventDefault();
     if (!createForm.msv.trim() || !createForm.mo_ta.trim()) {
@@ -228,8 +268,18 @@ export default function ViolationManagement({ searchTerm = "" }) {
     try {
       await api.post("/incidents/violations", {
         msv: createForm.msv.trim().toUpperCase(),
+        ho_ten: createForm.ho_ten.trim(),
+        phong: createForm.phong.trim(),
+        thoi_gian: createForm.thoi_gian.trim(),
+        thoi_diem: createForm.thoi_gian.trim(),
+        dia_diem: createForm.dia_diem.trim(),
+        nhom_hanh_vi: createForm.nhom_hanh_vi.trim(),
+        nhom_vi_pham: createForm.nhom_hanh_vi.trim(),
         mo_ta: createForm.mo_ta.trim(),
+        dinh_kem: createForm.dinh_kem,
+        bang_chung: createForm.dinh_kem,
         hinh_thuc_xu_ly: createForm.hinh_thuc_xu_ly.trim() || "Đang xem xét",
+        trang_thai: "CHO_XU_LY",
       });
       const { data } = await api.get("/incidents/violations");
       setViolations(Array.isArray(data) ? data : []);
@@ -245,7 +295,7 @@ export default function ViolationManagement({ searchTerm = "" }) {
         dinh_kem: [],
         hinh_thuc_xu_ly: "",
       });
-      showToast("Đã lập biên bản vi phạm thành công!");
+      showToast("Đã lập biên bản vi phạm thành công (Trạng thái: Chờ xử lý)!");
     } catch (error) {
       showToast(
         error.response?.data?.detail || "Không thể lưu biên bản vi phạm.",
@@ -345,6 +395,7 @@ export default function ViolationManagement({ searchTerm = "" }) {
                 type="text"
                 placeholder="Mã sinh viên"
                 value={createForm.msv}
+                onBlur={handleMsvBlur}
                 onChange={(e) =>
                   setCreateForm({ ...createForm, msv: e.target.value })
                 }
@@ -924,7 +975,7 @@ export default function ViolationManagement({ searchTerm = "" }) {
           className="flex items-center justify-center gap-1.5 px-5 py-2 rounded-full border border-blue-500 text-blue-600 bg-white hover:bg-blue-50/80 text-sm font-semibold transition-colors shadow-2xs cursor-pointer shrink-0"
         >
           <Plus className="w-4 h-4 stroke-[2.5]" />
-          <span>+ Lập biên bản mới</span>
+          <span>Lập biên bản mới</span>
         </button>
       </div>
 
@@ -1026,31 +1077,31 @@ export default function ViolationManagement({ searchTerm = "" }) {
       {/* Bảng danh sách biên bản */}
       <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1050px] table-auto">
+          <table className="w-full text-left border-collapse min-w-[1050px] table-fixed">
             <thead>
               <tr className="bg-[#dbeafe] text-slate-900 text-sm font-bold border-b border-blue-200/50">
-                <th className="py-3.5 px-5 whitespace-nowrap w-[130px]">
-                  Mã BB
+                <th className="py-3.5 px-4 whitespace-nowrap w-[15%]">
+                  Mã VP
                 </th>
-                <th className="py-3.5 px-4 whitespace-nowrap w-[140px]">
+                <th className="py-3.5 px-4 whitespace-nowrap w-[13%]">
                   Mã SV
                 </th>
-                <th className="py-3.5 px-4 whitespace-nowrap w-[160px]">
+                <th className="py-3.5 px-4 whitespace-nowrap w-[16%]">
                   Họ và tên
                 </th>
-                <th className="py-3.5 px-4 whitespace-nowrap w-[120px]">
+                <th className="py-3.5 px-4 whitespace-nowrap w-[12%]">
                   Phòng
                 </th>
-                <th className="py-3.5 px-4 whitespace-nowrap min-w-[280px]">
+                <th className="py-3.5 px-4 whitespace-nowrap w-[18%]">
                   Hành vi vi phạm
                 </th>
-                <th className="py-3.5 px-4 whitespace-nowrap min-w-[240px]">
+                <th className="py-3.5 px-4 whitespace-nowrap w-[14%]">
                   Hình thức xử lý
                 </th>
-                <th className="py-3.5 px-4 whitespace-nowrap text-center w-[120px]">
+                <th className="py-3.5 px-4 whitespace-nowrap text-center w-[12%]">
                   Trạng thái
                 </th>
-                <th className="py-3.5 px-5 whitespace-nowrap text-right w-[100px]"></th>
+                <th className="py-3.5 px-4 whitespace-nowrap text-right w-[10%]"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -1060,24 +1111,24 @@ export default function ViolationManagement({ searchTerm = "" }) {
                     key={row.id || idx}
                     className="hover:bg-slate-50/70 transition-colors"
                   >
-                    <td className="py-4 px-5 font-bold text-slate-900 whitespace-nowrap">
+                    <td className="py-4 px-4 font-bold text-slate-900 truncate" title={row.ma_bb}>
                       {row.ma_bb}
                     </td>
-                    <td className="py-4 px-4 font-mono font-medium text-slate-600 whitespace-nowrap">
+                    <td className="py-4 px-4 font-mono font-medium text-slate-600 truncate">
                       {row.msv}
                     </td>
-                    <td className="py-4 px-4 font-medium text-slate-800 whitespace-nowrap">
+                    <td className="py-4 px-4 font-medium text-slate-800 truncate" title={row.ho_ten}>
                       {row.ho_ten}
                     </td>
-                    <td className="py-4 px-4 text-slate-600 whitespace-nowrap">
+                    <td className="py-4 px-4 text-slate-600 truncate">
                       {row.phong}
                     </td>
-                    <td className="py-4 px-4 text-slate-600 min-w-[280px] max-w-[340px] leading-relaxed">
+                    <td className="py-4 px-4 text-slate-600 leading-relaxed">
                       <div className="line-clamp-2" title={row.hanh_vi}>
                         {row.hanh_vi}
                       </div>
                     </td>
-                    <td className="py-4 px-4 text-slate-600 min-w-[240px] max-w-[300px] leading-relaxed">
+                    <td className="py-4 px-4 text-slate-600 leading-relaxed">
                       <div className="line-clamp-2" title={row.hinh_thuc_xu_ly}>
                         {row.hinh_thuc_xu_ly}
                       </div>
@@ -1085,7 +1136,7 @@ export default function ViolationManagement({ searchTerm = "" }) {
                     <td className="py-4 px-4 text-center whitespace-nowrap">
                       {renderStatusBadge(row.trang_thai)}
                     </td>
-                    <td className="py-4 px-5 text-right whitespace-nowrap">
+                    <td className="py-4 px-4 text-right whitespace-nowrap">
                       <button
                         type="button"
                         onClick={() => handleViewDetail(row)}
