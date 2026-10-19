@@ -18,6 +18,7 @@ import {
   isGenderCompatible,
 } from "../../services/geminiService";
 import { approveStudentRoom } from "../../services/studentAccountService";
+import studentNotificationService from "../../services/studentNotificationService";
 
 export default function ProcessRegistrationPage({
   requestId = "DK-001",
@@ -65,6 +66,19 @@ export default function ProcessRegistrationPage({
         // Lấy chi tiết đơn
         const detail = await occupancyService.getRequestDetail(requestId);
         setRequestData(detail);
+
+        // Kiểm tra an toàn: Nếu là đơn chuyển phòng -> Chuyển hướng ngay sang trang xử lý chuyển phòng
+        const cleanReqId = String(requestId || "").toUpperCase();
+        const isTransfer =
+          cleanReqId.startsWith("YC") ||
+          cleanReqId.startsWith("CP") ||
+          String(detail?.loai_don || "").toUpperCase().includes("CHUYEN") ||
+          String(detail?.loai_yeu_cau || "").toLowerCase().includes("chuyển");
+
+        if (isTransfer) {
+          window.location.replace(`/admin/requests/transfer/${requestId}`);
+          return;
+        }
 
         // Lấy cây tòa -> phòng -> giường trống
         const bedsData = await occupancyService.getAvailableBeds();
@@ -339,6 +353,13 @@ export default function ProcessRegistrationPage({
 
     setSubmitting(true);
     try {
+      const cleanReqId = String(requestId || "").toUpperCase();
+      const isTransfer =
+        cleanReqId.startsWith("YC") ||
+        cleanReqId.startsWith("CP") ||
+        String(requestData?.loai_don || "").toUpperCase().includes("CHUYEN") ||
+        String(requestData?.loai_yeu_cau || "").toLowerCase().includes("chuyển");
+
       const payload = {
         ma_toa: selectedBuilding,
         phong_id: selectedRoom,
@@ -346,6 +367,19 @@ export default function ProcessRegistrationPage({
         msv: requestData?.msv,
         ho_ten: requestData?.ho_ten,
       };
+
+      if (isTransfer) {
+        const result = await occupancyService.approveTransferRequest(requestId, payload);
+        showToast(result.message || "Phê duyệt chuyển phòng thành công!", "success");
+        setTimeout(() => {
+          if (onProcessed) {
+            onProcessed("approved", result);
+          } else if (onBack) {
+            onBack();
+          }
+        }, 1500);
+        return;
+      }
 
       const result = await occupancyService.approveRequest(requestId, payload);
       const contractCode =
@@ -363,6 +397,17 @@ export default function ProcessRegistrationPage({
         startDate: "01/10/2026",
         endDate: "30/06/2027",
       });
+
+      try {
+        studentNotificationService.notifyFromManagement({
+          title: "Thông báo duyệt đăng ký phòng KTX",
+          content: `Đơn đăng ký phòng KTX của bạn đã được Ban quản lý KTX phê duyệt thành công. Bạn được xếp vào ${rNum ? `Phòng ${rNum} - ` : ""}${bldName}. Hợp đồng: ${contractCode}.`,
+          type: "registration",
+          actionUrl: "/student/history",
+          actionLabel: "Kiểm tra lịch sử phòng",
+          msv: requestData?.msv,
+        });
+      } catch (_) {}
 
       showToast(`Duyệt thành công! Đã tạo hợp đồng ${contractCode}`, "success");
 
@@ -396,6 +441,17 @@ export default function ProcessRegistrationPage({
     try {
       const payload = { ly_do_tu_choi: rejectReason.trim() };
       await occupancyService.rejectRequest(requestId, payload);
+
+      try {
+        studentNotificationService.notifyFromManagement({
+          title: "Thông báo kết quả đăng ký phòng KTX",
+          content: `Đơn đăng ký phòng KTX của bạn đã bị từ chối. Lý do: ${rejectReason.trim()}`,
+          type: "registration",
+          actionUrl: "/student/history",
+          actionLabel: "Kiểm tra lịch sử",
+          msv: requestData?.msv,
+        });
+      } catch (_) {}
 
       setIsRejectModalOpen(false);
       showToast("Đã từ chối đơn yêu cầu thành công.", "success");
@@ -587,7 +643,12 @@ export default function ProcessRegistrationPage({
                   <input
                     type="text"
                     readOnly
-                    value={requestData?.ho_ten_nguoi_giam_ho || ""}
+                    value={
+                      requestData?.nguoi_giam_ho ||
+                      requestData?.ho_ten_nguoi_giam_ho ||
+                      requestData?.ho_ten_phu_huynh ||
+                      ""
+                    }
                     placeholder="Họ và tên người giám hộ"
                     className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none cursor-default select-none shadow-2xs"
                   />

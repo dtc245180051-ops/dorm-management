@@ -8,6 +8,7 @@ STORE_FILE = os.path.join(os.path.dirname(__file__), "..", "data_store_requests.
 # In-memory store lưu trữ danh sách các đơn đăng ký chỗ ở để liên kết trực tiếp
 # giữa sinh viên và quản lý KTX
 REGISTRATION_REQUESTS: List[Dict] = []
+TRANSFER_CHECKOUT_REQUESTS: List[Dict] = []
 
 def _save_store():
     try:
@@ -26,7 +27,6 @@ def _load_store():
             with open(STORE_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if "REGISTRATION_REQUESTS" in data and isinstance(data["REGISTRATION_REQUESTS"], list):
-                    # Cập nhật danh sách đơn đăng ký từ file mà không làm mất các đơn đã có
                     loaded_ids = {r.get("id") for r in data["REGISTRATION_REQUESTS"]}
                     merged = list(data["REGISTRATION_REQUESTS"])
                     for r in REGISTRATION_REQUESTS:
@@ -34,6 +34,15 @@ def _load_store():
                             merged.append(r)
                     REGISTRATION_REQUESTS.clear()
                     REGISTRATION_REQUESTS.extend(merged)
+
+                if "TRANSFER_CHECKOUT_REQUESTS" in data and isinstance(data["TRANSFER_CHECKOUT_REQUESTS"], list):
+                    loaded_tc_ids = {r.get("id") for r in data["TRANSFER_CHECKOUT_REQUESTS"]}
+                    merged_tc = list(data["TRANSFER_CHECKOUT_REQUESTS"])
+                    for r in TRANSFER_CHECKOUT_REQUESTS:
+                        if r.get("id") not in loaded_tc_ids:
+                            merged_tc.append(r)
+                    TRANSFER_CHECKOUT_REQUESTS.clear()
+                    TRANSFER_CHECKOUT_REQUESTS.extend(merged_tc)
         except Exception as e:
             print("Lỗi tải file store:", e)
 
@@ -58,9 +67,9 @@ def add_request(req_data: dict) -> dict:
         "lop": req_data.get("lop", ""),
         "dia_chi": req_data.get("dia_chi", ""),
         "doi_tuong_uu_tien": req_data.get("doi_tuong_uu_tien", "Không thuộc diện ưu tiên"),
-        "nguoi_giam_ho": req_data.get("nguoi_giam_ho", ""),
+        "nguoi_giam_ho": req_data.get("nguoi_giam_ho") or req_data.get("ho_ten_nguoi_giam_ho") or req_data.get("ho_ten_phu_huynh") or "",
         "moi_quan_he": req_data.get("moi_quan_he", ""),
-        "sdt_nguoi_giam_ho": req_data.get("sdt_nguoi_giam_ho", ""),
+        "sdt_nguoi_giam_ho": req_data.get("sdt_nguoi_giam_ho") or req_data.get("sdt_phu_huynh") or "",
         "loai_phong": req_data.get("loai_phong", "") or "Phòng tiêu chuẩn",
         "tang_mong_muon": req_data.get("tang_mong_muon", ""),
         "muc_gia_mong_muon": req_data.get("muc_gia_mong_muon", ""),
@@ -127,8 +136,7 @@ def update_request_status(req_id: str, new_status: str, extra_data: Optional[dic
     return None
 
 
-# Danh sách các yêu cầu chuyển phòng và trả phòng
-TRANSFER_CHECKOUT_REQUESTS: List[Dict] = []
+# Các hàm xử lý yêu cầu chuyển phòng và trả phòng
 
 
 def add_transfer_request(data: dict) -> dict:

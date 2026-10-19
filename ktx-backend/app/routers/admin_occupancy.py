@@ -280,7 +280,7 @@ def approve_request(
         student = SinhVien(
             msv=clean_msv,
             ma_nguoi_dung=user.ma_nguoi_dung,
-            lop=registration.get("lop") or "DTC-KTX",
+            lop=registration.get("lop") or "",
             gioi_tinh=registration.get("gioi_tinh") or "Nam",
             khoa=registration.get("khoa") or "",
             dia_chi=registration.get("dia_chi") or "",

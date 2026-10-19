@@ -104,6 +104,17 @@ const getAssignedRoom = (record) => {
       roomDetails.ma_toa ||
       roomObject.toa ||
       "",
+    thanh_vien:
+      record.thanh_vien ||
+      roomDetails.thanh_vien ||
+      (record.so_thanh_vien && record.suc_chua
+        ? `${record.so_thanh_vien}/${record.suc_chua} người`
+        : "3/4 người"),
+    thoi_gian_luu_tru:
+      record.thoi_gian_luu_tru ||
+      (record.ngay_bat_dau
+        ? `${record.ngay_bat_dau} – Nay`
+        : "19/10/2026 – Nay"),
   };
 };
 
@@ -188,6 +199,8 @@ export function canAccessStudentFeature(status, featureId) {
 export async function resolveStudentStatus(studentMsv) {
   const code = (
     studentMsv ||
+    localStorage.getItem("ktx_msv") ||
+    localStorage.getItem("ktx_student_msv") ||
     localStorage.getItem("ktx_username") ||
     localStorage.getItem("ktx_email")?.split("@")[0] ||
     ""
@@ -206,11 +219,47 @@ export async function resolveStudentStatus(studentMsv) {
     };
   }
 
-  // 1. Kiểm tra nguồn chân lý chuẩn hóa: studentAccountService
+  // 1. Kiểm tra nguồn dữ liệu thật từ Backend API trước
+  try {
+    const currentRoom = await occupancyService.getCurrentRoomInfo(code);
+    if (currentRoom && currentRoom.so_phong) {
+      const activeRoom = {
+        so_phong: currentRoom.so_phong,
+        phong: currentRoom.phong || `P${currentRoom.so_phong}`,
+        toa: currentRoom.toa || "KTX",
+        loai_phong: currentRoom.loai_phong || currentRoom.roomType || "Phòng dịch vụ",
+        ngay_bat_dau: currentRoom.ngay_bat_dau || "01/10/2026",
+        ngay_ket_thuc: currentRoom.ngay_ket_thuc || "30/06/2027",
+        trang_thai: "ACTIVE",
+        trang_thai_label: "Đang ở",
+        thanh_vien: currentRoom.thanh_vien || `${currentRoom.so_thanh_vien || 1}/${currentRoom.suc_chua || 4} người`,
+        thoi_gian_luu_tru: currentRoom.thoi_gian_luu_tru || (currentRoom.ngay_bat_dau ? `${currentRoom.ngay_bat_dau} – Nay` : "Đang ở"),
+        tang: currentRoom.tang || 1,
+        danh_sach_thanh_vien: currentRoom.danh_sach_thanh_vien || [],
+        billing: currentRoom.billing || null,
+      };
+      return {
+        status: STUDENT_STATUS.ACTIVE_RESIDENT,
+        stage: 3,
+        studentInfo: {
+          msv: code,
+          ho_ten: localStorage.getItem("ktx_fullname") || account?.fullName || "Sinh viên",
+          trang_thai_o: "DANG_O",
+        },
+        activeRoom,
+        latestRequest: account?.registrationHistory?.[0] || null,
+        account,
+      };
+    }
+  } catch (err) {
+    console.warn("Lỗi gọi backend API getCurrentRoomInfo:", err);
+  }
+
+  // 2. Kiểm tra bộ nhớ tài khoản chuẩn hóa: studentAccountService
   const account = getStudentAccount(code);
   const residence = account?.currentResidence;
 
-  // 1. GIAI ĐOẠN 3: Sinh viên đang có phòng hợp lệ và hợp đồng ACTIVE
+  // GIAI ĐOẠN 3 (Dự phòng): Sinh viên đang có phòng hợp lệ và hợp đồng ACTIVE
   if (
     residence?.isActive === true &&
     residence?.contractStatus === "ACTIVE" &&
@@ -225,6 +274,8 @@ export async function resolveStudentStatus(studentMsv) {
       ngay_ket_thuc: residence.endDate || "30/06/2027",
       trang_thai: "ACTIVE",
       trang_thai_label: "Đang ở",
+      thanh_vien: residence.members || "3/4 người",
+      thoi_gian_luu_tru: residence.startDate ? `${residence.startDate} – Nay` : "19/10/2026 – Nay",
       tang: String(residence.roomNumber).startsWith("5")
         ? 5
         : parseInt(residence.roomNumber) / 100 || 1,

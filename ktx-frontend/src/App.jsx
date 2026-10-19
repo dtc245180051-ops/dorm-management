@@ -28,6 +28,7 @@ import StudentProfilePage from "./pages/student/StudentProfilePage";
 import RoomSearchPage from "./pages/student/RoomSearchPage";
 import PaymentPage from "./pages/student/PaymentPage";
 import PaymentHistoryPage from "./pages/student/PaymentHistoryPage";
+import StudentNotificationsPage from "./pages/student/StudentNotificationsPage";
 import Dashboard from "./pages/admin/Dashboard";
 import {
   Clock,
@@ -50,7 +51,7 @@ export default function App() {
   const [adminSearchTerm, setAdminSearchTerm] = useState("");
 
   const [accountantActiveMenu, setAccountantActiveMenu] =
-    useState("reconciliation");
+    useState("dashboard");
   const [accountantSearchTerm, setAccountantSearchTerm] = useState("");
 
   const [requestsList, setRequestsList] = useState([]);
@@ -193,26 +194,58 @@ export default function App() {
   // Tự động dọn dẹp dữ liệu mẫu / test cũ nếu còn lưu trong LocalStorage
   useEffect(() => {
     try {
-      if (localStorage.getItem("ktx_test_data_cleaned_v3") !== "true") {
+      if (localStorage.getItem("ktx_test_data_cleaned_v5") !== "true") {
         const studentAcc = localStorage.getItem("ktx_student_account");
         if (studentAcc && (studentAcc.includes("REG-01") || studentAcc.includes("RES-01") || studentAcc.includes("BILL-10-2026"))) {
           localStorage.removeItem("ktx_student_account");
         }
-        const transferReqs = localStorage.getItem("dorm_transfer_checkout_requests");
-        if (transferReqs && (transferReqs.includes("YC-0231") || transferReqs.includes("YC-0232"))) {
-          localStorage.removeItem("dorm_transfer_checkout_requests");
-        }
+
         const incidents = localStorage.getItem("dorm_student_incidents");
-        if (incidents && (incidents.includes("PA-001") || incidents.includes("PA-002"))) {
+        if (incidents && (incidents.includes("PA-001") || incidents.includes("PA-002") || incidents.includes("PA-8291A4") || incidents.includes("PA-7193F2"))) {
           localStorage.removeItem("dorm_student_incidents");
         }
         const cachedRoom = localStorage.getItem("dorm_current_room_info");
         if (cachedRoom && (cachedRoom.includes("P36") || cachedRoom.includes('"so_phong":"36"'))) {
           localStorage.removeItem("dorm_current_room_info");
         }
-        localStorage.setItem("ktx_test_data_cleaned_v3", "true");
+
+        const notifs = localStorage.getItem("ktx_student_notifications");
+        if (notifs && (notifs.includes("noti-default-") || notifs.includes("transfer-approved-YC-0231") || notifs.includes("YC-0231"))) {
+          localStorage.removeItem("ktx_student_notifications");
+        }
+
+        localStorage.setItem("ktx_test_data_cleaned_v5", "true");
         window.dispatchEvent(new Event("student-account-updated"));
         window.dispatchEvent(new Event("occupancy-updated"));
+        window.dispatchEvent(new Event("student-incidents-updated"));
+        window.dispatchEvent(new CustomEvent("ktx-notifications-updated", { detail: [] }));
+      }
+
+      if (localStorage.getItem("ktx_fix_notifications_v8") !== "true") {
+        localStorage.removeItem("dorm_student_incidents");
+        const notifsRaw = localStorage.getItem("ktx_student_notifications");
+        if (notifsRaw) {
+          try {
+            const notifs = JSON.parse(notifsRaw);
+            if (Array.isArray(notifs)) {
+              const cleaned = notifs.filter((n) => {
+                const title = n.title || "";
+                const content = n.content || "";
+                if (title.includes("Ban quản lý KTX đang xử lý phản ánh")) return false;
+                if (content.includes("Báo hỏng vòi nước")) return false;
+                if (title.includes("hóa đơn điện nước Năm học")) return false;
+                if (title.includes("hóa đơn điện nước Tháng 10/2026")) return false;
+                if (n.time === "07:00") return false;
+                return true;
+              });
+              localStorage.setItem("ktx_student_notifications", JSON.stringify(cleaned));
+            }
+          } catch (_) {
+            localStorage.removeItem("ktx_student_notifications");
+          }
+        }
+        localStorage.setItem("ktx_fix_notifications_v8", "true");
+        window.dispatchEvent(new CustomEvent("ktx-notifications-updated", { detail: [] }));
       }
     } catch (_) {}
   }, []);
@@ -254,6 +287,10 @@ export default function App() {
       case "chuyen-phong":
         navigateTo("/student/transfer-room");
         break;
+      case "checkout":
+      case "tra-phong":
+        navigateTo("/student/transfer-room?tab=checkout");
+        break;
       case "lookup":
       case "tra-cuu":
       case "search-rooms":
@@ -277,6 +314,10 @@ export default function App() {
       case "profile":
       case "thong-tin-ca-nhan":
         navigateTo("/student/profile");
+        break;
+      case "notifications":
+      case "thong-bao":
+        navigateTo("/student/notifications");
         break;
       default:
         break;
@@ -321,7 +362,7 @@ export default function App() {
           onLoginSuccess={(role) => {
             const r = String(role || "").toUpperCase();
             if (r.includes("KE_TOAN") || r.includes("KETOAN")) {
-              navigateTo("/doi-soat");
+              navigateTo("/accountant/dashboard");
             } else if (
               r.includes("ADMIN") ||
               r.includes("QUAN_LY") ||
@@ -518,6 +559,45 @@ export default function App() {
   if (currentPath.startsWith("/admin/requests/registration")) {
     const match = currentPath.match(/\/admin\/requests\/registration\/?(.*)/);
     const requestId = match && match[1] ? match[1] : "DK-001";
+    const upperReqId = requestId.toUpperCase();
+
+    // Nếu ID là đơn chuyển phòng (YC hoặc CP) -> Tự động chuyển hướng xử lý đúng sang ProcessTransferPage
+    if (upperReqId.startsWith("YC") || upperReqId.startsWith("CP")) {
+      return (
+        <div className="relative">
+          <ProcessTransferPage
+            requestId={requestId}
+            onBack={() => {
+              loadRequests();
+              navigateTo("/admin");
+            }}
+            onProcessed={() => {
+              loadRequests();
+              navigateTo("/admin");
+            }}
+          />
+        </div>
+      );
+    }
+
+    // Nếu ID là đơn trả phòng (TP) -> Tự động chuyển hướng xử lý đúng sang ProcessCheckoutPage
+    if (upperReqId.startsWith("TP")) {
+      return (
+        <div className="relative">
+          <ProcessCheckoutPage
+            requestId={requestId}
+            onBack={() => {
+              loadRequests();
+              navigateTo("/admin");
+            }}
+            onProcessed={() => {
+              loadRequests();
+              navigateTo("/admin");
+            }}
+          />
+        </div>
+      );
+    }
 
     return (
       <div className="relative">
@@ -540,7 +620,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             )
           }
         />
@@ -574,7 +654,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             )
           }
         />
@@ -608,7 +688,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             )
           }
         />
@@ -637,7 +717,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -662,7 +742,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -696,7 +776,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -707,7 +787,9 @@ export default function App() {
   // 3. Chuyển / Trả phòng
   if (
     currentPath === "/student/transfer-room" ||
-    currentPath === "/student/transfer"
+    currentPath === "/student/transfer" ||
+    currentPath === "/student/checkout" ||
+    currentPath === "/student/tra-phong"
   ) {
     return (
       <div className="relative">
@@ -724,7 +806,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -753,7 +835,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -782,7 +864,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -802,7 +884,11 @@ export default function App() {
           onSelectTab={handleStudentTabSelect}
           onNavigate={navigateTo}
           onLogout={() => {
+            const savedAvatar = localStorage.getItem("ktx_student_avatar");
             localStorage.clear();
+            if (savedAvatar) {
+              localStorage.setItem("ktx_student_avatar", savedAvatar);
+            }
             navigateTo("/");
           }}
         />
@@ -815,7 +901,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -843,7 +929,7 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -884,7 +970,35 @@ export default function App() {
                 ? "/admin"
                 : r === "student"
                   ? "/student/dashboard"
-                  : "/doi-soat",
+                  : "/accountant/dashboard",
+            );
+          }}
+        />
+      </div>
+    );
+  }
+
+  // 7. Thông báo sinh viên (Nhận thông tin từ Quản lý KTX và Kế toán)
+  if (
+    currentPath === "/student/notifications" ||
+    currentPath === "/student/thong-bao"
+  ) {
+    return (
+      <div className="relative">
+        <StudentNotificationsPage
+          onSelectTab={handleStudentTabSelect}
+          onNavigate={navigateTo}
+        />
+        <RoleSwitcher
+          currentRole="student"
+          onSwitchRole={(r) => {
+            loadRequests();
+            navigateTo(
+              r === "admin"
+                ? "/admin"
+                : r === "student"
+                  ? "/student/dashboard"
+                  : "/accountant/dashboard",
             );
           }}
         />
@@ -975,7 +1089,7 @@ export default function App() {
               ? "/admin"
               : r === "student"
                 ? "/student/dashboard"
-                : "/doi-soat",
+                : "/accountant/dashboard",
           );
         }}
       />

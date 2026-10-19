@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import feedbackService from '../../services/feedbackService';
 import IncidentSummaryCard from '../../components/IncidentSummaryCard';
+import studentNotificationService from '../../services/studentNotificationService';
 
 export default function IncidentManagement({ searchTerm = '' }) {
   const [incidents, setIncidents] = useState([]);
@@ -69,6 +70,30 @@ export default function IncidentManagement({ searchTerm = '' }) {
         newStatus,
         processNote.trim()
       );
+
+      try {
+        const statusMap = {
+          CHO_XU_LY: "Chờ tiếp nhận",
+          DANG_XU_LY: "Đang xử lý",
+          HOAN_THANH: "Đã hoàn thành",
+          DA_GIAI_QUYET: "Đã giải quyết",
+          TU_CHOI: "Từ chối xử lý",
+        };
+        const statusText = statusMap[newStatus] || newStatus;
+        const targetMsv = (selectedIncident.msv || selectedIncident.ma_sinh_vien || "").trim().replace(/@.*$/, "").toUpperCase();
+        const notifTitle =
+          newStatus === "DANG_XU_LY"
+            ? "Ban quản lý KTX đã tiếp nhận xử lý phản ánh"
+            : `Cập nhật phản ánh: ${statusText}`;
+        studentNotificationService.notifyFromManagement({
+          title: notifTitle,
+          content: `Phản ánh sự cố "${selectedIncident.tieu_de || selectedIncident.mo_ta || selectedIncident.ma_phan_anh || "Báo hỏng"}" của bạn đã được Ban quản lý KTX chuyển sang trạng thái: ${statusText}.${processNote.trim() ? ` Ghi chú: ${processNote.trim()}` : ""}`,
+          type: "inspection",
+          actionUrl: "/student/feedback",
+          actionLabel: "Xem phản ánh",
+          msv: targetMsv || null,
+        });
+      } catch (_) {}
 
       setNotification({
         type: 'success',

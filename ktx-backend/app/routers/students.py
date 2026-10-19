@@ -1,6 +1,10 @@
+import os
+import shutil
+import uuid
+from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -155,6 +159,65 @@ def update_student(
         )
 
     return student_service.update_student(db, msv, update_data)
+
+
+@router.post(
+    "/{msv}/avatar",
+    response_model=SinhVienResponse,
+    summary="Tải lên và cập nhật ảnh đại diện sinh viên",
+)
+async def upload_student_avatar(
+    msv: str,
+    file: UploadFile = File(...),
+    current_user: TaiKhoan = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Tải lên ảnh đại diện sinh viên:
+    - Lưu file vào uploads/avatars/
+    - Cập nhật trường anh_dai_dien trong CSDL
+    - Sinh viên chỉ có thể cập nhật ảnh của chính mình
+    """
+    user_role = (
+        current_user.vai_tro.value
+        if hasattr(current_user.vai_tro, "value")
+        else str(current_user.vai_tro)
+    )
+
+    user_msv = None
+    if current_user.nguoi_dung and current_user.nguoi_dung.sinh_vien:
+        user_msv = current_user.nguoi_dung.sinh_vien.msv
+
+    clean_req_msv = (msv or "").strip().lower()
+    user_login = (current_user.ten_dang_nhap or "").strip().lower()
+    user_student_msv = (user_msv or "").strip().lower()
+
+    if user_role == "SinhVien" and user_login != clean_req_msv and user_student_msv != clean_req_msv:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Bạn chỉ được phép cập nhật ảnh đại diện của chính mình.",
+        )
+
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in [".jpg", ".jpeg", ".png", ".webp", ".gif"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Định dạng tệp '{ext}' không được hỗ trợ. Vui lòng tải lên ảnh JPG, PNG, WEBP hoặc GIF.",
+        )
+
+    unique_filename = f"avatar_{clean_req_msv}_{uuid.uuid4().hex[:8]}{ext}"
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    upload_folder = os.path.join(base_dir, "uploads", "avatars")
+    os.makedirs(upload_folder, exist_ok=True)
+    file_path = os.path.join(upload_folder, unique_filename)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    avatar_url = f"http://localhost:8000/uploads/avatars/{unique_filename}"
+
+    student_update = SinhVienUpdate(anh_dai_dien=avatar_url)
+    return student_service.update_student(db, msv, student_update)
 
 
 @router.delete(

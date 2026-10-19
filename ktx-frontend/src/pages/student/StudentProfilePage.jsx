@@ -139,6 +139,14 @@ export default function StudentProfilePage({ onSelectTab }) {
           const savedAvatar = localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY);
           const profileEmail = accountProfile.email || student.email || "";
           const msvFromEmail = profileEmail.split("@")[0].trim();
+          
+          let effectiveAvatar = "/avatar.png";
+          if (student.avatar_url && student.avatar_url !== "/avatar.png") {
+            effectiveAvatar = student.avatar_url;
+          } else if (savedAvatar && savedAvatar !== "/avatar.png") {
+            effectiveAvatar = savedAvatar;
+          }
+
           const studentProfile = {
             ...student,
             ...Object.fromEntries(
@@ -146,21 +154,21 @@ export default function StudentProfilePage({ onSelectTab }) {
             ),
             msv: msvFromEmail || accountProfile.msv || student.msv,
             email: profileEmail || student.email,
-            avatar_url: savedAvatar || student.avatar_url || "/avatar.png",
+            avatar_url: effectiveAvatar,
           };
           setProfile(studentProfile);
           setEditFormData({
             ...studentProfile,
             ngay_sinh: toDateInputValue(studentProfile.ngay_sinh),
           });
-          if (studentProfile.avatar_url) {
+          if (effectiveAvatar) {
             localStorage.setItem(
               STUDENT_AVATAR_STORAGE_KEY,
-              studentProfile.avatar_url,
+              effectiveAvatar,
             );
             window.dispatchEvent(
               new CustomEvent("student-avatar-updated", {
-                detail: { avatarUrl: studentProfile.avatar_url },
+                detail: { avatarUrl: effectiveAvatar },
               }),
             );
           }
@@ -202,32 +210,51 @@ export default function StudentProfilePage({ onSelectTab }) {
     }
   };
 
-  // Xử lý upload ảnh đại diện
-  const handleAvatarUpload = (e) => {
+  // Xử lý upload ảnh đại diện (Lưu bền vững cả vào CSDL Backend và LocalStorage)
+  const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const newAvatarUrl = event.target?.result;
-      if (newAvatarUrl) {
-        const updated = { ...profile, avatar_url: newAvatarUrl };
-        setProfile(updated);
-        setEditFormData((prev) => ({ ...prev, avatar_url: newAvatarUrl }));
-        localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, newAvatarUrl);
-        window.dispatchEvent(
-          new CustomEvent("student-avatar-updated", {
-            detail: { avatarUrl: newAvatarUrl },
-          }),
-        );
+    // Xem trước tức thì
+    const previewUrl = URL.createObjectURL(file);
+    setProfile((prev) => ({ ...prev, avatar_url: previewUrl }));
+    setEditFormData((prev) => ({ ...prev, avatar_url: previewUrl }));
 
-        if (occupancyService.updateStudentProfile) {
-          await occupancyService.updateStudentProfile(updated);
-        }
-        showToast("Cập nhật ảnh đại diện thành công!");
+    try {
+      const studentMsv =
+        profile.msv ||
+        localStorage.getItem("ktx_username") ||
+        "DTC245180137";
+
+      if (occupancyService.uploadStudentAvatar) {
+        const res = await occupancyService.uploadStudentAvatar(studentMsv, file);
+        const serverAvatarUrl = res.anh_dai_dien || previewUrl;
+        setProfile((prev) => ({ ...prev, avatar_url: serverAvatarUrl }));
+        setEditFormData((prev) => ({ ...prev, avatar_url: serverAvatarUrl }));
+        localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, serverAvatarUrl);
       }
-    };
-    reader.readAsDataURL(file);
+      showToast("Cập nhật ảnh đại diện thành công!");
+    } catch (err) {
+      console.warn("Upload avatar to server failed, falling back to local storage:", err);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result;
+        if (dataUrl) {
+          setProfile((prev) => ({ ...prev, avatar_url: dataUrl }));
+          setEditFormData((prev) => ({ ...prev, avatar_url: dataUrl }));
+          try {
+            localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, dataUrl);
+          } catch (_) {}
+          window.dispatchEvent(
+            new CustomEvent("student-avatar-updated", {
+              detail: { avatarUrl: dataUrl },
+            }),
+          );
+        }
+      };
+      reader.readAsDataURL(file);
+      showToast("Đã cập nhật ảnh đại diện!");
+    }
   };
 
   // Mở modal chỉnh sửa
@@ -691,19 +718,29 @@ export default function StudentProfilePage({ onSelectTab }) {
                   <input
                     type="file"
                     ref={modalAvatarInputRef}
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        if (event.target?.result) {
-                          setEditFormData((prev) => ({
-                            ...prev,
-                            avatar_url: event.target.result,
-                          }));
+                      const previewUrl = URL.createObjectURL(file);
+                      setEditFormData((prev) => ({
+                        ...prev,
+                        avatar_url: previewUrl,
+                      }));
+                      try {
+                        const studentMsv =
+                          profile.msv ||
+                          localStorage.getItem("ktx_username") ||
+                          "DTC245180137";
+                        if (occupancyService.uploadStudentAvatar) {
+                          const res = await occupancyService.uploadStudentAvatar(studentMsv, file);
+                          const serverAvatarUrl = res.anh_dai_dien || previewUrl;
+                          setProfile((prev) => ({ ...prev, avatar_url: serverAvatarUrl }));
+                          setEditFormData((prev) => ({ ...prev, avatar_url: serverAvatarUrl }));
+                          localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, serverAvatarUrl);
                         }
-                      };
-                      reader.readAsDataURL(file);
+                      } catch (err) {
+                        console.warn("Upload avatar from modal failed, fallback to local:", err);
+                      }
                     }}
                     accept="image/*"
                     className="hidden"

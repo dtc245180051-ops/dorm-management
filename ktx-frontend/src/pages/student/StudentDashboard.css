@@ -1030,6 +1030,10 @@
   border: 1px solid var(--border);
 }
 
+.student-modal-card.student-modal-card-lg {
+  max-width: 620px;
+}
+
 .student-modal-header {
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);

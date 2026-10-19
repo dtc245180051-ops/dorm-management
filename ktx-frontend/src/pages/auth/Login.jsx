@@ -118,7 +118,7 @@ export default function Login({
         const roleUpper = String(authenticatedUser.role || "").toUpperCase();
         const targetPath =
           (roleUpper.includes("KE_TOAN") || roleUpper.includes("KETOAN"))
-            ? "/doi-soat"
+            ? "/accountant/dashboard"
             : (roleUpper.includes("ADMIN") || roleUpper.includes("QUAN_LY") || roleUpper.includes("QUANLY"))
               ? "/admin"
               : "/student/dashboard";

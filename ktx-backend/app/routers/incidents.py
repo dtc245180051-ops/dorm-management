@@ -213,21 +213,23 @@ def create_incident(
     incident_code = f"PA-{uuid.uuid4().hex[:6].upper()}"
 
     # 2. Lưu vào CSDL bảng phan_anh
-    target_msv = req.msv or "dtc245180051"
+    original_msv = (req.msv or "dtc245180137").strip()
+    target_msv = original_msv
     try:
         student_check = db.execute(
-            text("SELECT msv FROM sinh_vien WHERE msv = :msv"),
+            text("SELECT msv FROM sinh_vien WHERE UPPER(msv) = UPPER(:msv)"),
             {"msv": target_msv},
         ).fetchone()
 
-        if not student_check:
+        if student_check:
+            db_msv = student_check[0]
+        else:
             first_sv = db.execute(text("SELECT msv FROM sinh_vien LIMIT 1")).fetchone()
-            if first_sv:
-                target_msv = first_sv[0]
+            db_msv = first_sv[0] if first_sv else target_msv
 
         new_db_incident = PhanAnh(
             ma_phan_anh=incident_code,
-            msv=target_msv,
+            msv=db_msv,
             noi_dung=clean_mo_ta,
             trang_thai="CHO_XU_LY",
             ngay_gui=datetime.date.today(),
@@ -245,11 +247,11 @@ def create_incident(
         db.rollback()
         print(f"Warning: Could not save to DB table phan_anh ({db_err}), saving to store.")
 
-    # 3. Lưu vào incident_store trung tâm phục vụ Ban Quản lý KTX
+    # 3. Lưu vào incident_store trung tâm phục vụ Ban Quản lý KTX và Sinh viên
     payload = {
         "id": incident_code,
         "ma_phan_anh": incident_code,
-        "msv": target_msv,
+        "msv": original_msv,
         "ho_ten": req.ho_ten or "Sinh viên",
         "phong": req.phong or "",
         "loai_phan_anh": phan_loai,
@@ -259,6 +261,7 @@ def create_incident(
         "hinh_anh": req.hinh_anh,
         "muc_do_uu_tien": muc_do_uu_tien,
         "trang_thai": "CHO_XU_LY",
+        "trang_thai_label": "Chờ xử lý",
         "ngay_gui": datetime.datetime.now().isoformat(),
         "ngay_tao": datetime.datetime.now().isoformat(),
     }
@@ -335,32 +338,60 @@ def get_incidents(
     Trả về danh sách phản ánh.
     Ban quản lý xem toàn bộ danh sách, sinh viên có thể lọc theo MSV của mình.
     """
-    # Đồng bộ từ MySQL nếu in-memory store đang trống
-    if len(incident_store.get_all_incidents()) == 0:
-        try:
-            db_records = db.query(PhanAnh).order_by(PhanAnh.ngay_gui.desc()).all()
-            for rec in db_records:
-                incident_store.add_incident({
-                    "id": rec.ma_phan_anh,
-                    "ma_phan_anh": rec.ma_phan_anh,
-                    "msv": rec.msv,
-                    "ho_ten": rec.sinh_vien.nguoi_dung.ho_ten if (rec.sinh_vien and rec.sinh_vien.nguoi_dung) else rec.msv,
-                    "phong": rec.phong or "",
-                    "loai_phan_anh": rec.phan_loai or "Cơ sở vật chất",
-                    "phan_loai": rec.phan_loai or "Cơ sở vật chất",
-                    "tieu_de": rec.tieu_de or rec.tom_tat or (rec.noi_dung[:40] if rec.noi_dung else "Sự cố"),
-                    "mo_ta": rec.mo_ta or rec.noi_dung or "",
-                    "muc_do_uu_tien": rec.muc_do_uu_tien or "Thường",
-                    "trang_thai": rec.trang_thai or "CHO_XU_LY",
-                    "ngay_gui": rec.ngay_gui.isoformat() if rec.ngay_gui else None,
-                })
-        except Exception as e:
-            print(f"Warning syncing incidents from DB: {e}")
-
     if msv:
         items = incident_store.get_incidents_by_student(msv)
+        # Đồng bộ thêm từ MySQL nếu có
+        try:
+            db_records = db.query(PhanAnh).filter(PhanAnh.msv.ilike(f"%{msv.strip()}%")).all()
+            existing_ids = {it.get("id") or it.get("ma_phan_anh") for it in items}
+            for rec in db_records:
+                rec_id = rec.ma_phan_anh
+                if rec_id not in existing_ids:
+                    mapped = {
+                        "id": rec_id,
+                        "ma_phan_anh": rec_id,
+                        "msv": rec.msv,
+                        "ho_ten": rec.sinh_vien.nguoi_dung.ho_ten if (rec.sinh_vien and rec.sinh_vien.nguoi_dung) else rec.msv,
+                        "phong": rec.phong or "",
+                        "loai_phan_anh": rec.phan_loai or "Cơ sở vật chất",
+                        "phan_loai": rec.phan_loai or "Cơ sở vật chất",
+                        "tieu_de": rec.tieu_de or rec.tom_tat or (rec.noi_dung[:40] if rec.noi_dung else "Sự cố"),
+                        "mo_ta": rec.mo_ta or rec.noi_dung or "",
+                        "muc_do_uu_tien": rec.muc_do_uu_tien or "Thường",
+                        "trang_thai": rec.trang_thai or "CHO_XU_LY",
+                        "trang_thai_label": "Đang xử lý" if rec.trang_thai == "DANG_XU_LY" else ("Đã xử lý" if rec.trang_thai in ("DA_XU_LY", "HOAN_THANH") else "Chờ xử lý"),
+                        "ngay_gui": rec.ngay_gui.isoformat() if rec.ngay_gui else None,
+                        "ghi_chu_xu_ly": rec.ghi_chu_xu_ly or "",
+                    }
+                    items.append(mapped)
+                    incident_store.add_incident(mapped)
+        except Exception as e:
+            print(f"Warning querying DB for student incidents: {e}")
     else:
         items = incident_store.get_all_incidents()
+        # Đồng bộ từ MySQL nếu in-memory store đang trống
+        if len(items) == 0:
+            try:
+                db_records = db.query(PhanAnh).order_by(PhanAnh.ngay_gui.desc()).all()
+                for rec in db_records:
+                    incident_store.add_incident({
+                        "id": rec.ma_phan_anh,
+                        "ma_phan_anh": rec.ma_phan_anh,
+                        "msv": rec.msv,
+                        "ho_ten": rec.sinh_vien.nguoi_dung.ho_ten if (rec.sinh_vien and rec.sinh_vien.nguoi_dung) else rec.msv,
+                        "phong": rec.phong or "",
+                        "loai_phan_anh": rec.phan_loai or "Cơ sở vật chất",
+                        "phan_loai": rec.phan_loai or "Cơ sở vật chất",
+                        "tieu_de": rec.tieu_de or rec.tom_tat or (rec.noi_dung[:40] if rec.noi_dung else "Sự cố"),
+                        "mo_ta": rec.mo_ta or rec.noi_dung or "",
+                        "muc_do_uu_tien": rec.muc_do_uu_tien or "Thường",
+                        "trang_thai": rec.trang_thai or "CHO_XU_LY",
+                        "ngay_gui": rec.ngay_gui.isoformat() if rec.ngay_gui else None,
+                        "ghi_chu_xu_ly": rec.ghi_chu_xu_ly or "",
+                    })
+                items = incident_store.get_all_incidents()
+            except Exception as e:
+                print(f"Warning syncing incidents from DB: {e}")
 
     if trang_thai and trang_thai != "ALL":
         items = [item for item in items if item.get("trang_thai") == trang_thai]

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import StudentLayout from '../../layouts/Student';
 import feedbackService from '../../services/feedbackService';
+import studentNotificationService from '../../services/studentNotificationService';
 import FeatureLockedNotice from '../../components/FeatureLockedNotice';
 import { resolveStudentStatus, STUDENT_STATUS } from '../../services/studentStatusService';
 
@@ -80,6 +81,10 @@ export default function FeedbackPage({
         setRoom(fallbackRoom);
       }
     });
+
+    const handleUpdate = () => loadHistory();
+    window.addEventListener('student-incidents-updated', handleUpdate);
+    return () => window.removeEventListener('student-incidents-updated', handleUpdate);
   }, [studentMsv]);
 
   // Xử lý chọn ảnh
@@ -130,6 +135,7 @@ export default function FeedbackPage({
 
       const result = await feedbackService.submitFeedback(payload);
       setSuccessTicket(result);
+
 
       // Reset form sau khi gửi thành công
       setDescription('');
@@ -304,7 +310,10 @@ export default function FeedbackPage({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('history')}
+                  onClick={() => {
+                    setActiveTab('history');
+                    loadHistory();
+                  }}
                   className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
                     activeTab === 'history'
                       ? 'bg-white text-blue-600 shadow-2xs font-bold'
@@ -561,7 +570,11 @@ export default function FeedbackPage({
                               </td>
                               <td className="py-3.5 px-4 text-xs text-slate-500">
                                 {pa.ngay_gui
-                                  ? new Date(pa.ngay_gui).toLocaleDateString('vi-VN')
+                                  ? (typeof pa.ngay_gui === 'string' && pa.ngay_gui.includes('/')
+                                      ? pa.ngay_gui
+                                      : (!isNaN(new Date(pa.ngay_gui).getTime())
+                                          ? new Date(pa.ngay_gui).toLocaleDateString('vi-VN')
+                                          : String(pa.ngay_gui)))
                                   : 'Hôm nay'}
                               </td>
                               <td className="py-3.5 px-4">
