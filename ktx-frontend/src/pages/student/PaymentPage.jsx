@@ -180,6 +180,8 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
     "Sinh viên";
 
   const maSV = (
+    localStorage.getItem("ktx_msv") ||
+    localStorage.getItem("ktx_student_msv") ||
     accountData.studentId ||
     localStorage.getItem("ktx_username") ||
     ""
@@ -210,6 +212,8 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
 
     const loadData = async () => {
       const currentCode = (
+        localStorage.getItem("ktx_msv") ||
+        localStorage.getItem("ktx_student_msv") ||
         maSV ||
         localStorage.getItem("ktx_username") ||
         ""
@@ -274,19 +278,6 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
         bldStr = rawBld;
       }
 
-      const fullDisplay =
-        roomStr && bldStr
-          ? `${roomStr} - ${bldStr}`
-          : roomStr || (statusRes.status === STUDENT_STATUS.ACTIVE_RESIDENT ? "Phòng KTX" : "Chưa xếp phòng");
-
-      if (isMounted) {
-        setRoomInfo({
-          roomNumber: roomStr,
-          building: bldStr,
-          fullDisplay: fullDisplay,
-        });
-      }
-
       // 2. Tải danh sách hóa đơn từ backend API hoặc fallback local account
       let fetchedInvoices = [];
       let isApiFetched = false;
@@ -306,8 +297,37 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
         fetchedInvoices = acc.bills;
       }
 
+      // Nếu có hóa đơn, trích xuất phòng từ hóa đơn nếu chưa tìm thấy
+      if ((!roomStr || roomStr === "Phòng KTX") && fetchedInvoices.length > 0) {
+        const invWithRoom = fetchedInvoices.find((i) => i.so_phong || i.ma_phong);
+        if (invWithRoom) {
+          const rawSp = String(invWithRoom.so_phong || invWithRoom.ma_phong);
+          if (rawSp.includes(" - ")) {
+            const [pPart, bPart] = rawSp.split(" - ");
+            roomStr = pPart.trim().startsWith("P") ? pPart.trim() : `P${pPart.trim()}`;
+            bldStr = bPart.trim();
+          } else {
+            roomStr = rawSp.startsWith("P") ? rawSp : `P${rawSp}`;
+          }
+        }
+      }
+
+      const fullDisplay =
+        roomStr && bldStr
+          ? `${roomStr} - ${bldStr}`
+          : roomStr || (statusRes.status === STUDENT_STATUS.ACTIVE_RESIDENT ? "Phòng KTX" : "Chưa xếp phòng");
+
       if (isMounted) {
+        setRoomInfo({
+          roomNumber: roomStr,
+          building: bldStr,
+          fullDisplay: fullDisplay,
+        });
         setInvoices(fetchedInvoices);
+        // Nếu sinh viên có hóa đơn thực tế cần thanh toán, tự động mở khóa trang thanh toán
+        if (fetchedInvoices.length > 0 && statusRes.status !== STUDENT_STATUS.ACTIVE_RESIDENT) {
+          setStudentStatus(STUDENT_STATUS.ACTIVE_RESIDENT);
+        }
       }
     };
 
@@ -550,34 +570,37 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
                   </div>
                 </div>
 
-                {/* Thẻ 3: Trạng thái thanh toán */}
+                {/* Thẻ 3: Trạng thái thanh toán & Tổng tiền cần nộp */}
                 <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm flex items-center gap-4 transition hover:shadow-sm">
                   <div className="w-12 h-12 rounded-full bg-[#dbeafe] text-blue-600 flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="w-6 h-6" />
+                    <Wallet className="w-6 h-6" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="text-xs text-slate-500 font-medium">
-                      Trạng thái thanh toán
+                      Tổng tiền cần nộp
                     </div>
-                    <div className="mt-1">
+                    <div className="text-xl font-bold text-slate-900 mt-0.5 truncate">
+                      {hasInvoices && unpaidItems.length > 0 ? formattedUnpaidTotal : "0 đ"}
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 flex-wrap">
                       {!hasInvoices || unpaidItems.length === 0 ? (
-                        <span className="bg-emerald-100 text-emerald-700 font-bold px-3 py-1 text-xs rounded-full inline-block">
+                        <span className="bg-emerald-100 text-emerald-700 font-bold px-2.5 py-0.5 text-xs rounded-full inline-block">
                           Đã hoàn tất
                         </span>
                       ) : unpaidItems.every((i) => i.status === "pending") ? (
-                        <span className="bg-amber-100 text-amber-700 font-bold px-3 py-1 text-xs rounded-full inline-block">
-                          Chờ xác nhận thanh toán
+                        <span className="bg-amber-100 text-amber-700 font-bold px-2.5 py-0.5 text-xs rounded-full inline-block">
+                          Chờ xác nhận
                         </span>
                       ) : (
-                        <span className="bg-rose-100 text-rose-700 font-bold px-3 py-1 text-xs rounded-full inline-block">
-                          Còn {unpaidItems.filter((i) => i.status !== "pending").length} khoản chưa nộp
+                        <span className="bg-rose-100 text-rose-700 font-bold px-2.5 py-0.5 text-xs rounded-full inline-block">
+                          Còn {unpaidItems.filter((i) => i.status !== "pending").length} khoản
                         </span>
                       )}
-                    </div>
-                    <div className="text-xs text-slate-400 mt-1 truncate">
-                      {hasInvoices && earliestDueDate
-                        ? `Hạn thanh toán: ${formatDisplayDate(earliestDueDate)}`
-                        : "Hạn thanh toán: --"}
+                      <span className="text-xs text-slate-400 truncate">
+                        {hasInvoices && earliestDueDate
+                          ? `Hạn: ${formatDisplayDate(earliestDueDate)}`
+                          : "Hạn: --"}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -619,8 +642,16 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
                       </div>
                     </div>
 
-                    <div className="text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
-                      Tổng số khoản phí: <span className="font-bold text-slate-800">{feeItems.length}</span>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      {unpaidItems.length > 0 && (
+                        <div className="text-xs font-semibold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200 flex items-center gap-1.5">
+                          <span>Tổng cần nộp:</span>
+                          <span className="font-extrabold text-sm text-rose-600">{formattedUnpaidTotal}</span>
+                        </div>
+                      )}
+                      <div className="text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+                        Tổng số khoản phí: <span className="font-bold text-slate-800">{feeItems.length}</span>
+                      </div>
                     </div>
                   </div>
 

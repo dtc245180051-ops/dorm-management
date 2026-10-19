@@ -328,10 +328,28 @@
   transform: none;
 }
 
+.billing-btn-download-template {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #059669;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: 1.5px solid #10b981;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.12);
+}
+
 .billing-btn-download-template:hover {
-  background-color: #eff6ff;
-  border-color: #1a73e8;
-  color: #1a73e8;
+  background-color: #ecfdf5;
+  border-color: #059669;
+  color: #047857;
+  transform: translateY(-1px);
 }
 
 .billing-upload-badge {
@@ -366,6 +384,50 @@
   background-color: #fef3c7;
   color: #92400e;
   border: 1px solid #fde68a;
+}
+
+.room-type-tag.tag-issued {
+  background-color: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+/* Status banner thông báo tình trạng đợt phát hành */
+.billing-status-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+  font-size: 13.5px;
+  color: #166534;
+}
+
+.billing-status-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.billing-toggle-btn {
+  background-color: #ffffff;
+  border: 1px solid #86efac;
+  color: #15803d;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.billing-toggle-btn:hover {
+  background-color: #dcfce7;
 }
 
 /* ================= TABLE ================= */

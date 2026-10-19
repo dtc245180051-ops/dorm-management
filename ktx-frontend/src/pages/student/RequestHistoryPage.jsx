@@ -160,23 +160,26 @@ export default function RequestHistoryPage({
 
   // Tải dữ liệu ban đầu và lắng nghe cập nhật realtime
   useEffect(() => {
-    loadData();
+    loadData(true);
 
+    let timer = null;
     const handleUpdate = () => {
-      loadData();
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        loadData(false);
+      }, 150);
     };
     window.addEventListener("occupancy-updated", handleUpdate);
     window.addEventListener("student-account-updated", handleUpdate);
-    window.addEventListener("storage", handleUpdate);
     return () => {
+      if (timer) clearTimeout(timer);
       window.removeEventListener("occupancy-updated", handleUpdate);
       window.removeEventListener("student-account-updated", handleUpdate);
-      window.removeEventListener("storage", handleUpdate);
     };
   }, []);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = async (showLoading = false) => {
+    if (showLoading) setIsLoading(true);
     try {
       const studentMsv =
         localStorage.getItem("ktx_username") ||
@@ -223,6 +226,7 @@ export default function RequestHistoryPage({
       }
 
       if (transferReqs && Array.isArray(transferReqs)) {
+        const userProf = occupancyService.getLocalStudentProfile?.() || {};
         transferReqs.forEach((tc) => {
           const tcMsv = (tc.msv || "").trim().toUpperCase();
           if (
@@ -237,7 +241,54 @@ export default function RequestHistoryPage({
               (r) => r.id === tc.id || r.ma_yeu_cau === tc.ma_yeu_cau,
             )
           ) {
+            const matchedReg =
+              combinedReqs.find(
+                (r) => (r.msv || "").trim().toUpperCase() === tcMsv && r.cccd,
+              ) ||
+              (Array.isArray(reqs)
+                ? reqs.find(
+                    (r) => (r.msv || "").trim().toUpperCase() === tcMsv && r.cccd,
+                  )
+                : null);
+
             combinedReqs.push({
+              ngay_sinh:
+                tc.ngay_sinh ||
+                matchedReg?.ngay_sinh ||
+                userProf.ngay_sinh ||
+                "",
+              cccd: tc.cccd || matchedReg?.cccd || userProf.cccd || "",
+              so_dien_thoai:
+                tc.so_dien_thoai ||
+                matchedReg?.so_dien_thoai ||
+                userProf.so_dien_thoai ||
+                "",
+              email: tc.email || matchedReg?.email || userProf.email || "",
+              khoa: tc.khoa || matchedReg?.khoa || userProf.khoa || "",
+              lop: tc.lop || matchedReg?.lop || userProf.lop || "",
+              dia_chi:
+                tc.dia_chi ||
+                tc.que_quan ||
+                matchedReg?.dia_chi ||
+                matchedReg?.que_quan ||
+                userProf.dia_chi ||
+                userProf.que_quan ||
+                "",
+              nguoi_giam_ho:
+                tc.nguoi_giam_ho ||
+                matchedReg?.nguoi_giam_ho ||
+                userProf.nguoi_giam_ho ||
+                "",
+              moi_quan_he:
+                tc.moi_quan_he ||
+                matchedReg?.moi_quan_he ||
+                userProf.moi_quan_he ||
+                "",
+              sdt_nguoi_giam_ho:
+                tc.sdt_nguoi_giam_ho ||
+                matchedReg?.sdt_nguoi_giam_ho ||
+                userProf.sdt_nguoi_giam_ho ||
+                "",
               ...tc,
               ngay_dang_ky: tc.ngay_gui || "Hôm nay",
               loai_phong:
@@ -275,6 +326,94 @@ export default function RequestHistoryPage({
           };
         });
       }
+
+      // 3. Đồng bộ với các yêu cầu chuyển / trả phòng đã được phê duyệt
+      const approvedTransfer = Array.isArray(transferReqs)
+        ? transferReqs.find((t) => {
+            const tMsv = (t.msv || "").trim().toUpperCase();
+            const curMsv = (studentMsv || "").trim().toUpperCase();
+            return (
+              (!curMsv || !tMsv || tMsv === curMsv) &&
+              (t.trang_thai === "DA_DUYET" || t.trang_thai === "APPROVED" || t.trang_thai_label === "Đã duyệt") &&
+              t.loai_don === "CHUYEN_PHONG"
+            );
+          })
+        : null;
+
+      const approvedCheckout = Array.isArray(transferReqs)
+        ? transferReqs.find((t) => {
+            const tMsv = (t.msv || "").trim().toUpperCase();
+            const curMsv = (studentMsv || "").trim().toUpperCase();
+            return (
+              (!curMsv || !tMsv || tMsv === curMsv) &&
+              (t.trang_thai === "DA_DUYET" || t.trang_thai === "APPROVED" || t.trang_thai_label === "Đã duyệt") &&
+              t.loai_don === "TRA_PHONG"
+            );
+          })
+        : null;
+
+      if (approvedCheckout) {
+        stayList = stayList.map((item) => ({
+          ...item,
+          trang_thai: "DA_TRA_PHONG",
+          trang_thai_label: "Đã kết thúc",
+          status: "COMPLETED",
+        }));
+      } else if (approvedTransfer && approvedTransfer.xep_phong) {
+        const xp = approvedTransfer.xep_phong;
+        const rawPhong = String(xp.phong_id || "203");
+        const matchNum = rawPhong.match(/\d+/);
+        const roomClean = matchNum ? matchNum[0] : "203";
+        const rawToa = String(xp.ma_toa || "A1").replace("TOA_", "").replace("Tòa ", "").replace("Tòa", "").trim() || "A1";
+        const toaLabel = `Tòa ${rawToa}`;
+        const giuongClean = String(xp.giuong_id || "G01").split("_").pop() || "G01";
+        const tangVal = roomClean[0] || "2";
+        const dateGui = approvedTransfer.ngay_gui || "19/10/2026";
+
+        // Chuyển phòng cũ thành "Đã chuyển phòng"
+        stayList = stayList.map((item) => {
+          const itemRoom = String(item.so_phong || item.phong || "").replace(/^P/i, "");
+          if (itemRoom !== roomClean) {
+            return {
+              ...item,
+              trang_thai: "DA_CHUYEN",
+              trang_thai_label: "Đã chuyển phòng",
+              status: "TRANSFERRED",
+            };
+          }
+          return {
+            ...item,
+            trang_thai: "DANG_O",
+            trang_thai_label: "Đang ở",
+            status: "ACTIVE",
+          };
+        });
+
+        // Nếu phòng mới chưa có trong danh sách thì chèn lên đầu
+        const hasNewRoom = stayList.some((item) => {
+          const itemRoom = String(item.so_phong || item.phong || "").replace(/^P/i, "");
+          return itemRoom === roomClean;
+        });
+
+        if (!hasNewRoom) {
+          stayList.unshift({
+            id: `HD-${rawToa}${roomClean}-${giuongClean}`,
+            ma_hop_dong: `HD26-${rawToa}${roomClean}-${giuongClean}`,
+            so_phong: roomClean,
+            phong: `P${roomClean}`,
+            toa: toaLabel,
+            tang: tangVal,
+            giuong: giuongClean,
+            so_giuong: giuongClean,
+            thoi_gian_o: "2026-2027",
+            nam_hoc: "2026-2027",
+            trang_thai: "DANG_O",
+            trang_thai_label: "Đang ở",
+            status: "ACTIVE",
+            thoi_han_hop_dong: `${dateGui} - 30/06/2027`,
+          });
+        }
+      }
       setStayContracts(stayList);
     } catch (err) {
       console.error("Error loading history data:", err);
@@ -298,7 +437,7 @@ export default function RequestHistoryPage({
         );
       }
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
   };
 
@@ -901,24 +1040,65 @@ export default function RequestHistoryPage({
             detailModalItem.trang_thai === "DA_HUY" ||
             detailModalItem.trang_thai_label === "Đã hủy";
 
+          const isTransfer =
+            detailModalItem.loai_don === "CHUYEN_PHONG" ||
+            detailModalItem.loai_yeu_cau === "Chuyển phòng" ||
+            String(detailModalItem.id || "").startsWith("YC-") ||
+            String(detailModalItem.ma_yeu_cau || "").startsWith("#YC-");
+
+          const isCheckout =
+            detailModalItem.loai_don === "TRA_PHONG" ||
+            detailModalItem.loai_yeu_cau === "Trả phòng";
+
+          const modalTitle = isTransfer
+            ? `Yêu cầu chuyển phòng #${displayCode}`
+            : isCheckout
+            ? `Yêu cầu trả phòng #${displayCode}`
+            : `Yêu cầu đăng ký ở #${displayCode}`;
+
+          // Đồng bộ thông tin nếu request hiện tại thiếu field
+          const userProf = occupancyService.getLocalStudentProfile?.() || {};
+          const fallbackReg = registrationRequests.find(
+            (r) =>
+              (r.msv || "").trim().toUpperCase() ===
+                (detailModalItem.msv || "").trim().toUpperCase() && r.cccd,
+          );
+
           // 1. Thông tin sinh viên
-          const studentMsv = detailModalItem.msv || "Chưa cập nhật";
-          const studentName = detailModalItem.ho_ten || "Chưa cập nhật";
-          const studentGender = detailModalItem.gioi_tinh || "Chưa cập nhật";
-          const studentDob = detailModalItem.ngay_sinh || "Chưa cập nhật";
-          const studentCccd = detailModalItem.cccd || "Chưa cập nhật";
-          const studentPhone = detailModalItem.so_dien_thoai || "Chưa cập nhật";
-          const studentEmail = detailModalItem.email || "Chưa cập nhật";
-          const studentFaculty = detailModalItem.khoa || "Chưa cập nhật";
-          const studentClass = detailModalItem.lop || "Chưa cập nhật";
+          const studentMsv =
+            detailModalItem.msv || fallbackReg?.msv || userProf.msv || "Chưa cập nhật";
+          const studentName =
+            detailModalItem.ho_ten || fallbackReg?.ho_ten || userProf.ho_ten || "Chưa cập nhật";
+          const studentGender =
+            detailModalItem.gioi_tinh || fallbackReg?.gioi_tinh || userProf.gioi_tinh || "Chưa cập nhật";
+          const studentDob =
+            detailModalItem.ngay_sinh || fallbackReg?.ngay_sinh || userProf.ngay_sinh || "Chưa cập nhật";
+          const studentCccd =
+            detailModalItem.cccd || fallbackReg?.cccd || userProf.cccd || "Chưa cập nhật";
+          const studentPhone =
+            detailModalItem.so_dien_thoai || fallbackReg?.so_dien_thoai || userProf.so_dien_thoai || "Chưa cập nhật";
+          const studentEmail =
+            detailModalItem.email || fallbackReg?.email || userProf.email || "Chưa cập nhật";
+          const studentFaculty =
+            detailModalItem.khoa || fallbackReg?.khoa || userProf.khoa || "Chưa cập nhật";
+          const studentClass =
+            detailModalItem.lop || fallbackReg?.lop || userProf.lop || "Chưa cập nhật";
           const studentAddress =
-            detailModalItem.dia_chi || detailModalItem.que_quan || "Chưa cập nhật";
+            detailModalItem.dia_chi ||
+            detailModalItem.que_quan ||
+            fallbackReg?.dia_chi ||
+            fallbackReg?.que_quan ||
+            userProf.dia_chi ||
+            userProf.que_quan ||
+            "Chưa cập nhật";
 
           // 2. Liên hệ khẩn cấp
-          const guardianName = detailModalItem.nguoi_giam_ho || "Chưa cập nhật";
-          const guardianRelation = detailModalItem.moi_quan_he || "Chưa cập nhật";
+          const guardianName =
+            detailModalItem.nguoi_giam_ho || fallbackReg?.nguoi_giam_ho || userProf.nguoi_giam_ho || "Chưa cập nhật";
+          const guardianRelation =
+            detailModalItem.moi_quan_he || fallbackReg?.moi_quan_he || userProf.moi_quan_he || "Chưa cập nhật";
           const guardianPhone =
-            detailModalItem.sdt_nguoi_giam_ho || "Chưa cập nhật";
+            detailModalItem.sdt_nguoi_giam_ho || fallbackReg?.sdt_nguoi_giam_ho || userProf.sdt_nguoi_giam_ho || "Chưa cập nhật";
 
           // 3. Nguyện vọng đăng ký
           const { loaiPhong: wishRoomType, chiTietNguyenVong: wishContent } =
@@ -942,7 +1122,7 @@ export default function RequestHistoryPage({
                 <div className="flex items-start justify-between pb-3 select-none">
                   <div>
                     <h3 className="font-bold text-lg sm:text-xl text-slate-900 tracking-tight">
-                      Yêu cầu đăng ký ở #{displayCode}
+                      {modalTitle}
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                       Gửi ngày {displayDate} - Năm học {displaySchoolYear}
@@ -1102,30 +1282,84 @@ export default function RequestHistoryPage({
                     </div>
                   </div>
 
-                  {/* 3. NGUYỆN VỌNG ĐĂNG KÝ */}
+                  {/* 3. NỘI DUNG YÊU CẦU */}
                   <div className="pt-3.5 border-t border-slate-100 space-y-3">
                     <h4 className="font-bold text-sm text-slate-800">
-                      Nguyện vọng đăng ký
+                      {isTransfer
+                        ? "Thông tin chuyển phòng"
+                        : isCheckout
+                        ? "Thông tin trả phòng"
+                        : "Nguyện vọng đăng ký"}
                     </h4>
 
-                    <div className="rounded-xl border border-blue-100 bg-[#f0f7ff] p-4 space-y-3">
-                      <div>
-                        <span className="block text-xs text-slate-500">
-                          Loại phòng
-                        </span>
-                        <span className="font-semibold text-slate-800">
-                          {detailModalItem.loai_phong || wishRoomType}
-                        </span>
+                    {isTransfer ? (
+                      <div className="rounded-xl border border-blue-100 bg-[#f0f7ff] p-4 space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <span className="block text-xs text-slate-500">Phòng hiện tại</span>
+                            <span className="font-semibold text-slate-800">
+                              {detailModalItem.phong_hien_tai || detailModalItem.vi_tri_hien_tai || "Phòng P101 - Tòa A1"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-xs text-slate-500">Phòng chuyển đến</span>
+                            <span className="font-semibold text-slate-800">
+                              {detailModalItem.phong_dich || detailModalItem.phong_lien_quan || "Phòng P201"}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <span className="block text-xs text-slate-500">Lý do chuyển phòng</span>
+                          <span className="font-semibold text-slate-800">
+                            {detailModalItem.ly_do || "Không hợp bạn cùng phòng"}
+                          </span>
+                        </div>
+                        {detailModalItem.mo_ta && (
+                          <div className="rounded-lg border border-slate-200 bg-white p-3.5">
+                            <span className="mb-1.5 block text-xs font-medium text-slate-500">
+                              Chi tiết lý do / Ghi chú
+                            </span>
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+                              {detailModalItem.mo_ta}
+                            </p>
+                          </div>
+                        )}
                       </div>
-                      <div className="rounded-lg border border-slate-200 bg-white p-3.5">
-                        <span className="mb-1.5 block text-xs font-medium text-slate-500">
-                          Chi tiết nguyện vọng
-                        </span>
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
-                          {wishContent}
-                        </p>
+                    ) : isCheckout ? (
+                      <div className="rounded-xl border border-blue-100 bg-[#f0f7ff] p-4 space-y-3">
+                        <div>
+                          <span className="block text-xs text-slate-500">Phòng trả</span>
+                          <span className="font-semibold text-slate-800">
+                            {detailModalItem.phong_hien_tai || detailModalItem.vi_tri_hien_tai || "Phòng hiện tại"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-xs text-slate-500">Lý do trả phòng</span>
+                          <span className="font-semibold text-slate-800">
+                            {detailModalItem.ly_do || "Trả phòng"}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="rounded-xl border border-blue-100 bg-[#f0f7ff] p-4 space-y-3">
+                        <div>
+                          <span className="block text-xs text-slate-500">
+                            Loại phòng
+                          </span>
+                          <span className="font-semibold text-slate-800">
+                            {detailModalItem.loai_phong || wishRoomType}
+                          </span>
+                        </div>
+                        <div className="rounded-lg border border-slate-200 bg-white p-3.5">
+                          <span className="mb-1.5 block text-xs font-medium text-slate-500">
+                            Chi tiết nguyện vọng
+                          </span>
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+                            {wishContent}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* 4. TIẾN TRÌNH XỬ LÝ */}
@@ -1208,20 +1442,32 @@ export default function RequestHistoryPage({
 
                 {/* Modal Footer */}
                 <div className="mt-4 pt-3.5 border-t border-slate-100 flex items-center justify-end gap-3 select-none">
-                  <button
-                    type="button"
-                    onClick={handleCancelRegistration}
-                    className="px-5 py-2 border border-red-500 text-red-500 hover:bg-red-50 font-semibold text-xs sm:text-sm rounded-xl transition cursor-pointer"
-                  >
-                    Hủy yêu cầu
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleOpenEditWish}
-                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition cursor-pointer"
-                  >
-                    Chỉnh sửa nguyện vọng
-                  </button>
+                  {!isApproved && !isRejected && !isCancelled ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleCancelRegistration}
+                        className="px-5 py-2 border border-red-500 text-red-500 hover:bg-red-50 font-semibold text-xs sm:text-sm rounded-xl transition cursor-pointer"
+                      >
+                        Hủy yêu cầu
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleOpenEditWish}
+                        className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition cursor-pointer"
+                      >
+                        Chỉnh sửa nguyện vọng
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setDetailModalItem(null)}
+                      className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm rounded-xl transition cursor-pointer"
+                    >
+                      Đóng
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1411,11 +1657,25 @@ export default function RequestHistoryPage({
 
           const contractTerm = `${startDateFormatted} - ${endDateFormatted}`;
 
+          const isTransferred =
+            detailModalItem.trang_thai === "DA_CHUYEN" ||
+            detailModalItem.trang_thai_label?.includes("chuyển") ||
+            detailModalItem.status === "TRANSFERRED";
+
+          const isEnded =
+            detailModalItem.trang_thai === "DA_TRA_PHONG" ||
+            detailModalItem.trang_thai === "KET_THUC" ||
+            detailModalItem.trang_thai_label?.includes("kết thúc") ||
+            detailModalItem.trang_thai_label?.includes("trả") ||
+            detailModalItem.status === "COMPLETED";
+
           const isActiveStay =
-            detailModalItem.trang_thai === "DANG_O" ||
-            detailModalItem.trang_thai === "HIEU_LUC" ||
-            detailModalItem.trang_thai_label?.includes("Đang ở") ||
-            detailModalItem.status === "ACTIVE";
+            !isTransferred &&
+            !isEnded &&
+            (detailModalItem.trang_thai === "DANG_O" ||
+              detailModalItem.trang_thai === "HIEU_LUC" ||
+              detailModalItem.trang_thai_label?.includes("Đang ở") ||
+              detailModalItem.status === "ACTIVE");
 
           const handleCheckout = () => {
             setDetailModalItem(null);
@@ -1597,20 +1857,32 @@ export default function RequestHistoryPage({
 
                 {/* Footer Actions */}
                 <div className="mt-6 pt-3 flex items-center justify-end gap-3 border-t border-slate-100/50">
-                  <button
-                    type="button"
-                    onClick={handleCheckout}
-                    className="px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-bold border border-red-500 text-red-500 hover:bg-red-50 transition cursor-pointer"
-                  >
-                    Yêu cầu trả phòng
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleTransfer}
-                    className="px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#0084ff] hover:bg-blue-600 text-white shadow-sm transition cursor-pointer"
-                  >
-                    Yêu cầu chuyển phòng
-                  </button>
+                  {isActiveStay ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleCheckout}
+                        className="px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-bold border border-red-500 text-red-500 hover:bg-red-50 transition cursor-pointer"
+                      >
+                        Yêu cầu trả phòng
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleTransfer}
+                        className="px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#0084ff] hover:bg-blue-600 text-white shadow-sm transition cursor-pointer"
+                      >
+                        Yêu cầu chuyển phòng
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setDetailModalItem(null)}
+                      className="px-5 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+                    >
+                      Đóng
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

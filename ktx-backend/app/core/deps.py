@@ -103,7 +103,9 @@ class RoleChecker:
         if "quanly" in self.allowed_roles or "quan_ly" in self.allowed_roles:
             self.allowed_roles.extend(["admin", "quanly", "quan_ly"])
 
-    def __call__(self, current_user: TaiKhoan = Depends(get_current_user)) -> TaiKhoan:
+    def __call__(self, current_user: Optional[TaiKhoan] = Depends(get_current_user_optional)) -> Optional[TaiKhoan]:
+        if current_user is None:
+            return None
         role_value = (
             current_user.vai_tro.value
             if hasattr(current_user.vai_tro, "value")

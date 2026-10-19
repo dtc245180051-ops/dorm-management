@@ -50,7 +50,7 @@ class SinhVienCreate(BaseModel):
     nguoi_giam_ho: Optional[str] = Field(default=None, max_length=100, description="Họ và tên người giám hộ")
     moi_quan_he: Optional[str] = Field(default=None, max_length=50, description="Mối quan hệ")
     sdt_nguoi_giam_ho: Optional[str] = Field(default=None, max_length=20, description="SĐT liên hệ khẩn cấp")
-    anh_dai_dien: Optional[str] = Field(default=None, max_length=255, description="URL ảnh đại diện")
+    anh_dai_dien: Optional[str] = Field(default=None, max_length=500, description="URL ảnh đại diện")
     mat_khau_khoi_tao: Optional[str] = Field(
         default=None,
         min_length=6,
@@ -85,7 +85,7 @@ class SinhVienUpdate(BaseModel):
     nguoi_giam_ho: Optional[str] = Field(default=None, max_length=100)
     moi_quan_he: Optional[str] = Field(default=None, max_length=50)
     sdt_nguoi_giam_ho: Optional[str] = Field(default=None, max_length=20)
-    anh_dai_dien: Optional[str] = Field(default=None, max_length=255)
+    anh_dai_dien: Optional[str] = Field(default=None, max_length=500)
     anh_hop_dong: Optional[str] = Field(default=None, max_length=255)
 
 

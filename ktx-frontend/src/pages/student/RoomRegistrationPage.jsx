@@ -187,10 +187,8 @@ export default function RoomRegistrationPage({
           currentUser?.department ||
           prev.khoa,
         lop:
-          studentProfile.lop ||
-          userProfile.lop ||
-          currentUser?.className ||
-          prev.lop,
+          [studentProfile.lop, userProfile.lop, currentUser?.className, prev.lop]
+            .find((l) => l && l.trim() && l.trim().toUpperCase() !== "DTC-KTX") || "",
         doi_tuong_uu_tien:
           studentProfile.doi_tuong_uu_tien || prev.doi_tuong_uu_tien,
         dia_chi:

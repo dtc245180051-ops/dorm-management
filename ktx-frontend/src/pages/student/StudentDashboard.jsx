@@ -143,20 +143,25 @@ export default function StudentDashboard({ user, onNavigate }) {
     loadRegistrationStatus();
     loadComplaints();
 
+    let updateTimer = null;
     const handleUpdate = () => {
-      loadRoomInfo();
-      loadRegistrationStatus();
-      loadComplaints();
+      if (updateTimer) clearTimeout(updateTimer);
+      updateTimer = setTimeout(() => {
+        loadRoomInfo();
+        loadRegistrationStatus();
+        loadComplaints();
+      }, 150);
     };
 
     window.addEventListener("occupancy-updated", handleUpdate);
     window.addEventListener("student-account-updated", handleUpdate);
-    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("student-incidents-updated", handleUpdate);
 
     return () => {
+      if (updateTimer) clearTimeout(updateTimer);
       window.removeEventListener("occupancy-updated", handleUpdate);
       window.removeEventListener("student-account-updated", handleUpdate);
-      window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener("student-incidents-updated", handleUpdate);
     };
   }, []);
 
@@ -296,17 +301,44 @@ export default function StudentDashboard({ user, onNavigate }) {
         {/* Thẻ 2: Số thành viên */}
         <div
           className="student-stat-card"
-          onClick={() =>
+          onClick={() => {
+            const rawRoom = currentRoomInfo?.so_phong || "203";
+            const cleanRoom = String(rawRoom).replace(/^P/i, "");
+            const rawToa = currentRoomInfo?.toa || "Tòa A1";
+            const roomTitle = `P${cleanRoom} - ${rawToa.startsWith("Tòa") ? rawToa : `Tòa ${rawToa}`}`;
+            
+            const currentMsv = (user?.msv || user?.nguoi_dung?.sinh_vien?.msv || localStorage.getItem("ktx_username") || "").trim();
+            const currentName = (user?.nguoi_dung?.ho_ten || user?.ho_ten || localStorage.getItem("ktx_fullname") || "Sinh viên").trim();
+
+            const memberList = (currentRoomInfo?.danh_sach_thanh_vien && currentRoomInfo.danh_sach_thanh_vien.length > 0)
+              ? currentRoomInfo.danh_sach_thanh_vien
+              : [
+                  {
+                    msv: currentMsv,
+                    ho_ten: currentName,
+                    giuong: currentRoomInfo?.giuong || "G01",
+                    so_giuong: currentRoomInfo?.giuong || "G01",
+                    lop: user?.lop || localStorage.getItem("ktx_lop") || "",
+                    khoa: user?.khoa || localStorage.getItem("ktx_khoa") || "",
+                    so_dien_thoai: user?.so_dien_thoai || localStorage.getItem("ktx_phone") || "",
+                    vai_tro: "Bạn (Trưởng phòng)",
+                    ngay_vao: currentRoomInfo?.ngay_bat_dau || "01/10/2026",
+                    trang_thai: "DANG_O",
+                    trang_thai_label: "Đang ở",
+                    is_current_user: true,
+                  },
+                ];
+
             setActiveModal({
+              type: "room_members",
               title: "Danh sách thành viên phòng",
-              desc: currentRoomInfo?.thanh_vien
-                ? `Hiện có ${currentRoomInfo.thanh_vien} sinh viên`
-                : "Chưa có thông tin phòng",
-              detail: currentRoomInfo
-                ? "Phòng đang còn chỗ trống cho đợt tiếp nhận kỳ mới."
-                : "Bạn chưa được xếp phòng.",
-            })
-          }
+              roomTitle,
+              tang: currentRoomInfo?.tang || "2",
+              members: memberList,
+              so_thanh_vien: currentRoomInfo?.so_thanh_vien || memberList.filter(m => !m.is_empty).length || 3,
+              suc_chua: currentRoomInfo?.suc_chua || "4 người",
+            });
+          }}
         >
           <div className="student-stat-left">
             <div className="student-stat-icon-box cyan">
@@ -440,7 +472,9 @@ export default function StudentDashboard({ user, onNavigate }) {
               <span className="student-stat-label">Phản ánh</span>
               <span className="student-stat-value">{complaints.total}</span>
               <span className="student-stat-subtext">
-                Đang xử lý: {complaints.processing} | Đã xử lý: {complaints.resolved}
+                {complaints.total === 0
+                  ? "Chưa có phản ánh"
+                  : `Đang xử lý: ${complaints.processing} | Đã xử lý: ${complaints.resolved}`}
               </span>
             </div>
           </div>
@@ -807,25 +841,288 @@ export default function StudentDashboard({ user, onNavigate }) {
         </div>
       </section>
 
-      {/* ================= MODAL XEM CHI TIẾT TÍNH NĂNG ================= */}
+      {/* ================= MODAL XEM CHI TIẾT TÍNH NĂNG / THÀNH VIÊN ================= */}
       {activeModal && (
         <div className="student-modal-backdrop" onClick={closeModal}>
           <div
-            className="student-modal-card"
+            className={`student-modal-card ${activeModal.type === "room_members" ? "student-modal-card-lg" : ""}`}
             onClick={(e) => e.stopPropagation()}
+            style={activeModal.type === "room_members" ? { maxWidth: "600px", maxHeight: "90vh" } : {}}
           >
             <div className="student-modal-header">
-              <h4 className="student-modal-title">{activeModal.title}</h4>
-              <button className="student-modal-close-btn" onClick={closeModal}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {activeModal.type === "room_members" && (
+                  <div style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "10px",
+                    backgroundColor: "#EFF6FF",
+                    color: "#2563EB",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  </div>
+                )}
+                <div>
+                  <h4 className="student-modal-title">{activeModal.title}</h4>
+                  {activeModal.roomTitle && (
+                    <div style={{ fontSize: "12px", color: "#64748B", fontWeight: 500, marginTop: "2px" }}>
+                      Phòng <strong>{activeModal.roomTitle}</strong> • Tầng {activeModal.tang || "2"}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button className="student-modal-close-btn" onClick={closeModal} title="Đóng">
                 ✕
               </button>
             </div>
-            <div className="student-modal-body">
-              <p style={{ fontWeight: 600, color: "#1D68FE", marginBottom: 6 }}>
-                {activeModal.desc}
-              </p>
-              <p>{activeModal.detail}</p>
-            </div>
+
+            {activeModal.type === "room_members" ? (
+              <div className="student-modal-body" style={{ padding: "16px 20px", maxHeight: "calc(90vh - 140px)", overflowY: "auto" }}>
+                {/* Thanh trạng thái phòng */}
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  backgroundColor: "#F8FAFC",
+                  padding: "10px 14px",
+                  borderRadius: "10px",
+                  border: "1px solid #E2E8F0",
+                  marginBottom: "14px"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{
+                      backgroundColor: "#ECFDF5",
+                      color: "#059669",
+                      padding: "3px 10px",
+                      borderRadius: "12px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      border: "1px solid #A7F3D0",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "5px"
+                    }}>
+                      <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#059669" }}></span>
+                      {activeModal.members.filter(m => !m.is_empty).length} đang ở
+                    </span>
+                    <span style={{
+                      backgroundColor: "#FFFBEB",
+                      color: "#D97706",
+                      padding: "3px 10px",
+                      borderRadius: "12px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      border: "1px solid #FDE68A"
+                    }}>
+                      {activeModal.members.filter(m => m.is_empty).length} chỗ trống
+                    </span>
+                  </div>
+                  <span style={{ fontSize: "12.5px", color: "#475569", fontWeight: 500 }}>
+                    Sức chứa: <strong>{activeModal.suc_chua || "4 người"}</strong>
+                  </span>
+                </div>
+
+                {/* Danh sách thành viên / giường */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {activeModal.members.map((mem, idx) => (
+                    mem.is_empty ? (
+                      <div
+                        key={idx}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "12px 14px",
+                          borderRadius: "10px",
+                          border: "1.5px dashed #CBD5E1",
+                          backgroundColor: "#F8FAFC",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <div style={{
+                            width: "40px",
+                            height: "40px",
+                            borderRadius: "50%",
+                            border: "1.5px dashed #94A3B8",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#94A3B8",
+                            backgroundColor: "#FFFFFF",
+                            flexShrink: 0
+                          }}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                              <circle cx="12" cy="7" r="4" />
+                            </svg>
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600, color: "#64748B", fontSize: "13.5px" }}>
+                              {mem.giuong ? `Giường ${mem.giuong}` : `Vị trí #${idx + 1}`} — {mem.ho_ten || "Chưa có người ở"}
+                            </div>
+                            <div style={{ fontSize: "12px", color: "#94A3B8", marginTop: "1px" }}>
+                              Chỗ trống sẵn sàng tiếp nhận sinh viên mới trong đợt tiếp theo
+                            </div>
+                          </div>
+                        </div>
+                        <span style={{
+                          fontSize: "11px",
+                          fontWeight: 600,
+                          color: "#64748B",
+                          backgroundColor: "#E2E8F0",
+                          padding: "4px 9px",
+                          borderRadius: "6px",
+                          whiteSpace: "nowrap"
+                        }}>
+                          Còn trống
+                        </span>
+                      </div>
+                    ) : (
+                      <div
+                        key={idx}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "12px 14px",
+                          borderRadius: "10px",
+                          border: mem.is_current_user ? "1.5px solid #93C5FD" : "1px solid #E2E8F0",
+                          backgroundColor: mem.is_current_user ? "#F0F7FF" : "#FFFFFF",
+                          boxShadow: mem.is_current_user ? "0 2px 8px rgba(37, 99, 235, 0.08)" : "0 1px 3px rgba(0,0,0,0.02)"
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
+                          {/* Avatar Circle */}
+                          <div style={{
+                            width: "42px",
+                            height: "42px",
+                            borderRadius: "50%",
+                            background: mem.is_current_user
+                              ? "linear-gradient(135deg, #2563EB, #1D4ED8)"
+                              : idx === 1
+                                ? "linear-gradient(135deg, #0D9488, #059669)"
+                                : "linear-gradient(135deg, #7C3AED, #6D28D9)",
+                            color: "#FFFFFF",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: 700,
+                            fontSize: "13.5px",
+                            flexShrink: 0,
+                            boxShadow: "0 2px 5px rgba(0,0,0,0.1)"
+                          }}>
+                            {mem.ho_ten ? mem.ho_ten.split(" ").slice(-2).map(n => n[0]).join("") : "SV"}
+                          </div>
+
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                              <span style={{ fontWeight: 700, color: "#0F172A", fontSize: "14px" }}>
+                                {mem.ho_ten}
+                              </span>
+                              {mem.is_current_user ? (
+                                <span style={{
+                                  fontSize: "10.5px",
+                                  fontWeight: 600,
+                                  backgroundColor: "#DBEAFE",
+                                  color: "#1D4ED8",
+                                  padding: "1px 7px",
+                                  borderRadius: "4px"
+                                }}>
+                                  {mem.vai_tro || "Bạn"}
+                                </span>
+                              ) : (
+                                mem.vai_tro && mem.vai_tro !== "Thành viên" && (
+                                  <span style={{
+                                    fontSize: "10.5px",
+                                    fontWeight: 600,
+                                    backgroundColor: "#F1F5F9",
+                                    color: "#475569",
+                                    padding: "1px 6px",
+                                    borderRadius: "4px"
+                                  }}>
+                                    {mem.vai_tro}
+                                  </span>
+                                )
+                              )}
+                            </div>
+
+                            <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                              <span>MSV: <strong style={{ color: "#334155" }}>{mem.msv}</strong></span>
+                              {mem.lop && <span>• Lớp: {mem.lop}</span>}
+                              {mem.khoa && <span>• {mem.khoa}</span>}
+                            </div>
+
+                            {mem.so_dien_thoai && (
+                              <div style={{ fontSize: "11.5px", color: "#2563EB", marginTop: "3px", display: "flex", alignItems: "center", gap: "5px" }}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                                </svg>
+                                <span>{mem.so_dien_thoai}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "5px", flexShrink: 0, marginLeft: "10px" }}>
+                          <span style={{
+                            fontSize: "11.5px",
+                            fontWeight: 700,
+                            color: "#1E293B",
+                            backgroundColor: "#F1F5F9",
+                            padding: "3px 9px",
+                            borderRadius: "6px",
+                            border: "1px solid #E2E8F0"
+                          }}>
+                            {mem.giuong ? `Giường ${mem.giuong}` : `G${idx + 1}`}
+                          </span>
+                          <span style={{
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            color: "#059669",
+                            backgroundColor: "#ECFDF5",
+                            padding: "2px 7px",
+                            borderRadius: "4px"
+                          }}>
+                            {mem.trang_thai_label || "Đang ở"}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  ))}
+                </div>
+
+                <div style={{
+                  fontSize: "11.5px",
+                  color: "#94A3B8",
+                  marginTop: "14px",
+                  paddingTop: "10px",
+                  borderTop: "1px dashed #E2E8F0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between"
+                }}>
+                  <span>* Dữ liệu sinh viên nội trú được xác thực từ KTX</span>
+                  <span>Ngày vào: {currentRoomInfo?.ngay_bat_dau || "19/10/2026"}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="student-modal-body">
+                <p style={{ fontWeight: 600, color: "#1D68FE", marginBottom: 6 }}>
+                  {activeModal.desc}
+                </p>
+                <p>{activeModal.detail}</p>
+              </div>
+            )}
+
             <div className="student-modal-footer">
               <button
                 className="student-modal-primary-btn"

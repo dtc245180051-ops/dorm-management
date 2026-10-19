@@ -31,6 +31,7 @@ export const DEFAULT_STUDENT_ACCOUNT = {
 export function getStudentAccount(studentId) {
   const currentId = (
     studentId ||
+    localStorage.getItem("ktx_msv") ||
     localStorage.getItem("ktx_username") ||
     ""
   )
@@ -53,12 +54,14 @@ export function getStudentAccount(studentId) {
   }
 
   // Khởi tạo mặc định trống nếu chưa có
-  const defaultAcc = {
+  const defaultAcc = normalizeAccount({
     ...DEFAULT_STUDENT_ACCOUNT,
     studentId: currentId || "",
     fullName: localStorage.getItem("ktx_fullname") || "",
-  };
-  saveStudentAccount(defaultAcc);
+  });
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultAcc));
+  } catch (_) {}
   return defaultAcc;
 }
 

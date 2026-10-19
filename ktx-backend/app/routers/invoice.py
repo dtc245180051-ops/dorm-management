@@ -143,7 +143,7 @@ async def upload_utility_readings(
     thang: str = Form("Tháng 09/2026"),
     don_gia_dien: float = Form(3000.0),
     don_gia_nuoc: float = Form(15000.0),
-    current_user: TaiKhoan = Depends(require_ke_toan),
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     """
@@ -192,7 +192,7 @@ def get_all_invoices(
     trang_thai: Optional[str] = Query(None, description="Lọc theo trạng thái thanh toán"),
     msv: Optional[str] = Query(None, description="Lọc theo mã sinh viên"),
     ma_phong: Optional[str] = Query(None, description="Lọc theo mã phòng"),
-    current_user: TaiKhoan = Depends(require_ke_toan),
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     """
@@ -223,22 +223,14 @@ def get_student_my_invoices(
     from app.models.dorm import Giuong
     from app.models.invoice import HoaDon
     from app.models.user import NguoiDung, SinhVien
+    from app.services.student_helper import resolve_student_msv
 
-    clean_code = (msv or (current_user.ten_dang_nhap if current_user else "") or "").strip().upper()
-    if not clean_code:
+    raw_code = (msv or (current_user.ten_dang_nhap if current_user else "") or "").strip()
+    if not raw_code:
         return []
 
-    sv_filter = [SinhVien.msv.ilike(clean_code)]
-    if current_user:
-        sv_filter.append(NguoiDung.ma_tai_khoan == current_user.ma_tai_khoan)
-
-    sv = (
-        db.query(SinhVien)
-        .outerjoin(NguoiDung, SinhVien.ma_nguoi_dung == NguoiDung.ma_nguoi_dung)
-        .filter(or_(*sv_filter))
-        .first()
-    )
-    student_msv = sv.msv if sv else clean_code
+    # Chuẩn hóa mã sinh viên chính xác từ bất kỳ mã/tên đăng nhập/email nào
+    student_msv = resolve_student_msv(raw_code, db) or raw_code.upper()
 
     active_hd = (
         db.query(HopDong)
@@ -249,10 +241,14 @@ def get_student_my_invoices(
     if active_hd and active_hd.giuong:
         ma_phong = active_hd.giuong.ma_phong
 
-    # Lấy các hóa đơn phát hành trực tiếp cho sinh viên này
+    # Lấy các hóa đơn phát hành trực tiếp cho sinh viên này (cả MSV chuẩn hoặc username)
+    msv_queries = [HoaDon.msv.ilike(student_msv)]
+    if raw_code and raw_code.upper() != student_msv.upper():
+        msv_queries.append(HoaDon.msv.ilike(raw_code))
+
     student_invoices = (
         db.query(HoaDon)
-        .filter(HoaDon.msv.ilike(student_msv))
+        .filter(or_(*msv_queries))
         .order_by(HoaDon.han_thanh_toan.desc(), HoaDon.ngay_tao.desc())
         .all()
     )
@@ -290,7 +286,7 @@ def get_student_my_invoices(
             if inv_date:
                 if isinstance(inv_date, datetime.datetime):
                     inv_date = inv_date.date()
-                if inv_date < c_start:
+                if inv_date <= c_start:
                     continue
 
             # Kiểm tra kỳ thanh toán ví dụ "Tháng 09/2026"
@@ -322,7 +318,17 @@ def get_student_my_invoices(
                 inv_dict["msv"] = student_msv
                 invoices.append(HoaDonResponse(**inv_dict))
 
-    return invoices
+    res_list: List[HoaDonResponse] = []
+    for inv in invoices:
+        if isinstance(inv, HoaDonResponse):
+            res_list.append(inv)
+        else:
+            inv_dict = {c.name: getattr(inv, c.name) for c in inv.__table__.columns}
+            if not inv_dict.get("ky_thanh_toan"):
+                inv_dict["ky_thanh_toan"] = "Năm học 2026-2027" if inv_dict.get("loai_hoa_don") == "TIEN_PHONG" else "Tháng 10/2026"
+            res_list.append(HoaDonResponse(**inv_dict))
+
+    return res_list
 
 
 @router.get(

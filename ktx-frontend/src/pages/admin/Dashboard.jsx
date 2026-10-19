@@ -41,20 +41,51 @@ const requestRoute = (request) => {
   const id = String(
     request?.id || request?.ma_yeu_cau || request?.msv || "",
   ).replace(/^#/, "");
+  const upperId = id.toUpperCase();
   const type = normalize(request?.loai_don || request?.loai_yeu_cau);
-  if (type.includes("chuy") || type.includes("transfer"))
+  if (
+    upperId.startsWith("YC") ||
+    upperId.startsWith("CP") ||
+    type.includes("chuy") ||
+    type.includes("transfer") ||
+    type.includes("đổi")
+  ) {
     return `/admin/requests/transfer/${id}`;
-  if (type.includes("trả") || type.includes("tra") || type.includes("checkout"))
+  }
+  if (
+    upperId.startsWith("TP") ||
+    type.includes("trả") ||
+    type.includes("tra") ||
+    type.includes("checkout")
+  ) {
     return `/admin/requests/checkout/${id}`;
+  }
   return `/admin/requests/registration/${id}`;
 };
 
 const getRequestTypeLabel = (request) => {
+  const id = String(
+    request?.id || request?.ma_yeu_cau || request?.msv || "",
+  ).replace(/^#/, "");
+  const upperId = id.toUpperCase();
   const type = normalize(request?.loai_don || request?.loai_yeu_cau);
-  if (type.includes("chuy") || type.includes("transfer"))
+  if (
+    upperId.startsWith("YC") ||
+    upperId.startsWith("CP") ||
+    type.includes("chuy") ||
+    type.includes("transfer") ||
+    type.includes("đổi")
+  ) {
     return "Đăng ký chuyển phòng";
-  if (type.includes("trả") || type.includes("tra") || type.includes("checkout"))
+  }
+  if (
+    upperId.startsWith("TP") ||
+    type.includes("trả") ||
+    type.includes("tra") ||
+    type.includes("checkout")
+  ) {
     return "Trả phòng";
+  }
   return "Đăng ký ở";
 };
 

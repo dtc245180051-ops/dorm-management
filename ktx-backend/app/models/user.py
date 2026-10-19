@@ -172,7 +172,7 @@ class SinhVien(Base):
         nullable=True,
     )
     anh_dai_dien: Mapped[Optional[str]] = mapped_column(
-        String(255),
+        String(500),
         nullable=True,
     )
     anh_hop_dong: Mapped[Optional[str]] = mapped_column(
