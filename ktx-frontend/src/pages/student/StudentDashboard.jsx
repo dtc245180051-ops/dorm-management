@@ -378,7 +378,7 @@ export default function StudentDashboard({ user, onNavigate }) {
         {/* Thẻ 3: Phí KTX */}
         <div
           className="student-stat-card"
-          onClick={() =>
+          onClick={() => {
             setActiveModal({
               title: "Tình trạng phí Ký túc xá",
               desc: billing ? `Số tiền: ${billing.amount}` : "Chưa có thông tin phí",
@@ -387,8 +387,10 @@ export default function StudentDashboard({ user, onNavigate }) {
                   ? "Bạn đã hoàn tất nộp phí lưu trú. Không có công nợ tồn đọng."
                   : "Bạn có khoản phí ký túc xá cần thanh toán.")
                 : "Bạn chưa có hợp đồng lưu trú hoặc công nợ phí. Vui lòng kiểm tra lại sau khi được xếp phòng.",
-            })
-          }
+              actionText: billing?.status !== "Đã thanh toán" ? "Thanh toán ngay" : null,
+              actionPath: billing?.status !== "Đã thanh toán" ? "/student/payment" : null,
+            });
+          }}
         >
           <div className="student-stat-left">
             <div className="student-stat-icon-box amber">
@@ -428,7 +430,13 @@ export default function StudentDashboard({ user, onNavigate }) {
                 )}
               </span>
               {billing ? (
-                <span className="student-stat-badge">{billing.status}</span>
+                <span
+                  className={`student-stat-badge ${
+                    billing.status === "Đã thanh toán" ? "paid" : "unpaid"
+                  }`}
+                >
+                  {billing.status}
+                </span>
               ) : (
                 <span className="student-stat-subtext">Chưa phát sinh</span>
               )}
@@ -1124,12 +1132,41 @@ export default function StudentDashboard({ user, onNavigate }) {
             )}
 
             <div className="student-modal-footer">
-              <button
-                className="student-modal-primary-btn"
-                onClick={closeModal}
-              >
-                Đã hiểu
-              </button>
+              {activeModal.actionPath && onNavigate ? (
+                <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", width: "100%" }}>
+                  <button
+                    className="student-modal-secondary-btn"
+                    onClick={closeModal}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      border: "1px solid #CBD5E1",
+                      backgroundColor: "#fff",
+                      color: "#475569",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    className="student-modal-primary-btn"
+                    onClick={() => {
+                      closeModal();
+                      onNavigate(activeModal.actionPath);
+                    }}
+                  >
+                    {activeModal.actionText || "Đến trang thanh toán"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="student-modal-primary-btn"
+                  onClick={closeModal}
+                >
+                  Đã hiểu
+                </button>
+              )}
             </div>
           </div>
         </div>

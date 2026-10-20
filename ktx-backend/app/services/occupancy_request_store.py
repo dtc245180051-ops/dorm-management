@@ -142,7 +142,7 @@ def update_request_status(req_id: str, new_status: str, extra_data: Optional[dic
 def add_transfer_request(data: dict) -> dict:
     req_num = len(TRANSFER_CHECKOUT_REQUESTS) + 231
     req_id = data.get("id") or f"YC-{req_num:04d}"
-    today_str = datetime.datetime.now().strftime("%d/%m/%Y")
+    today_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
     
     phong_hien_tai = data.get("phong_hien_tai", "")
     phong_mong_muon = data.get("phong_mong_muon", "")
@@ -178,7 +178,7 @@ def add_transfer_request(data: dict) -> dict:
 def add_checkout_request(data: dict) -> dict:
     req_num = len(TRANSFER_CHECKOUT_REQUESTS) + 231
     req_id = data.get("id") or f"YC-{req_num:04d}"
-    today_str = datetime.datetime.now().strftime("%d/%m/%Y")
+    today_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
     
     phong_hien_tai = data.get("phong_hien_tai", "")
     

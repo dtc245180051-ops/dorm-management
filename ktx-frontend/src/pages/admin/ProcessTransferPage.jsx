@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import AdminLayout from '../../layouts/Admin';
 import occupancyService from '../../services/occupancyService';
+import ProcessCheckoutPage from './ProcessCheckoutPage';
 
 export default function ProcessTransferPage({
   requestId = 'YC-0231',
@@ -180,6 +181,24 @@ export default function ProcessTransferPage({
     }
   };
 
+  const reqType = String(
+    requestData?.loai_don || requestData?.loai_yeu_cau || "",
+  ).toLowerCase();
+  if (
+    requestData &&
+    (reqType.includes("trả") ||
+      reqType.includes("tra") ||
+      reqType.includes("checkout"))
+  ) {
+    return (
+      <ProcessCheckoutPage
+        requestId={requestId}
+        onBack={onBack}
+        onProcessed={onProcessed}
+      />
+    );
+  }
+
   return (
     <AdminLayout activeTab="dashboard" userName="QL_Minh">
       {/* Toast thông báo */}
@@ -257,9 +276,19 @@ export default function ProcessTransferPage({
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
                     <span className="text-slate-600 font-medium">Công nợ</span>
-                    <span className="font-bold text-emerald-600">
-                      {requestData?.cong_no || 'Đã kiểm tra'}
-                    </span>
+                    {requestData?.cong_no &&
+                    (requestData.cong_no.toLowerCase().includes('nợ') ||
+                      requestData.cong_no.toLowerCase().includes('chưa') ||
+                      requestData.cong_no.toLowerCase().includes('thiếu')) &&
+                    !requestData.cong_no.toLowerCase().includes('không có') ? (
+                      <span className="font-bold text-rose-600">
+                        {requestData.cong_no}
+                      </span>
+                    ) : (
+                      <span className="font-bold text-emerald-600">
+                        {requestData?.cong_no || 'Đã hoàn thành toàn bộ phí'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

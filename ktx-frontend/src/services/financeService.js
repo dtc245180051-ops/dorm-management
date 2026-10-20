@@ -96,34 +96,8 @@ export const financeService = {
             unmatchedTransactions: unmatchedTransactions,
             unpaidStudentsCount: unpaidItems.length,
           },
-          monthlyTrend: [
-            {
-              period: 'Tháng 09/2026',
-              roomFee: Math.round(totalReceivable * 0.7),
-              utilityFee: Math.round(totalReceivable * 0.3),
-              totalInvoiced: totalReceivable,
-              totalCollected: totalCollected,
-              outstanding: totalOutstanding,
-            }
-          ],
-          roomTypeStats: [
-            {
-              roomType: 'Phòng tiêu chuẩn',
-              monthlyRate: 350000,
-              count: 0,
-              totalReceivable: Math.round(totalReceivable * 0.6),
-              totalCollected: Math.round(totalCollected * 0.6),
-              totalOutstanding: Math.round(totalOutstanding * 0.6),
-            },
-            {
-              roomType: 'Phòng dịch vụ',
-              monthlyRate: 650000,
-              count: 0,
-              totalReceivable: Math.round(totalReceivable * 0.4),
-              totalCollected: Math.round(totalCollected * 0.4),
-              totalOutstanding: Math.round(totalOutstanding * 0.4),
-            }
-          ],
+          monthlyTrend: [],
+          roomTypeStats: [],
           recentTransactions,
         },
       };

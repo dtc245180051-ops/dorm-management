@@ -515,17 +515,17 @@ class InvoiceService:
                     so_phong=so_p,
                     toa_nha=toa_ten,
                     so_sinh_vien=student_count if student_count > 0 else (r.suc_chua or 4),
-                    chi_so_dien_cu_moi="1000 - 1100",
-                    so_dien_kwh=100,
-                    chi_so_nuoc_cu_moi="400 - 410",
-                    so_nuoc_m3=10,
-                    tong_tien=450000.0,
-                    so_dien_cu=1000,
-                    so_dien_moi=1100,
-                    so_nuoc_cu=400,
-                    so_nuoc_moi=410,
-                    tien_dien=300000.0,
-                    tien_nuoc=150000.0,
+                    chi_so_dien_cu_moi="--",
+                    so_dien_kwh=0,
+                    chi_so_nuoc_cu_moi="--",
+                    so_nuoc_m3=0,
+                    tong_tien=0.0,
+                    so_dien_cu=0,
+                    so_dien_moi=0,
+                    so_nuoc_cu=0,
+                    so_nuoc_moi=0,
+                    tien_dien=0.0,
+                    tien_nuoc=0.0,
                     da_lap_hoa_don=existing is not None,
                 )
             )
@@ -630,7 +630,9 @@ class InvoiceService:
             else:
                 calculated_amount = (c.so_dien_kwh * request.don_gia_dien) + (c.so_nuoc_m3 * request.don_gia_nuoc)
                 if calculated_amount <= 0:
-                    calculated_amount = c.tong_tien
+                    calculated_amount = float(c.tong_tien or 0.0)
+                if calculated_amount <= 0:
+                    continue  # Bỏ qua các phòng chưa có chỉ số điện nước thực tế
                 note_str = request.ghi_chu or f"Hóa đơn tiền điện nước {request.thang} (Phòng {c.so_phong} - {c.toa_nha})"
 
             # Tìm danh sách sinh viên đang lưu trú tại phòng này (Hợp đồng ACTIVE / DANG_O)

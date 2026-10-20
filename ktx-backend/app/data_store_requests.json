@@ -285,5 +285,82 @@
       "so_giuong": "A1_T3_P301_G01"
     }
   ],
-  "TRANSFER_CHECKOUT_REQUESTS": []
+  "TRANSFER_CHECKOUT_REQUESTS": [
+    {
+      "id": "YC-0233",
+      "ma_yeu_cau": "#YC-0233",
+      "loai_yeu_cau": "Chuyển phòng",
+      "loai_don": "CHUYEN_PHONG",
+      "msv": "dtc245180037",
+      "ho_ten": "Ngô Phương Mai",
+      "gioi_tinh": "Nữ",
+      "khoa": "CNTT",
+      "lop": "KTPM K23C",
+      "vi_tri_hien_tai": "Phòng P101 - Tòa A1 - Giường 01",
+      "cong_no": "Còn nợ 4.800.000 ₫",
+      "ngay_gui": "20/10/2026 11:06",
+      "phong_lien_quan": "P101 → P301",
+      "phong_hien_tai": "P101",
+      "phong_dich": "P301",
+      "ly_do": "Không hợp bạn cùng phòng",
+      "ngay_mong_muon": "30/10/2026",
+      "mo_ta": "",
+      "trang_thai": "DA_DUYET",
+      "trang_thai_label": "Đã duyệt",
+      "xep_phong": {
+        "ma_toa": "TOA_A1",
+        "phong_id": "A203",
+        "giuong_id": "G04",
+        "msv": null,
+        "ho_ten": null
+      }
+    },
+    {
+      "id": "YC-0232",
+      "ma_yeu_cau": "#YC-0232",
+      "loai_yeu_cau": "Trả phòng",
+      "loai_don": "TRA_PHONG",
+      "msv": "dtc245180037",
+      "ho_ten": "Ngô Phương Mai",
+      "gioi_tinh": "Nữ",
+      "khoa": "CNTT",
+      "lop": "KTPM K23C",
+      "vi_tri_hien_tai": "Phòng P101 - Tòa A1 - Giường 01",
+      "cong_no": "Còn nợ 4.800.000 ₫",
+      "ngay_gui": "20/10/2026 10:48",
+      "phong_lien_quan": "P101",
+      "phong_hien_tai": "P101",
+      "ly_do": "Chuyển ra ngoài ở",
+      "ngay_mong_muon": "31/10/2026",
+      "dia_chi_sau_tra": "s, Huyện Đình Lập, Lạng Sơn",
+      "dia_chi_chi_tiet": {},
+      "mo_ta": "x",
+      "trang_thai": "TU_CHOI",
+      "trang_thai_label": "Từ chối",
+      "ly_do_tu_choi": "lí do không chính đáng"
+    },
+    {
+      "id": "YC-0231",
+      "ma_yeu_cau": "#YC-0231",
+      "loai_yeu_cau": "Chuyển phòng",
+      "loai_don": "CHUYEN_PHONG",
+      "msv": "dtc245180037",
+      "ho_ten": "Ngô Phương Mai",
+      "gioi_tinh": "Nữ",
+      "khoa": "CNTT",
+      "lop": "KTPM K23C",
+      "vi_tri_hien_tai": "Phòng P101 - Tòa A1 - Giường 01",
+      "cong_no": "Còn nợ 4.800.000 ₫",
+      "ngay_gui": "20/10/2026 10:15",
+      "phong_lien_quan": "P101 → P102",
+      "phong_hien_tai": "P101",
+      "phong_dich": "P102",
+      "ly_do": "Cơ sở vật chất phòng hiện tại chưa phù hợp",
+      "ngay_mong_muon": "23/10/2026",
+      "mo_ta": "cán bộ quản lí duyệt cho em với ạ",
+      "trang_thai": "TU_CHOI",
+      "trang_thai_label": "Từ chối",
+      "ly_do_tu_choi": "lí do không phù hợp"
+    }
+  ]
 }

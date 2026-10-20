@@ -561,11 +561,27 @@ export default function App() {
     const requestId = match && match[1] ? match[1] : "DK-001";
     const upperReqId = requestId.toUpperCase();
 
-    // Nếu ID là đơn chuyển phòng (YC hoặc CP) -> Tự động chuyển hướng xử lý đúng sang ProcessTransferPage
-    if (upperReqId.startsWith("YC") || upperReqId.startsWith("CP")) {
+    const foundReq = (requestsList || []).find(
+      (r) =>
+        String(r.id || r.ma_yeu_cau || "").replace(/^#/, "").toUpperCase() ===
+        upperReqId,
+    );
+    const reqType = (
+      foundReq?.loai_don ||
+      foundReq?.loai_yeu_cau ||
+      ""
+    ).toLowerCase();
+
+    // Nếu ID là đơn trả phòng -> Tự động chuyển hướng xử lý đúng sang ProcessCheckoutPage
+    if (
+      upperReqId.startsWith("TP") ||
+      reqType.includes("trả") ||
+      reqType.includes("tra") ||
+      reqType.includes("checkout")
+    ) {
       return (
         <div className="relative">
-          <ProcessTransferPage
+          <ProcessCheckoutPage
             requestId={requestId}
             onBack={() => {
               loadRequests();
@@ -580,11 +596,16 @@ export default function App() {
       );
     }
 
-    // Nếu ID là đơn trả phòng (TP) -> Tự động chuyển hướng xử lý đúng sang ProcessCheckoutPage
-    if (upperReqId.startsWith("TP")) {
+    // Nếu ID là đơn chuyển phòng (YC hoặc CP) -> Tự động chuyển hướng xử lý đúng sang ProcessTransferPage
+    if (
+      upperReqId.startsWith("YC") ||
+      upperReqId.startsWith("CP") ||
+      reqType.includes("chuy") ||
+      reqType.includes("transfer")
+    ) {
       return (
         <div className="relative">
-          <ProcessCheckoutPage
+          <ProcessTransferPage
             requestId={requestId}
             onBack={() => {
               loadRequests();
@@ -632,6 +653,53 @@ export default function App() {
   if (currentPath.startsWith("/admin/requests/transfer")) {
     const match = currentPath.match(/\/admin\/requests\/transfer\/?(.*)/);
     const requestId = match && match[1] ? match[1] : "";
+    const upperReqId = requestId.toUpperCase();
+    const foundReq = (requestsList || []).find(
+      (r) =>
+        String(r.id || r.ma_yeu_cau || "").replace(/^#/, "").toUpperCase() ===
+        upperReqId,
+    );
+    const reqType = (
+      foundReq?.loai_don ||
+      foundReq?.loai_yeu_cau ||
+      ""
+    ).toLowerCase();
+
+    // Nếu đơn thực chất là đơn trả phòng -> Chuyển sang ProcessCheckoutPage
+    if (
+      upperReqId.startsWith("TP") ||
+      reqType.includes("trả") ||
+      reqType.includes("tra") ||
+      reqType.includes("checkout")
+    ) {
+      return (
+        <div className="relative">
+          <ProcessCheckoutPage
+            requestId={requestId}
+            onBack={() => {
+              loadRequests();
+              navigateTo("/admin");
+            }}
+            onProcessed={() => {
+              loadRequests();
+              navigateTo("/admin");
+            }}
+          />
+          <RoleSwitcher
+            currentRole="admin"
+            onSwitchRole={(r) =>
+              navigateTo(
+                r === "admin"
+                  ? "/admin"
+                  : r === "student"
+                    ? "/student/dashboard"
+                    : "/accountant/dashboard",
+              )
+            }
+          />
+        </div>
+      );
+    }
 
     return (
       <div className="relative">

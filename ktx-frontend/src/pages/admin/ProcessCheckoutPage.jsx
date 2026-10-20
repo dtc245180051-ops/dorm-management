@@ -231,9 +231,19 @@ export default function ProcessCheckoutPage({
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
                     <span className="text-slate-600 font-medium">Công nợ</span>
-                    <span className="font-bold text-emerald-600">
-                      {requestData?.cong_no || "Đã kiểm tra"}
-                    </span>
+                    {requestData?.cong_no &&
+                    (requestData.cong_no.toLowerCase().includes("nợ") ||
+                      requestData.cong_no.toLowerCase().includes("chưa") ||
+                      requestData.cong_no.toLowerCase().includes("thiếu")) &&
+                    !requestData.cong_no.toLowerCase().includes("không có") ? (
+                      <span className="font-bold text-rose-600">
+                        {requestData.cong_no}
+                      </span>
+                    ) : (
+                      <span className="font-bold text-emerald-600">
+                        {requestData?.cong_no || "Đã hoàn thành toàn bộ phí"}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

@@ -541,6 +541,18 @@
   width: fit-content;
 }
 
+.student-stat-badge.unpaid {
+  background-color: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+}
+
+.student-stat-badge.paid {
+  background-color: #E8F8EE;
+  color: #16A34A;
+  border: 1px solid #BBF7D0;
+}
+
 .student-stat-arrow {
   color: #CBD5E1;
   font-size: 18px;

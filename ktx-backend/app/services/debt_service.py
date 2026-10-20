@@ -121,10 +121,7 @@ class DebtService:
                     db.query(HoaDon)
                     .filter(
                         HoaDon.loai_hoa_don == LoaiHoaDon.DIEN_NUOC.value,
-                        or_(
-                            HoaDon.ma_phong == p.ma_phong,
-                            HoaDon.so_phong.ilike(f"%{p.so_phong}%"),
-                        ),
+                        HoaDon.ma_phong == p.ma_phong,
                         HoaDon.msv.is_(None),
                     )
                     .all()
@@ -177,7 +174,7 @@ class DebtService:
 
             total_debt = room_fee_debt + utility_fee_debt
             if total_debt > 0:
-                deadline_str = earliest_deadline.strftime("%d/%m/%Y") if earliest_deadline else "15/09/2026"
+                deadline_str = earliest_deadline.strftime("%d/%m/%Y") if earliest_deadline else "--"
                 debt_items.append(
                     DebtItemResponse(
                         studentId=sv.msv,
@@ -264,10 +261,7 @@ class DebtService:
                     db.query(HoaDon)
                     .filter(
                         HoaDon.loai_hoa_don == LoaiHoaDon.DIEN_NUOC.value,
-                        or_(
-                            HoaDon.ma_phong == p.ma_phong,
-                            HoaDon.so_phong.ilike(f"%{p.so_phong}%"),
-                        ),
+                        HoaDon.ma_phong == p.ma_phong,
                         HoaDon.msv.is_(None),
                     )
                     .all()

@@ -192,12 +192,24 @@ def run_tests():
 
     import time
     dynamic_month = f"Tháng {int(time.time()) % 10000}/2026"
+    sample_room = util_candidates[0] if util_candidates else None
     util_publish_payload = {
         "thang": dynamic_month,
         "han_thanh_toan": "2026-09-20",
         "don_gia_dien": 3000.0,
         "don_gia_nuoc": 15000.0,
         "ghi_chu": f"Phát hành tiền điện nước test {dynamic_month}",
+        "chi_tiet_phong": [
+            {
+                "ma_phong": sample_room["ma_phong"] if sample_room else "A1_P101",
+                "so_phong": sample_room["so_phong"] if sample_room else "P101",
+                "chi_so_dien_cu_moi": "100 - 150",
+                "so_dien_kwh": 50,
+                "chi_so_nuoc_cu_moi": "10 - 15",
+                "so_nuoc_m3": 5,
+                "tong_tien": 225000.0,
+            }
+        ] if sample_room else None,
     }
     status, util_pub_result = http_request("POST", "/invoices/utility/publish", data=util_publish_payload, token=kt_token)
     assert status == 201, f"Phát hành điện nước thất bại: {util_pub_result}"

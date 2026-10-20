@@ -345,6 +345,17 @@ def submit_transfer_request(
                 g_code = active_c.giuong.ma_giuong.split("_")[-1] if active_c.giuong.ma_giuong else ""
                 data["vi_tri_hien_tai"] = f"Phòng P{p.so_phong} - {b_name} - Giường {g_code}"
                 data["phong_hien_tai"] = f"P{p.so_phong}"
+
+            # Tra cứu công nợ thực tế của sinh viên
+            try:
+                from app.services.debt_service import DebtService
+                debt_resp = DebtService.get_personal_debt(db, clean_msv)
+                if debt_resp and debt_resp.totalDebt > 0:
+                    data["cong_no"] = f"Còn nợ {debt_resp.totalDebt:,.0f} ₫".replace(",", ".")
+                else:
+                    data["cong_no"] = "Đã hoàn thành toàn bộ phí"
+            except Exception:
+                data["cong_no"] = "Đã hoàn thành toàn bộ phí"
     stored = occupancy_request_store.add_transfer_request(data)
     return {
         "status": "success",
@@ -383,6 +394,17 @@ def submit_checkout_request(
                 g_code = active_c.giuong.ma_giuong.split("_")[-1] if active_c.giuong.ma_giuong else ""
                 data["vi_tri_hien_tai"] = f"Phòng P{p.so_phong} - {b_name} - Giường {g_code}"
                 data["phong_hien_tai"] = f"P{p.so_phong}"
+
+            # Tra cứu công nợ thực tế của sinh viên
+            try:
+                from app.services.debt_service import DebtService
+                debt_resp = DebtService.get_personal_debt(db, clean_msv)
+                if debt_resp and debt_resp.totalDebt > 0:
+                    data["cong_no"] = f"Còn nợ {debt_resp.totalDebt:,.0f} ₫".replace(",", ".")
+                else:
+                    data["cong_no"] = "Đã hoàn thành toàn bộ phí"
+            except Exception:
+                data["cong_no"] = "Đã hoàn thành toàn bộ phí"
     stored = occupancy_request_store.add_checkout_request(data)
     return {
         "status": "success",
@@ -419,6 +441,43 @@ def get_current_room(
 
     if not target_msv:
         return {"data": None, "message": "Chưa xác định được sinh viên"}
+
+    def _compute_student_billing(student_msv: str, contract_no: Optional[str] = None):
+        inv_item = None
+        if contract_no:
+            inv_item = db.query(HoaDon).filter(HoaDon.ma_hop_dong == contract_no).first()
+        if not inv_item and student_msv:
+            inv_item = (
+                db.query(HoaDon)
+                .filter(HoaDon.msv == student_msv)
+                .order_by(HoaDon.ngay_lap.desc())
+                .first()
+            )
+        try:
+            from app.services.debt_service import DebtService
+            debt_resp = DebtService.get_personal_debt(db, student_msv)
+            if debt_resp and debt_resp.fees:
+                room_fee = next((f for f in debt_resp.fees if "phòng" in f.feeName.lower()), debt_resp.fees[0])
+                amt_str = f"{int(room_fee.amount):,}".replace(",", ".") + " đ"
+                st = "Chưa thanh toán" if debt_resp.totalDebt > 0 else "Đã thanh toán"
+                return {
+                    "amount": amt_str,
+                    "period": "/năm",
+                    "status": st,
+                }
+        except Exception:
+            pass
+
+        if inv_item:
+            so_tien = int(inv_item.so_tien) if inv_item.so_tien else 4800000
+            so_tien_fmt = f"{so_tien:,}".replace(",", ".") + " đ"
+            trang_thai_phi = "Đã thanh toán" if inv_item.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value else "Chưa thanh toán"
+            return {
+                "amount": so_tien_fmt,
+                "period": "/năm",
+                "status": trang_thai_phi,
+            }
+        return None
 
     # 0. Kiểm tra nếu sinh viên đã được duyệt trả phòng (checkout)
     checkout_req = next(
@@ -565,11 +624,7 @@ def get_current_room(
                 "ngay_bat_dau": date_gui,
                 "ngay_ket_thuc": "30/06/2027",
                 "thoi_gian_luu_tru": f"{date_gui} – Nay",
-                "billing": {
-                    "amount": "4.800.000 đ",
-                    "period": "/năm",
-                    "status": "Đã thanh toán",
-                },
+                "billing": _compute_student_billing(target_msv),
                 "danh_sach_thanh_vien": members_transfer,
             }
         }
@@ -605,46 +660,8 @@ def get_current_room(
     suc_chua = room.suc_chua or 4
     thanh_vien = f"{occupied_count}/{suc_chua} người"
 
-    # Tìm khoản phí hoặc hóa đơn liên quan đến hợp đồng này
-    inv = (
-        db.query(HoaDon)
-        .filter(HoaDon.ma_hop_dong == active_contract.ma_hop_dong)
-        .first()
-    )
-    if not inv and target_msv:
-        inv = (
-            db.query(HoaDon)
-            .filter(HoaDon.msv == target_msv)
-            .first()
-        )
-
-    phi = (
-        db.query(Phi)
-        .filter(Phi.ma_hop_dong == active_contract.ma_hop_dong, Phi.loai_phi == "TIEN_PHONG")
-        .first()
-    )
-
-    billing = None
-    if inv:
-        so_tien = int(inv.so_tien) if inv.so_tien else 400000
-        so_tien_fmt = f"{so_tien:,}".replace(",", ".") + " đ"
-        trang_thai_phi = "Đã thanh toán" if inv.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value else "Chưa thanh toán"
-        billing = {
-            "amount": so_tien_fmt,
-            "period": "/năm",
-            "status": trang_thai_phi,
-        }
-    elif phi:
-        so_tien = int(phi.so_tien) if phi.so_tien else 350000
-        so_tien_fmt = f"{so_tien:,}".replace(",", ".") + " đ"
-        is_paid = len(phi.thanh_toans) > 0 if phi.thanh_toans else False
-        billing = {
-            "amount": so_tien_fmt,
-            "period": "/năm",
-            "status": "Đã thanh toán" if is_paid else "Chưa thanh toán",
-        }
-    else:
-        billing = None
+    # Lấy thông tin thanh toán công nợ thực tế của sinh viên
+    billing = _compute_student_billing(target_msv, active_contract.ma_hop_dong)
 
     toa_label = building.ten_toa if building else (f"Tòa {floor.ma_toa}" if floor and floor.ma_toa else "KTX")
     tang_val = str(floor.so_tang) if floor and floor.so_tang else "1"

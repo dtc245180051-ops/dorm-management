@@ -104,22 +104,26 @@ export default function AccountantDashboard({ onNavigate }) {
   const roomTypeStats = dashboardData?.roomTypeStats || [];
   const recentTransactions = dashboardData?.recentTransactions || [];
 
-  // Tính toán dữ liệu tiền phòng vs điện nước
+  // Tính toán dữ liệu tiền phòng vs điện nước theo số liệu thực tế
   const latestTrend = monthlyTrend?.[monthlyTrend.length - 1] || null;
-  const roomFeeTotal = latestTrend?.roomFee || (kpis?.totalRevenue ? kpis.totalRevenue * 0.7 : 0);
-  const roomFeeCollected = kpis?.totalRevenue > 0
-    ? Math.min(roomFeeTotal, kpis.collectedRevenue * 0.72)
-    : 0;
-  const roomFeeRate = roomFeeTotal > 0
-    ? Math.min(100, Math.round((roomFeeCollected / roomFeeTotal) * 100))
-    : 0;
+  const currentPeriodName = latestTrend?.period || 'Năm học 2026 - 2027';
 
-  const utilityFeeTotal = latestTrend?.utilityFee || (kpis?.totalRevenue ? kpis.totalRevenue * 0.3 : 0);
-  const utilityFeeCollected = kpis?.totalRevenue > 0
-    ? Math.min(utilityFeeTotal, kpis.collectedRevenue * 0.28)
+  const roomFeeTotal = latestTrend ? Number(latestTrend.roomFee || 0) : Number(kpis?.totalRevenue || 0);
+  const utilityFeeTotal = latestTrend ? Number(latestTrend.utilityFee || 0) : 0;
+
+  // Phân bổ số tiền đã thu: nếu chưa phát hành hóa đơn điện nước (utilityFeeTotal = 0), toàn bộ tiền thu là tiền phòng
+  const utilityFeeCollected = utilityFeeTotal > 0
+    ? Math.min(utilityFeeTotal, Math.max(0, Number(latestTrend?.totalCollected || 0) - roomFeeTotal))
     : 0;
   const utilityFeeRate = utilityFeeTotal > 0
     ? Math.min(100, Math.round((utilityFeeCollected / utilityFeeTotal) * 100))
+    : 0;
+
+  const roomFeeCollected = utilityFeeTotal > 0
+    ? Math.min(roomFeeTotal, Math.max(0, Number(latestTrend?.totalCollected || 0) - utilityFeeCollected))
+    : Number(kpis?.collectedRevenue || 0);
+  const roomFeeRate = roomFeeTotal > 0
+    ? Math.min(100, Math.round((roomFeeCollected / roomFeeTotal) * 100))
     : 0;
 
   return (
@@ -315,7 +319,7 @@ export default function AccountantDashboard({ onNavigate }) {
                 </p>
               </div>
               <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200">
-                Kỳ hiện tại: Tháng 09/2026
+                Kỳ hiện tại: {currentPeriodName}
               </span>
             </div>
 

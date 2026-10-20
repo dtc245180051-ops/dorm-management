@@ -323,11 +323,15 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
       };
 
       const res = await occupancyService.submitTransferRequest(payload);
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      const fullTimeStr = `${now.toLocaleDateString("vi-VN")} ${timeStr}`;
       const newReq = res.data || {
         id: `YC-${Date.now().toString().slice(-4)}`,
         ma_yeu_cau: `#YC-${Date.now().toString().slice(-4)}`,
         loai_yeu_cau: "Chuyển phòng",
-        ngay_gui: new Date().toLocaleDateString("vi-VN"),
+        loai_don: "CHUYEN_PHONG",
+        ngay_gui: fullTimeStr,
         phong_lien_quan: `${currentRoomInfo.so_phong || ""} → ${transferForm.phong_mong_muon.split(" - ")[0]}`,
         trang_thai: "CHO_DUYET",
         trang_thai_label: "Chờ duyệt",
@@ -409,11 +413,15 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
       };
 
       const res = await occupancyService.submitCheckoutRequest(payload);
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      const fullTimeStr = `${now.toLocaleDateString("vi-VN")} ${timeStr}`;
       const newReq = res.data || {
         id: `YC-${Date.now().toString().slice(-4)}`,
         ma_yeu_cau: `#YC-${Date.now().toString().slice(-4)}`,
         loai_yeu_cau: "Trả phòng",
-        ngay_gui: new Date().toLocaleDateString("vi-VN"),
+        loai_don: "TRA_PHONG",
+        ngay_gui: fullTimeStr,
         phong_lien_quan: currentRoomInfo.so_phong || "",
         trang_thai: "CHO_DUYET",
         trang_thai_label: "Chờ duyệt",

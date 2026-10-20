@@ -61,6 +61,19 @@ def get_request_detail(
     # 1. Kiểm tra đơn trong occupancy_request_store trước
     stored = occupancy_request_store.get_request_by_id(clean_id)
     if stored:
+        # Tra cứu công nợ thực tế của sinh viên từ database
+        msv = (stored.get("msv") or "").strip().upper()
+        if msv:
+            try:
+                from app.services.debt_service import DebtService
+                debt_resp = DebtService.get_personal_debt(db, msv)
+                if debt_resp and debt_resp.totalDebt > 0:
+                    stored["cong_no"] = f"Còn nợ {debt_resp.totalDebt:,.0f} ₫".replace(",", ".")
+                else:
+                    stored["cong_no"] = "Đã hoàn thành toàn bộ phí"
+            except Exception:
+                pass
+
         # Tự động cập nhật hoặc sửa gợi ý nếu gợi ý chưa khớp giới tính
         student_gender = stored.get("gioi_tinh", "Nam")
         available_rooms = dorm_service.get_available_beds(db, gender=student_gender)

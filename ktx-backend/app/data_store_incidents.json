@@ -1,5 +1,23 @@
 [
   {
+    "id": "PA-06C287",
+    "ma_phan_anh": "PA-06C287",
+    "msv": "dtc245180037",
+    "ho_ten": "Ngô Phương Mai",
+    "phong": "P203",
+    "loai_phan_anh": "Điện nước",
+    "phan_loai": "Điện nước",
+    "tieu_de": "Phòng bị hỏng bóng điện",
+    "mo_ta": "phòng bị hỏng bóng điện",
+    "hinh_anh": null,
+    "muc_do_uu_tien": "Thường",
+    "ngay_gui": "2026-10-20T11:08:18.342716",
+    "ngay_tao": "2026-10-20T11:08:18.342722",
+    "trang_thai": "DA_XU_LY",
+    "trang_thai_label": "Đã xử lý",
+    "ghi_chu_xu_ly": ""
+  },
+  {
     "id": "PA-F8B322",
     "ma_phan_anh": "PA-F8B322",
     "msv": "dtc245180132",
