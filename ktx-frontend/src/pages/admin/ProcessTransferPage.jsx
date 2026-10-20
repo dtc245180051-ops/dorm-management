@@ -131,6 +131,7 @@ export default function ProcessTransferPage({
         ma_toa: selectedBuilding || 'A',
         phong_id: selectedRoom || 'A203',
         giuong_id: selectedBed || 'G04',
+        msv: requestData?.msv || requestData?.ma_sinh_vien || "DTC245180037",
       };
 
       const result = await occupancyService.approveTransferRequest(requestId, payload);
@@ -160,7 +161,10 @@ export default function ProcessTransferPage({
 
     setSubmitting(true);
     try {
-      const payload = { ly_do_tu_choi: rejectReason.trim() };
+      const payload = {
+        ly_do_tu_choi: rejectReason.trim(),
+        msv: requestData?.msv || requestData?.ma_sinh_vien || "DTC245180037",
+      };
       await occupancyService.rejectTransferRequest(requestId, payload);
 
       setIsRejectModalOpen(false);

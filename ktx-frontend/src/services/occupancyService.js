@@ -119,9 +119,9 @@ function getLocalCurrentRoomInfo() {
         tang: tangVal,
         giuong: giuongClean,
         so_giuong: giuongClean,
-        so_thanh_vien: 3,
+        so_thanh_vien: 1,
         suc_chua: "4 người",
-        thanh_vien: "3/4 người",
+        thanh_vien: "1/4 người",
         thoi_gian_luu_tru: `${approvedTransfer.ngay_gui || "19/10/2026"} – Nay`,
         ngay_nhan_phong: approvedTransfer.ngay_gui || "19/10/2026",
         ngay_bat_dau: approvedTransfer.ngay_gui || "19/10/2026",
@@ -1411,12 +1411,21 @@ export const occupancyService = {
     // Bắn sự kiện cập nhật thời gian thực
     window.dispatchEvent(new Event("occupancy-updated"));
     try {
+      const targetReq = all.find(
+        (r) =>
+          r.id?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.replace("#", "").toLowerCase() === cleanId.replace("#", "").toLowerCase()
+      );
+      const targetMsv = targetReq?.msv || targetReq?.ma_sinh_vien || payload.msv || "DTC245180037";
       studentNotificationService.notifyFromManagement({
-        title: "Thông báo đổi phòng",
-        content: "Kết quả xét duyệt đăng ký chuyển phòng đã có. Bạn vui lòng kiểm tra thông tin phòng tại mục Lịch sử phòng",
+        id: `transfer-approved-${cleanId.replace("#", "")}`,
+        title: "Thông báo duyệt chuyển phòng",
+        content: `Kết quả xét duyệt chuyển phòng (${cleanId}) đã có: Yêu cầu chuyển phòng của bạn đã được Ban quản lý phê duyệt. Bạn được chuyển sang Phòng ${phongLabel} - ${toaLabel} (Giường ${giuongClean}). Vui lòng kiểm tra thông tin phòng tại mục Lịch sử phòng.`,
         type: "transfer",
         actionUrl: "/student/history",
         actionLabel: "Kiểm tra lịch sử phòng",
+        msv: targetMsv,
       });
     } catch (_) {}
 
@@ -1471,12 +1480,21 @@ export const occupancyService = {
 
     window.dispatchEvent(new Event("occupancy-updated"));
     try {
+      const targetReq = all.find(
+        (r) =>
+          r.id?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.replace("#", "").toLowerCase() === cleanId.replace("#", "").toLowerCase()
+      );
+      const targetMsv = targetReq?.msv || targetReq?.ma_sinh_vien || payload.msv || "DTC245180037";
       studentNotificationService.notifyFromManagement({
-        title: "Thông báo đơn chuyển phòng",
-        content: `Yêu cầu chuyển phòng của bạn đã bị từ chối. Lý do: ${payload.ly_do_tu_choi || "Không đáp ứng điều kiện chuyển phòng."}`,
+        id: `transfer-rejected-${cleanId.replace("#", "")}`,
+        title: "Thông báo từ chối chuyển phòng",
+        content: `Yêu cầu chuyển phòng (${cleanId}) của bạn đã bị từ chối. Lý do: ${payload.ly_do_tu_choi || "Không đáp ứng điều kiện chuyển phòng."}`,
         type: "transfer",
         actionUrl: "/student/history",
         actionLabel: "Xem lịch sử yêu cầu",
+        msv: targetMsv,
       });
     } catch (_) {}
 
@@ -1549,12 +1567,21 @@ export const occupancyService = {
 
     window.dispatchEvent(new Event("occupancy-updated"));
     try {
+      const targetReq = all.find(
+        (r) =>
+          r.id?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.replace("#", "").toLowerCase() === cleanId.replace("#", "").toLowerCase()
+      );
+      const targetMsv = targetReq?.msv || targetReq?.ma_sinh_vien || payload.msv || "DTC245180037";
       studentNotificationService.notifyFromManagement({
+        id: `checkout-approved-${cleanId.replace("#", "")}`,
         title: "Thông báo kết quả trả phòng",
-        content: "Yêu cầu trả phòng của bạn đã được Ban quản lý phê duyệt và hoàn tất thủ tục bàn giao.",
+        content: `Yêu cầu trả phòng (${cleanId}) của bạn đã được Ban quản lý phê duyệt hoàn tất. Thủ tục bàn giao tài sản và kết thúc lưu trú đã xong.`,
         type: "inspection",
         actionUrl: "/student/history",
         actionLabel: "Kiểm tra lịch sử",
+        msv: targetMsv,
       });
     } catch (_) {}
 
@@ -1604,12 +1631,21 @@ export const occupancyService = {
 
     window.dispatchEvent(new Event("occupancy-updated"));
     try {
+      const targetReq = all.find(
+        (r) =>
+          r.id?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.replace("#", "").toLowerCase() === cleanId.replace("#", "").toLowerCase()
+      );
+      const targetMsv = targetReq?.msv || targetReq?.ma_sinh_vien || payload.msv || "DTC245180037";
       studentNotificationService.notifyFromManagement({
+        id: `checkout-rejected-${cleanId.replace("#", "")}`,
         title: "Thông báo từ chối trả phòng",
-        content: `Yêu cầu trả phòng của bạn đã bị từ chối. Lý do: ${payload.ly_do_tu_choi || "Chưa hoàn tất công nợ hoặc thủ tục bàn giao tài sản."}`,
+        content: `Yêu cầu trả phòng (${cleanId}) của bạn đã bị từ chối. Lý do: ${payload.ly_do_tu_choi || "Chưa hoàn tất công nợ hoặc thủ tục bàn giao tài sản."}`,
         type: "inspection",
         actionUrl: "/student/history",
         actionLabel: "Kiểm tra lịch sử",
+        msv: targetMsv,
       });
     } catch (_) {}
 

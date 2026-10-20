@@ -287,6 +287,62 @@
   ],
   "TRANSFER_CHECKOUT_REQUESTS": [
     {
+      "id": "YC-0235",
+      "ma_yeu_cau": "#YC-0235",
+      "loai_yeu_cau": "Trả phòng",
+      "loai_don": "TRA_PHONG",
+      "msv": "dtc245180037",
+      "ho_ten": "Ngô Phương Mai",
+      "gioi_tinh": "Nữ",
+      "khoa": "CNTT",
+      "lop": "KTPM K23C",
+      "vi_tri_hien_tai": "Phòng P101 - Tòa A1 - Giường 01",
+      "cong_no": "Đã hoàn thành toàn bộ phí",
+      "ngay_gui": "20/10/2026 14:28",
+      "phong_lien_quan": "P101",
+      "phong_hien_tai": "P101",
+      "ly_do": "Đã tốt nghiệp",
+      "ngay_mong_muon": "22/10/2026",
+      "dia_chi_sau_tra": "a, Thành phố Tuyên Quang, Tuyên Quang",
+      "dia_chi_chi_tiet": {
+        "tinh": "Tuyên Quang",
+        "huyen": "Thành phố Tuyên Quang",
+        "so_nha": "a"
+      },
+      "mo_ta": "",
+      "trang_thai": "TU_CHOI",
+      "trang_thai_label": "Từ chối",
+      "ly_do_tu_choi": "k"
+    },
+    {
+      "id": "YC-0234",
+      "ma_yeu_cau": "#YC-0234",
+      "loai_yeu_cau": "Trả phòng",
+      "loai_don": "TRA_PHONG",
+      "msv": "dtc245180037",
+      "ho_ten": "Ngô Phương Mai",
+      "gioi_tinh": "Nữ",
+      "khoa": "CNTT",
+      "lop": "KTPM K23C",
+      "vi_tri_hien_tai": "Phòng P101 - Tòa A1 - Giường 01",
+      "cong_no": "Đã hoàn thành toàn bộ phí",
+      "ngay_gui": "20/10/2026 14:02",
+      "phong_lien_quan": "P101",
+      "phong_hien_tai": "P101",
+      "ly_do": "Chuyển ra ngoài ở",
+      "ngay_mong_muon": "21/10/2026",
+      "dia_chi_sau_tra": "z, Huyện Sơn Dương, Tuyên Quang",
+      "dia_chi_chi_tiet": {
+        "tinh": "Tuyên Quang",
+        "huyen": "Huyện Sơn Dương",
+        "so_nha": "z"
+      },
+      "mo_ta": "x",
+      "trang_thai": "TU_CHOI",
+      "trang_thai_label": "Từ chối",
+      "ly_do_tu_choi": "khong"
+    },
+    {
       "id": "YC-0233",
       "ma_yeu_cau": "#YC-0233",
       "loai_yeu_cau": "Chuyển phòng",
@@ -309,10 +365,10 @@
       "trang_thai_label": "Đã duyệt",
       "xep_phong": {
         "ma_toa": "TOA_A1",
-        "phong_id": "A203",
-        "giuong_id": "G04",
-        "msv": null,
-        "ho_ten": null
+        "phong_id": "P301",
+        "giuong_id": "G01",
+        "msv": "dtc245180037",
+        "ho_ten": "Ngô Phương Mai"
       }
     },
     {

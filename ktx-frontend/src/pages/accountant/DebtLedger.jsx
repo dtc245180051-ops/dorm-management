@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import './DebtLedger.css';
 import { debtService } from '../../services/debtService';
+import studentNotificationService from '../../services/studentNotificationService';
 
 /**
  * Trang Sổ công nợ (Chuẩn 100% theo 2 Screenshot thiết kế)
@@ -92,6 +93,17 @@ export default function DebtLedger({ searchTerm = '' }) {
     setRemindingStudentId(studentId);
     try {
       const res = await debtService.remindStudentDebt(studentId);
+      try {
+        studentNotificationService.notifyFromAccountant({
+          title: "Thông báo nhắc nộp phí và thanh toán công nợ KTX",
+          content: `Phòng Kế toán KTX thông báo: Sinh viên ${studentName || studentId} (${studentId}) vui lòng kiểm tra và hoàn tất các khoản nợ/phí nội trú còn thiếu. Hạn thanh toán sớm để đảm bảo quyền lợi nội trú.`,
+          type: "billing",
+          actionUrl: "/student/payment",
+          actionLabel: "Thanh toán ngay",
+          msv: studentId,
+        });
+        window.dispatchEvent(new Event("ktx-notifications-updated"));
+      } catch (_) {}
       showToast(
         res?.message || `Đã gửi thông báo nhắc nợ thành công tới sinh viên ${studentName || studentId}!`,
         'success'

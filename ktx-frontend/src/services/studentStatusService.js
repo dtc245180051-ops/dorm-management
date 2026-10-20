@@ -105,11 +105,13 @@ const getAssignedRoom = (record) => {
       roomObject.toa ||
       "",
     thanh_vien:
-      record.thanh_vien ||
-      roomDetails.thanh_vien ||
-      (record.so_thanh_vien && record.suc_chua
-        ? `${record.so_thanh_vien}/${record.suc_chua} người`
-        : "3/4 người"),
+      record.thanh_vien && record.thanh_vien !== "3/4 người"
+        ? record.thanh_vien
+        : roomDetails.thanh_vien && roomDetails.thanh_vien !== "3/4 người"
+          ? roomDetails.thanh_vien
+          : (record.so_thanh_vien && record.suc_chua
+            ? `${record.so_thanh_vien}/${record.suc_chua} người`
+            : "1/4 người"),
     thoi_gian_luu_tru:
       record.thoi_gian_luu_tru ||
       (record.ngay_bat_dau
@@ -274,7 +276,7 @@ export async function resolveStudentStatus(studentMsv) {
       ngay_ket_thuc: residence.endDate || "30/06/2027",
       trang_thai: "ACTIVE",
       trang_thai_label: "Đang ở",
-      thanh_vien: residence.members || "3/4 người",
+      thanh_vien: residence.members && residence.members !== "3/4 người" ? residence.members : "1/4 người",
       thoi_gian_luu_tru: residence.startDate ? `${residence.startDate} – Nay` : "19/10/2026 – Nay",
       tang: String(residence.roomNumber).startsWith("5")
         ? 5

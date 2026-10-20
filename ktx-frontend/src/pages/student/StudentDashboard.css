@@ -975,6 +975,9 @@
   border-bottom: 1px solid #F1F5F9;
   cursor: pointer;
   transition: opacity 0.15s ease;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
 }
 
 .student-notif-item:last-child {
@@ -992,9 +995,19 @@
   gap: 8px;
   color: var(--text-body);
   font-weight: 500;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.student-notif-title-wrap span:not(.student-notif-dot),
+.student-notif-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+  display: block;
 }
 
 .student-notif-dot {
@@ -1009,7 +1022,8 @@
   color: var(--text-secondary);
   font-size: 11px;
   white-space: nowrap;
-  margin-left: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* --------------------------------------------------------------------------

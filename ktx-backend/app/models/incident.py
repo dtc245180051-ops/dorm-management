@@ -65,6 +65,10 @@ class PhanAnh(Base):
         Text,
         nullable=True,
     )
+    ghi_chu_xu_ly: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
     ngay_tao: Mapped[Optional[datetime.datetime]] = mapped_column(
         DateTime,
         nullable=True,
@@ -141,6 +145,14 @@ class ViPham(Base):
     )
     quyet_dinh: Mapped[Optional[str]] = mapped_column(
         String(255),
+        nullable=True,
+    )
+    giai_trinh: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    giai_trinh_at: Mapped[Optional[str]] = mapped_column(
+        String(100),
         nullable=True,
     )
 

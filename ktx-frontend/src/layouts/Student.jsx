@@ -16,6 +16,9 @@ import {
   Send,
   Menu,
   Lock,
+  Scale,
+  AlertTriangle,
+  ChevronRight,
 } from "lucide-react";
 import { askGeminiChatbot } from "../services/geminiService";
 import AppFooter from "../components/AppFooter";
@@ -109,10 +112,10 @@ export default function StudentLayout({
     syncNotifications();
     studentNotificationService.syncFromBackend().then(() => syncNotifications());
 
-    // Quét định kỳ mỗi 10 giây để nhận thông báo mới nhất ngay khi Kế toán hoặc BQL thao tác
+    // Quét định kỳ mỗi 3 giây để nhận thông báo mới nhất ngay khi Kế toán hoặc BQL thao tác
     const intervalId = setInterval(() => {
       studentNotificationService.syncFromBackend().then(() => syncNotifications());
-    }, 10000);
+    }, 3000);
 
     const onWindowFocus = () => {
       studentNotificationService.syncFromBackend().then(() => syncNotifications());
@@ -263,6 +266,38 @@ export default function StudentLayout({
     }
   };
 
+  const handleToggleNotifications = () => {
+    const currentPath = (window.location.pathname || "").split("?")[0];
+    const isCurrentlyOnNotifications =
+      activeTab === "notifications" ||
+      currentPath === "/student/notifications" ||
+      currentPath.includes("/notifications");
+
+    if (isCurrentlyOnNotifications) {
+      // Đang ở trang thông báo -> Ấn lần nữa thì mất thông báo đi (quay về trang trước đó hoặc dashboard)
+      const prevPath = sessionStorage.getItem("ktx_student_prev_path");
+      const targetPath =
+        prevPath && !prevPath.includes("/notifications")
+          ? prevPath
+          : "/student/dashboard";
+      if (onSelectTab) {
+        onSelectTab("dashboard");
+      }
+      window.history.pushState({}, "", targetPath);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      window.dispatchEvent(
+        new CustomEvent("student-navigate", { detail: { path: targetPath } }),
+      );
+    } else {
+      // Chưa ở trang thông báo -> Lưu lại trang hiện tại và chuyển sang trang thông báo đầy đủ như cũ
+      sessionStorage.setItem(
+        "ktx_student_prev_path",
+        currentPath || "/student/dashboard",
+      );
+      handleTabClick("notifications");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#eef2f6] text-slate-800 font-sans flex flex-col antialiased selection:bg-blue-100 selection:text-blue-700">
       {/* 1. Header trên cùng theo chuẩn Figma */}
@@ -323,14 +358,26 @@ export default function StudentLayout({
 
         {/* Khối cá nhân & Thông báo bên phải */}
         <div className="flex items-center gap-3 sm:gap-5 shrink-0">
-          {/* Nút chuông thông báo kèm số lượng chưa đọc: Click chuyển tới trang Thông báo */}
+          {/* Nút chuông thông báo: Bấm lần 1 mở trang Thông báo đầy đủ như cũ, bấm lần 2 đóng lại (quay về trang trước) */}
           <div className="relative">
             <button
               type="button"
-              onClick={() => handleTabClick("notifications")}
-              className="relative p-2 text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-full transition cursor-pointer"
-              title={`Thông báo sinh viên${unreadNotifCount > 0 ? ` (${unreadNotifCount} chưa đọc)` : ""}`}
-              aria-label="Xem thông báo sinh viên"
+              onClick={handleToggleNotifications}
+              className={`relative p-2 text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-full transition cursor-pointer ${
+                activeTab === "notifications" ||
+                (typeof window !== "undefined" &&
+                  window.location.pathname.includes("/notifications"))
+                  ? "text-blue-600 bg-blue-50 ring-2 ring-blue-100"
+                  : ""
+              }`}
+              title={
+                activeTab === "notifications" ||
+                (typeof window !== "undefined" &&
+                  window.location.pathname.includes("/notifications"))
+                  ? "Đóng thông báo (quay lại)"
+                  : `Xem thông báo sinh viên${unreadNotifCount > 0 ? ` (${unreadNotifCount} chưa đọc)` : ""}`
+              }
+              aria-label="Thông báo sinh viên"
             >
               <Bell className="w-5 h-5" />
               {unreadNotifCount > 0 && (
@@ -512,13 +559,20 @@ export default function StudentLayout({
                         key={item.id}
                         type="button"
                         onClick={() => handleTabClick(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
                           ? "bg-[#e0f2fe] text-[#0284c7] font-bold"
                           : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
                           }`}
                       >
-                        <Icon className="w-4 h-4 shrink-0 text-slate-400" />
-                        <span>{item.label}</span>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Icon className="w-4 h-4 shrink-0 text-slate-400" />
+                          <span>{item.label}</span>
+                        </div>
+                        {item.badgeCount > 0 && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-bold bg-rose-500 text-white rounded-full leading-none shrink-0 shadow-xs">
+                            {item.badgeCount > 99 ? "99+" : item.badgeCount}
+                          </span>
+                        )}
                       </button>
                     );
                   })}

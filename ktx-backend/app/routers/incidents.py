@@ -72,6 +72,8 @@ def list_violations(db: Session = Depends(get_db)):
             "ngay_lap": item.ngay_vi_pham.strftime("%d/%m/%Y") if item.ngay_vi_pham else "",
             "trang_thai": status_val,
             "sub_status": sub_status_val,
+            "giai_trinh": getattr(item, "giai_trinh", None) or "",
+            "giai_trinh_at": getattr(item, "giai_trinh_at", None) or "",
         })
     return results
 
@@ -134,6 +136,8 @@ class UpdateViolationStatusRequest(BaseModel):
     hinh_thuc_xu_ly: Optional[str] = None
     quyet_dinh: Optional[str] = None
     ghi_chu: Optional[str] = None
+    giai_trinh: Optional[str] = None
+    giai_trinh_at: Optional[str] = None
 
 
 @router.put("/violations/{ma_vi_pham}")
@@ -150,6 +154,10 @@ def update_violation(ma_vi_pham: str, req: UpdateViolationStatusRequest, db: Ses
         item.quyet_dinh = req.quyet_dinh or req.hinh_thuc_xu_ly
     if req.ghi_chu is not None:
         item.ghi_chu = req.ghi_chu
+    if req.giai_trinh is not None:
+        item.giai_trinh = req.giai_trinh
+    if req.giai_trinh_at is not None:
+        item.giai_trinh_at = req.giai_trinh_at
     db.commit()
     db.refresh(item)
     return {
@@ -160,6 +168,8 @@ def update_violation(ma_vi_pham: str, req: UpdateViolationStatusRequest, db: Ses
         "hinh_thuc_xu_ly": item.hinh_thuc_xu_ly,
         "quyet_dinh": item.quyet_dinh,
         "ghi_chu": item.ghi_chu,
+        "giai_trinh": item.giai_trinh,
+        "giai_trinh_at": item.giai_trinh_at,
     }
 
 
@@ -435,21 +445,46 @@ def update_status(
     updated = incident_store.update_incident_status(
         incident_id, req.trang_thai, req.ghi_chu_xu_ly
     )
-    if not updated:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Không tìm thấy phản ánh để cập nhật.",
-        )
 
     # Cập nhật trong CSDL nếu có
+    db_pa = None
     try:
         db_pa = db.query(PhanAnh).filter(PhanAnh.ma_phan_anh == incident_id).first()
         if db_pa:
             db_pa.trang_thai = req.trang_thai
+            if req.ghi_chu_xu_ly is not None:
+                db_pa.ghi_chu_xu_ly = req.ghi_chu_xu_ly
             db.commit()
+            db.refresh(db_pa)
     except Exception as e:
         db.rollback()
         print(f"Warning: Failed to update DB phan_anh: {e}")
+
+    if not updated and db_pa:
+        mapped = {
+            "id": db_pa.ma_phan_anh,
+            "ma_phan_anh": db_pa.ma_phan_anh,
+            "msv": db_pa.msv,
+            "ho_ten": db_pa.sinh_vien.nguoi_dung.ho_ten if (db_pa.sinh_vien and db_pa.sinh_vien.nguoi_dung) else db_pa.msv,
+            "phong": db_pa.phong or "",
+            "loai_phan_anh": db_pa.phan_loai or "Cơ sở vật chất",
+            "phan_loai": db_pa.phan_loai or "Cơ sở vật chất",
+            "tieu_de": db_pa.tieu_de or db_pa.tom_tat or (db_pa.noi_dung[:40] if db_pa.noi_dung else "Sự cố"),
+            "mo_ta": db_pa.mo_ta or db_pa.noi_dung or "",
+            "muc_do_uu_tien": db_pa.muc_do_uu_tien or "Thường",
+            "trang_thai": db_pa.trang_thai,
+            "trang_thai_label": "Đang xử lý" if db_pa.trang_thai == "DANG_XU_LY" else ("Đã xử lý" if db_pa.trang_thai in ("DA_XU_LY", "HOAN_THANH") else "Chờ xử lý"),
+            "ngay_gui": db_pa.ngay_gui.isoformat() if db_pa.ngay_gui else None,
+            "ghi_chu_xu_ly": db_pa.ghi_chu_xu_ly or "",
+        }
+        incident_store.add_incident(mapped)
+        updated = mapped
+
+    if not updated and not db_pa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy phản ánh để cập nhật.",
+        )
 
     return {
         "status": "success",

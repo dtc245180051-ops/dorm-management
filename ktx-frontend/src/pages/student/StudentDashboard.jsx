@@ -3,6 +3,7 @@ import "./StudentDashboard.css";
 import campusBanner from "../../assets/image.png";
 import occupancyService from "../../services/occupancyService";
 import feedbackService from "../../services/feedbackService";
+import studentNotificationService from "../../services/studentNotificationService";
 
 // Dữ liệu tĩnh cho danh sách chức năng (không phải dữ liệu người dùng)
 const SERVICE_LIST = [
@@ -63,6 +64,20 @@ export default function StudentDashboard({ user, onNavigate }) {
   const [billing, setBilling] = useState(null);
   const [complaints, setComplaints] = useState({ total: 0, processing: 0, resolved: 0 });
   const [registrationStatus, setRegistrationStatus] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+
+  const loadNotifications = async () => {
+    try {
+      const initial = studentNotificationService.getNotifications();
+      if (notifications.length === 0) {
+        setNotifications(initial.slice(0, 3));
+      }
+      await studentNotificationService.syncViolations();
+      await studentNotificationService.syncFromBackend();
+      const updated = studentNotificationService.getNotifications();
+      setNotifications(updated.slice(0, 3));
+    } catch (_) {}
+  };
 
   const loadRoomInfo = async () => {
     try {
@@ -74,8 +89,18 @@ export default function StudentDashboard({ user, onNavigate }) {
       }
       const info = await occupancyService.getCurrentRoomInfo(msv);
       if (info && info.so_phong) {
-        setCurrentRoomInfo(info);
-        setBilling(info.billing || null);
+        const memberCount = (Array.isArray(info.danh_sach_thanh_vien) && info.danh_sach_thanh_vien.length > 0)
+          ? (info.danh_sach_thanh_vien.filter((m) => !m.is_empty && m.msv).length || 1)
+          : (info.so_thanh_vien === 3 ? 1 : (info.so_thanh_vien || 1));
+        const maxCap = String(info.suc_chua || "4").match(/\d+/)?.[0] || "4";
+        const normalized = {
+          ...info,
+          so_thanh_vien: memberCount,
+          suc_chua: `${maxCap} người`,
+          thanh_vien: `${memberCount}/${maxCap} người`,
+        };
+        setCurrentRoomInfo(normalized);
+        setBilling(normalized.billing || null);
       } else {
         setCurrentRoomInfo(null);
         setBilling(null);
@@ -131,7 +156,12 @@ export default function StudentDashboard({ user, onNavigate }) {
     if (cachedRoom) {
       try {
         const parsed = JSON.parse(cachedRoom);
-        if (parsed?.so_phong === "36" || parsed?.phong_hien_tai?.includes("P36")) {
+        if (
+          parsed?.so_phong === "36" ||
+          parsed?.phong_hien_tai?.includes("P36") ||
+          parsed?.so_thanh_vien === 3 ||
+          parsed?.thanh_vien === "3/4 người"
+        ) {
           localStorage.removeItem("dorm_current_room_info");
         }
       } catch (_) {
@@ -157,8 +187,18 @@ export default function StudentDashboard({ user, onNavigate }) {
     window.addEventListener("student-account-updated", handleUpdate);
     window.addEventListener("student-incidents-updated", handleUpdate);
 
+    loadNotifications();
+    const intervalNotifs = setInterval(loadNotifications, 3000);
+    window.addEventListener("focus", loadNotifications);
+    window.addEventListener("ktx-notifications-updated", loadNotifications);
+    window.addEventListener("storage", loadNotifications);
+
     return () => {
       if (updateTimer) clearTimeout(updateTimer);
+      clearInterval(intervalNotifs);
+      window.removeEventListener("focus", loadNotifications);
+      window.removeEventListener("ktx-notifications-updated", loadNotifications);
+      window.removeEventListener("storage", loadNotifications);
       window.removeEventListener("occupancy-updated", handleUpdate);
       window.removeEventListener("student-account-updated", handleUpdate);
       window.removeEventListener("student-incidents-updated", handleUpdate);
@@ -335,7 +375,7 @@ export default function StudentDashboard({ user, onNavigate }) {
               roomTitle,
               tang: currentRoomInfo?.tang || "2",
               members: memberList,
-              so_thanh_vien: currentRoomInfo?.so_thanh_vien || memberList.filter(m => !m.is_empty).length || 3,
+              so_thanh_vien: memberList.filter(m => !m.is_empty && m.msv).length || 1,
               suc_chua: currentRoomInfo?.suc_chua || "4 người",
             });
           }}
@@ -362,9 +402,13 @@ export default function StudentDashboard({ user, onNavigate }) {
               <span className="student-stat-label">Số thành viên</span>
               <span className="student-stat-value">
                 {currentRoomInfo
-                  ? (currentRoomInfo.so_thanh_vien !== undefined && currentRoomInfo.suc_chua
-                      ? `${currentRoomInfo.so_thanh_vien}/${String(currentRoomInfo.suc_chua).match(/\d+/)?.[0] || 4}`
-                      : (currentRoomInfo.thanh_vien?.replace(/người/i, '').trim() || "4/4"))
+                  ? (() => {
+                      const count = (Array.isArray(currentRoomInfo.danh_sach_thanh_vien) && currentRoomInfo.danh_sach_thanh_vien.length > 0)
+                        ? (currentRoomInfo.danh_sach_thanh_vien.filter(m => !m.is_empty && m.msv).length || 1)
+                        : (currentRoomInfo.so_thanh_vien === 3 ? 1 : (currentRoomInfo.so_thanh_vien || 1));
+                      const cap = String(currentRoomInfo.suc_chua || "4").match(/\d+/)?.[0] || 4;
+                      return `${count}/${cap}`;
+                    })()
                   : "—"}
               </span>
               <span className="student-stat-subtext">
@@ -807,7 +851,7 @@ export default function StudentDashboard({ user, onNavigate }) {
                                 : "#94A3B8",
                       }}
                     />
-                    <span>
+                    <span className="student-notif-text">
                       {!registrationStatus && "Đăng ký chỗ ở KTX"}
                       {registrationStatus?.trang_thai === "CHO_DUYET" &&
                         "Đơn đăng ký — Đang chờ duyệt"}
@@ -843,7 +887,86 @@ export default function StudentDashboard({ user, onNavigate }) {
                 </div>
               )}
 
+              {/* Danh sách thông báo thực tế (Vi phạm nội quy, Hội đồng, Kết quả, Hóa đơn...) - Giới hạn tối đa 3 thông báo mới nhất */}
+              {notifications && notifications.length > 0 ? (
+                notifications.slice(0, 3).map((item) => (
+                  <div
+                    key={item.id}
+                    className="student-notif-item"
+                    onClick={() =>
+                      onNavigate &&
+                      onNavigate(item.actionUrl || "/student/notifications")
+                    }
+                    style={{ cursor: "pointer" }}
+                  >
+                    <div className="student-notif-title-wrap">
+                      <span
+                        className="student-notif-dot"
+                        style={{
+                          backgroundColor:
+                            item.type === "violation_warning"
+                              ? "#F59E0B"
+                              : item.type === "violation_summon"
+                                ? "#EF4444"
+                                : item.type === "violation_resolved"
+                                  ? "#10B981"
+                                  : item.source === "ACCOUNTANT"
+                                    ? "#8B5CF6"
+                                    : "#0284C7",
+                        }}
+                      />
+                      <span
+                        className="student-notif-text"
+                        style={{ fontWeight: !item.isRead ? 700 : 500 }}
+                        title={item.title}
+                      >
+                        {item.title}
+                      </span>
+                    </div>
+                    <span className="student-notif-date">
+                      {item.date || "Hôm nay"}
+                    </span>
+                  </div>
+                ))
+              ) : currentRoomInfo ? (
+                <div
+                  style={{
+                    padding: "16px 12px",
+                    textAlign: "center",
+                    color: "#94A3B8",
+                    fontSize: "13px",
+                  }}
+                >
+                  Chưa có thông báo mới nào
+                </div>
+              ) : null}
 
+              {/* Nút xem toàn bộ trang thông báo */}
+              <div
+                style={{
+                  paddingTop: "8px",
+                  borderTop: "1px solid #F1F5F9",
+                  textAlign: "right",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    onNavigate && onNavigate("/student/notifications")
+                  }
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#0284C7",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    padding: "4px 8px",
+                  }}
+                >
+                  Xem tất cả thông báo →
+                </button>
+              </div>
             </div>
           </div>
         </div>

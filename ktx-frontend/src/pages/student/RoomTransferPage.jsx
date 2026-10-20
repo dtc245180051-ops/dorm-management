@@ -68,7 +68,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
           return {
             ...parsed,
             phong_hien_tai: parsed.phong_hien_tai || `P${parsed.so_phong} - ${parsed.toa || "Tòa A1"}`,
-            thanh_vien: parsed.thanh_vien || "3/4 người",
+            thanh_vien: parsed.thanh_vien && parsed.thanh_vien !== "3/4 người" ? parsed.thanh_vien : "1/4 người",
             thoi_gian_luu_tru: parsed.thoi_gian_luu_tru || "19/10/2026 – Nay",
             so_phong: parsed.so_phong || "P203",
           };
@@ -77,7 +77,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
     } catch (_) {}
     return {
       phong_hien_tai: "P203 - Tòa A1",
-      thanh_vien: "3/4 người",
+      thanh_vien: "1/4 người",
       thoi_gian_luu_tru: "19/10/2026 – Nay",
       so_phong: "P203",
     };
@@ -194,11 +194,13 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
         const displayPhong = `${roomLabel} - ${cleanToa}`;
 
         const thanhVienDisplay =
-          assignedRoom.thanh_vien ||
-          roomData?.thanh_vien ||
-          (assignedRoom.so_thanh_vien && assignedRoom.suc_chua
-            ? `${assignedRoom.so_thanh_vien}/${assignedRoom.suc_chua} người`
-            : "3/4 người");
+          assignedRoom.thanh_vien && assignedRoom.thanh_vien !== "3/4 người"
+            ? assignedRoom.thanh_vien
+            : roomData?.thanh_vien && roomData?.thanh_vien !== "3/4 người"
+              ? roomData.thanh_vien
+              : (assignedRoom.so_thanh_vien && assignedRoom.suc_chua
+                ? `${assignedRoom.so_thanh_vien}/${assignedRoom.suc_chua} người`
+                : "1/4 người");
 
         const thoiGianDisplay =
           assignedRoom.thoi_gian_luu_tru ||
@@ -407,6 +409,12 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
         ly_do: checkoutForm.ly_do,
         ngay_mong_muon: formatInputDateToDisplay(checkoutForm.ngay_mong_muon),
         dia_chi_lien_he: checkoutForm.dia_chi_lien_he,
+        dia_chi_sau_tra: checkoutForm.dia_chi_lien_he,
+        dia_chi_chi_tiet: {
+          tinh: checkoutProvince,
+          huyen: checkoutDistrict,
+          so_nha: checkoutStreet,
+        },
         mo_ta_chi_tiet: checkoutForm.mo_ta_chi_tiet,
         msv: localStorage.getItem("ktx_username") || "",
         ho_ten: localStorage.getItem("ktx_fullname") || "",
@@ -510,7 +518,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
                 Thành viên
               </p>
               <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white drop-shadow-2xs">
-                {currentRoomInfo.thanh_vien || "3/4 người"}
+                {currentRoomInfo.thanh_vien && currentRoomInfo.thanh_vien !== "3/4 người" ? currentRoomInfo.thanh_vien : "1/4 người"}
               </h3>
             </div>
 

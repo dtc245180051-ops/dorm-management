@@ -312,6 +312,8 @@ class CheckoutRoomRequest(BaseModel):
     ly_do: str
     ngay_mong_muon: str
     dia_chi_lien_he: str
+    dia_chi_sau_tra: Optional[str] = None
+    dia_chi_chi_tiet: Optional[Dict[str, Any]] = None
     mo_ta_chi_tiet: Optional[str] = ""
 
 @router.post(
@@ -604,6 +606,9 @@ def get_current_room(
                 "is_current_user": True,
             })
 
+        actual_members_count = len([m for m in members_transfer if not m.get("is_empty") and m.get("msv")]) or 1
+        room_capacity = target_phong.suc_chua if (target_phong and target_phong.suc_chua) else 4
+
         return {
             "data": {
                 "so_phong": phong_clean,
@@ -612,9 +617,9 @@ def get_current_room(
                 "tang": tang_val,
                 "loai_phong": (target_phong.loai_phong if target_phong and target_phong.loai_phong else "Phòng tiêu chuẩn"),
                 "roomType": (target_phong.loai_phong if target_phong and target_phong.loai_phong else "Phòng tiêu chuẩn"),
-                "thanh_vien": "3/4 người",
-                "so_thanh_vien": 3,
-                "suc_chua": "4 người",
+                "thanh_vien": f"{actual_members_count}/{room_capacity} người",
+                "so_thanh_vien": actual_members_count,
+                "suc_chua": f"{room_capacity} người",
                 "ma_giuong": f"P{phong_clean}_{giuong_clean}",
                 "giuong": giuong_clean,
                 "so_giuong": giuong_clean,

@@ -182,6 +182,29 @@ def add_checkout_request(data: dict) -> dict:
     
     phong_hien_tai = data.get("phong_hien_tai", "")
     
+    dia_chi_sau_tra = data.get("dia_chi_sau_tra") or data.get("dia_chi_lien_he") or ""
+    dia_chi_chi_tiet = data.get("dia_chi_chi_tiet") or {}
+    if (not dia_chi_chi_tiet or not any(dia_chi_chi_tiet.values())) and dia_chi_sau_tra:
+        parts = [s.strip() for s in dia_chi_sau_tra.split(",") if s.strip()]
+        if len(parts) >= 3:
+            dia_chi_chi_tiet = {
+                "tinh": parts[-1],
+                "huyen": parts[-2],
+                "so_nha": ", ".join(parts[:-2]),
+            }
+        elif len(parts) == 2:
+            dia_chi_chi_tiet = {
+                "tinh": parts[1],
+                "huyen": "",
+                "so_nha": parts[0],
+            }
+        elif len(parts) == 1:
+            dia_chi_chi_tiet = {
+                "tinh": parts[0],
+                "huyen": "",
+                "so_nha": "",
+            }
+
     new_req = {
         "id": req_id,
         "ma_yeu_cau": f"#{req_id}",
@@ -199,8 +222,8 @@ def add_checkout_request(data: dict) -> dict:
         "phong_hien_tai": phong_hien_tai,
         "ly_do": data.get("ly_do", "Trả phòng"),
         "ngay_mong_muon": data.get("ngay_mong_muon", ""),
-        "dia_chi_sau_tra": data.get("dia_chi_lien_he") or data.get("dia_chi_sau_tra", ""),
-        "dia_chi_chi_tiet": data.get("dia_chi_chi_tiet", {}),
+        "dia_chi_sau_tra": dia_chi_sau_tra,
+        "dia_chi_chi_tiet": dia_chi_chi_tiet,
         "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", ""),
         "trang_thai": "CHO_DUYET",
         "trang_thai_label": "Chờ duyệt",

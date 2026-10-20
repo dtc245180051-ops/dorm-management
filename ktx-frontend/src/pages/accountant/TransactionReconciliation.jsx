@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import './TransactionReconciliation.css';
 import { reconciliationService } from '../../services/reconciliationService';
+import studentNotificationService from '../../services/studentNotificationService';
 import QuickActionsBar from '../../components/reconciliation/QuickActionsBar';
 import ReconciliationStats from '../../components/reconciliation/ReconciliationStats';
 import ReconciliationFilters from '../../components/reconciliation/ReconciliationFilters';
@@ -327,7 +328,22 @@ export default function TransactionReconciliation({ searchTerm = '' }) {
       });
     }
 
-    // 13.2. Đồng bộ lại dữ liệu mới nhất từ CSDL backend
+    // 13.2. Bắn thông báo xác nhận thanh toán thành công cho sinh viên
+    try {
+      const matchedCode = matchedData?.invoiceCode || matchedData?.transaction?.invoiceCode || 'HDTP-20260926-5A08F4';
+      const studentMsv = matchedData?.studentId || matchedData?.msv || selectedTx?.studentId || selectedTx?.msv;
+      studentNotificationService.notifyFromAccountant({
+        title: "Xác nhận thanh toán phí KTX thành công",
+        content: `Khoản thanh toán hóa đơn ${matchedCode} của bạn đã được Phòng Kế toán đối soát và xác nhận thanh toán thành công. Cảm ơn bạn đã hoàn thành nghĩa vụ tài chính đúng hạn.`,
+        type: "billing",
+        actionUrl: "/student/payment-history",
+        actionLabel: "Xem lịch sử",
+        msv: studentMsv,
+      });
+      window.dispatchEvent(new Event("ktx-notifications-updated"));
+    } catch (_) {}
+
+    // 13.3. Đồng bộ lại dữ liệu mới nhất từ CSDL backend
     loadTransactions({ hasUploaded: true });
   };
 
