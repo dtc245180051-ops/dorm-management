@@ -194,7 +194,7 @@ class Giuong(Base):
                 "msv": sv.msv,
                 "ho_ten": user_name,
                 "ma_hop_dong": active_contract.ma_hop_dong,
-                "lop": sv.lop or "CNTTK24A",
+                "lop": sv.lop or "",
                 "gioi_tinh": sv.gioi_tinh or "Nam",
                 "khoa": sv.khoa or "Công nghệ thông tin",
                 "ngay_sinh": sv.ngay_sinh or "",

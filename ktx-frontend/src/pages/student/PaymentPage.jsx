@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import StudentLayout from "../../layouts/Student";
 import FeatureLockedNotice from "../../components/FeatureLockedNotice";
-import { resolveStudentStatus, STUDENT_STATUS } from "../../services/studentStatusService";
+import { resolveStudentStatus, STUDENT_STATUS, getInitialStudentStatus } from "../../services/studentStatusService";
 import { getStudentAccount, payStudentBill } from "../../services/studentAccountService";
 import { invoiceService } from "../../services/invoiceService";
 import occupancyService from "../../services/occupancyService";
@@ -146,20 +146,91 @@ const getFeeItems = (inv) => {
   ];
 };
 
+// Module-level in-memory cache để chuyển giữa các trang không bao giờ bị nháy màn hình hoặc giật thông báo trống
+let inMemoryCachedInvoices = null;
+let inMemoryCachedRoom = null;
+
 export default function PaymentPage({ onSelectTab, onNavigate }) {
   // Quản lý danh sách các khoản phí và khoản phí đang chọn thanh toán
-  const [invoices, setInvoices] = useState([]);
+  const [invoices, setInvoices] = useState(() => {
+    if (inMemoryCachedInvoices && inMemoryCachedInvoices.length > 0) {
+      return inMemoryCachedInvoices;
+    }
+    try {
+      const code = (
+        localStorage.getItem("ktx_msv") ||
+        localStorage.getItem("ktx_student_msv") ||
+        localStorage.getItem("ktx_username") ||
+        ""
+      ).trim().toLowerCase();
+      const cached = sessionStorage.getItem(`ktx_cached_invoices_${code}`) || localStorage.getItem(`ktx_cached_invoices_${code}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          inMemoryCachedInvoices = parsed;
+          return parsed;
+        }
+      }
+      const acc = getStudentAccount(code);
+      if (Array.isArray(acc?.bills) && acc.bills.length > 0) {
+        return acc.bills;
+      }
+    } catch (_) {}
+    return [];
+  });
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [accountData, setAccountData] = useState(() => getStudentAccount());
-  const [studentStatus, setStudentStatus] = useState(() =>
-    getStudentAccount()?.currentResidence?.isActive
-      ? STUDENT_STATUS.ACTIVE_RESIDENT
-      : STUDENT_STATUS.NOT_REGISTERED,
-  );
-  const [roomInfo, setRoomInfo] = useState({
-    roomNumber: "",
-    building: "",
-    fullDisplay: "Đang tải...",
+  const [studentStatus, setStudentStatus] = useState(() => getInitialStudentStatus());
+  const [roomInfo, setRoomInfo] = useState(() => {
+    if (inMemoryCachedRoom) return inMemoryCachedRoom;
+    try {
+      const cached = localStorage.getItem("dorm_current_room_info");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.so_phong) {
+          const rNum = String(parsed.so_phong).replace(/^P/i, "");
+          const bld = parsed.toa || "";
+          const res = {
+            roomNumber: `P${rNum}`,
+            building: bld,
+            fullDisplay: bld ? `P${rNum} - ${bld}` : `P${rNum}`,
+          };
+          inMemoryCachedRoom = res;
+          return res;
+        }
+      }
+      const acc = getStudentAccount();
+      if (acc?.currentResidence?.roomNumber) {
+        const rNum = String(acc.currentResidence.roomNumber).replace(/^P/i, "");
+        const bld = acc.currentResidence.building || "";
+        const res = {
+          roomNumber: `P${rNum}`,
+          building: bld,
+          fullDisplay: bld ? `P${rNum} - ${bld}` : `P${rNum}`,
+        };
+        inMemoryCachedRoom = res;
+        return res;
+      }
+    } catch (_) {}
+    return {
+      roomNumber: "",
+      building: "",
+      fullDisplay: "Đang tải...",
+    };
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    if (inMemoryCachedInvoices && inMemoryCachedInvoices.length > 0) return false;
+    try {
+      const code = (
+        localStorage.getItem("ktx_msv") ||
+        localStorage.getItem("ktx_student_msv") ||
+        localStorage.getItem("ktx_username") ||
+        ""
+      ).trim().toLowerCase();
+      const cached = sessionStorage.getItem(`ktx_cached_invoices_${code}`) || localStorage.getItem(`ktx_cached_invoices_${code}`);
+      if (cached && JSON.parse(cached).length > 0) return false;
+    } catch (_) {}
+    return true;
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [pendingInvoiceIds, setPendingInvoiceIds] = useState(() => {
@@ -225,7 +296,9 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
 
       const statusRes = await resolveStudentStatus(currentCode);
       if (!isMounted) return;
-      setStudentStatus(statusRes.status);
+      if (statusRes.status === STUDENT_STATUS.ACTIVE_RESIDENT) {
+        setStudentStatus(STUDENT_STATUS.ACTIVE_RESIDENT);
+      }
 
       let roomStr = "";
       let bldStr = "";
@@ -318,16 +391,27 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
           : roomStr || (statusRes.status === STUDENT_STATUS.ACTIVE_RESIDENT ? "Phòng KTX" : "Chưa xếp phòng");
 
       if (isMounted) {
-        setRoomInfo({
+        inMemoryCachedRoom = {
           roomNumber: roomStr,
           building: bldStr,
           fullDisplay: fullDisplay,
-        });
+        };
+        setRoomInfo(inMemoryCachedRoom);
+        inMemoryCachedInvoices = fetchedInvoices;
         setInvoices(fetchedInvoices);
-        // Nếu sinh viên có hóa đơn thực tế cần thanh toán, tự động mở khóa trang thanh toán
-        if (fetchedInvoices.length > 0 && statusRes.status !== STUDENT_STATUS.ACTIVE_RESIDENT) {
-          setStudentStatus(STUDENT_STATUS.ACTIVE_RESIDENT);
-        }
+        setIsLoading(false);
+        try {
+          if (currentCode) {
+            sessionStorage.setItem(`ktx_cached_invoices_${currentCode.toLowerCase()}`, JSON.stringify(fetchedInvoices));
+            localStorage.setItem(`ktx_cached_invoices_${currentCode.toLowerCase()}`, JSON.stringify(fetchedInvoices));
+          }
+        } catch (_) {}
+        const hasActive =
+          statusRes.status === STUDENT_STATUS.ACTIVE_RESIDENT ||
+          fetchedInvoices.length > 0 ||
+          Boolean(roomStr) ||
+          Boolean(statusRes.activeRoom);
+        setStudentStatus(hasActive ? STUDENT_STATUS.ACTIVE_RESIDENT : statusRes.status);
       }
     };
 
@@ -518,7 +602,7 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
           </div>
 
           {/* Nếu sinh viên chưa được duyệt phòng / chưa đăng ký phòng -> Empty state chặn tính năng */}
-          {studentStatus !== STUDENT_STATUS.ACTIVE_RESIDENT ? (
+          {studentStatus !== STUDENT_STATUS.ACTIVE_RESIDENT && invoices.length === 0 ? (
             <FeatureLockedNotice
               featureName="Thanh toán phí KTX"
               title="Tính năng tài chính chỉ mở sau khi bạn hoàn tất đăng ký và được duyệt phòng KTX"
@@ -609,7 +693,19 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
               {/* ========================================================================= */}
               {/* 3. KHU VỰC CHI TIẾT CÁC KHOẢN PHÍ                                         */}
               {/* ========================================================================= */}
-              {!hasInvoices ? (
+              {isLoading && !hasInvoices ? (
+                /* ĐANG TẢI DỮ LIỆU - SKELETON ĐẸP MẮT ĐỂ TRÁNH NHẢY MÀN HÌNH */
+                <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm w-full animate-pulse my-2">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-8 h-8 rounded-xl bg-slate-200"></div>
+                    <div className="h-5 w-48 bg-slate-200 rounded-lg"></div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="h-16 bg-slate-100 rounded-2xl w-full"></div>
+                    <div className="h-16 bg-slate-100 rounded-2xl w-full"></div>
+                  </div>
+                </div>
+              ) : !hasInvoices ? (
                 /* TRƯỜNG HỢP 1: KẾ TOÁN CHƯA PHÁT HÀNH HÓA ĐƠN                           */
                 <div className="bg-white rounded-3xl border border-slate-200/80 p-8 sm:p-14 shadow-sm w-full text-center flex flex-col items-center justify-center my-2 animate-in fade-in zoom-in-95 duration-200 select-none">
                   <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600 mb-5 shadow-xs">

@@ -145,9 +145,31 @@ def add_transfer_request(data: dict) -> dict:
     today_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
     
     phong_hien_tai = data.get("phong_hien_tai", "")
+    toa_hien_tai = data.get("toa_hien_tai", "")
+    if not toa_hien_tai and " - " in data.get("vi_tri_hien_tai", ""):
+        for vp in data.get("vi_tri_hien_tai", "").split(" - "):
+            if "Tòa" in vp:
+                toa_hien_tai = vp.strip()
+                break
+
     phong_mong_muon = data.get("phong_mong_muon", "")
-    target_short = phong_mong_muon.split(" - ")[0] if " - " in phong_mong_muon else phong_mong_muon
-    
+    from_label = f"{phong_hien_tai} ({toa_hien_tai})" if toa_hien_tai and phong_hien_tai and f"({toa_hien_tai})" not in phong_hien_tai else phong_hien_tai
+
+    if " - " in phong_mong_muon:
+        p_parts = phong_mong_muon.split(" - ")
+        to_label = f"{p_parts[0].strip()} ({p_parts[1].strip()})"
+        target_short = p_parts[0].strip()
+    else:
+        to_label = phong_mong_muon.strip()
+        target_short = phong_mong_muon.strip()
+
+    if data.get("phong_lien_quan") and "→" in data.get("phong_lien_quan"):
+        phong_lien_quan = data.get("phong_lien_quan")
+        if "(" not in phong_lien_quan and from_label and to_label:
+            phong_lien_quan = f"{from_label} → {to_label}"
+    else:
+        phong_lien_quan = f"{from_label} → {to_label}" if from_label and to_label else (to_label or from_label)
+
     new_req = {
         "id": req_id,
         "ma_yeu_cau": f"#{req_id}",
@@ -159,11 +181,11 @@ def add_transfer_request(data: dict) -> dict:
         "khoa": data.get("khoa", ""),
         "lop": data.get("lop", ""),
         "vi_tri_hien_tai": data.get("vi_tri_hien_tai", phong_hien_tai),
-        "cong_no": data.get("cong_no", "Đã hoàn thành toàn bộ phí"),
+        "cong_no": data.get("cong_no", "Chưa thanh toán (Chưa phát hành hóa đơn)"),
         "ngay_gui": data.get("ngay_gui") or today_str,
-        "phong_lien_quan": f"{phong_hien_tai} → {target_short}" if target_short else phong_hien_tai,
-        "phong_hien_tai": phong_hien_tai,
-        "phong_dich": target_short,
+        "phong_lien_quan": phong_lien_quan,
+        "phong_hien_tai": from_label,
+        "phong_dich": to_label,
         "ly_do": data.get("ly_do", "Chuyển phòng"),
         "ngay_mong_muon": data.get("ngay_mong_muon", ""),
         "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", ""),
@@ -216,7 +238,7 @@ def add_checkout_request(data: dict) -> dict:
         "khoa": data.get("khoa", ""),
         "lop": data.get("lop", ""),
         "vi_tri_hien_tai": data.get("vi_tri_hien_tai", phong_hien_tai),
-        "cong_no": data.get("cong_no", "Đã hoàn thành toàn bộ phí"),
+        "cong_no": data.get("cong_no", "Chưa thanh toán (Chưa phát hành hóa đơn)"),
         "ngay_gui": data.get("ngay_gui") or today_str,
         "phong_lien_quan": phong_hien_tai,
         "phong_hien_tai": phong_hien_tai,

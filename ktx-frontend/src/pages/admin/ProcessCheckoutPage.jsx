@@ -255,7 +255,7 @@ export default function ProcessCheckoutPage({
                       </span>
                     ) : (
                       <span className="font-bold text-emerald-600">
-                        {requestData?.cong_no || "Đã hoàn thành toàn bộ phí"}
+                        {requestData?.cong_no || "Chưa thanh toán (Chưa phát hành hóa đơn)"}
                       </span>
                     )}
                   </div>

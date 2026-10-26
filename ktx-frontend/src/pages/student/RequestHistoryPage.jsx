@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import StudentLayout from "../../layouts/Student";
 import occupancyService from "../../services/occupancyService";
-import { resolveStudentStatus, STUDENT_STATUS } from "../../services/studentStatusService";
+import { resolveStudentStatus, STUDENT_STATUS, getInitialStudentStatus } from "../../services/studentStatusService";
 import { getStudentAccount } from "../../services/studentAccountService";
 import FeatureLockedNotice from "../../components/FeatureLockedNotice";
 
@@ -25,7 +25,7 @@ export default function RequestHistoryPage({
   onNavigate,
   initialTab = "registration",
 }) {
-  const [studentStatus, setStudentStatus] = useState(null);
+  const [studentStatus, setStudentStatus] = useState(() => getInitialStudentStatus());
   // 1. Quản lý tab hiển thị: 'registration' (Lịch sử đăng ký) hoặc 'stay' (Lịch sử ở)
   const [activeTab, setActiveTab] = useState(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -199,7 +199,17 @@ export default function RequestHistoryPage({
       let combinedReqs = Array.isArray(reqs)
         ? reqs.filter((r) => {
             const rMsv = (r.msv || "").trim().toUpperCase();
-            return !studentMsv || !rMsv || rMsv === studentMsv.trim().toUpperCase();
+            const matchMsv = !studentMsv || !rMsv || rMsv === studentMsv.trim().toUpperCase();
+            const isTransferOrCheckout =
+              r.loai_don === "CHUYEN_PHONG" ||
+              r.loai_don === "TRA_PHONG" ||
+              r.loai_yeu_cau === "Chuyển phòng" ||
+              r.loai_yeu_cau === "Trả phòng" ||
+              String(r.id || r.ma_yeu_cau || "").toUpperCase().startsWith("YC-") ||
+              String(r.id || r.ma_yeu_cau || "").toUpperCase().startsWith("#YC-") ||
+              String(r.id || r.ma_yeu_cau || "").toUpperCase().startsWith("TP-") ||
+              String(r.id || r.ma_yeu_cau || "").toUpperCase().startsWith("#TP-");
+            return matchMsv && !isTransferOrCheckout;
           })
         : [];
 
@@ -220,83 +230,6 @@ export default function RequestHistoryPage({
               nam_hoc: "2026–2027",
               trang_thai: reg.status,
               trang_thai_label: reg.status === "APPROVED" ? "Đã duyệt" : reg.status,
-            });
-          }
-        });
-      }
-
-      if (transferReqs && Array.isArray(transferReqs)) {
-        const userProf = occupancyService.getLocalStudentProfile?.() || {};
-        transferReqs.forEach((tc) => {
-          const tcMsv = (tc.msv || "").trim().toUpperCase();
-          if (
-            studentMsv &&
-            tcMsv &&
-            tcMsv !== studentMsv.trim().toUpperCase()
-          ) {
-            return;
-          }
-          if (
-            !combinedReqs.some(
-              (r) => r.id === tc.id || r.ma_yeu_cau === tc.ma_yeu_cau,
-            )
-          ) {
-            const matchedReg =
-              combinedReqs.find(
-                (r) => (r.msv || "").trim().toUpperCase() === tcMsv && r.cccd,
-              ) ||
-              (Array.isArray(reqs)
-                ? reqs.find(
-                    (r) => (r.msv || "").trim().toUpperCase() === tcMsv && r.cccd,
-                  )
-                : null);
-
-            combinedReqs.push({
-              ngay_sinh:
-                tc.ngay_sinh ||
-                matchedReg?.ngay_sinh ||
-                userProf.ngay_sinh ||
-                "",
-              cccd: tc.cccd || matchedReg?.cccd || userProf.cccd || "",
-              so_dien_thoai:
-                tc.so_dien_thoai ||
-                matchedReg?.so_dien_thoai ||
-                userProf.so_dien_thoai ||
-                "",
-              email: tc.email || matchedReg?.email || userProf.email || "",
-              khoa: tc.khoa || matchedReg?.khoa || userProf.khoa || "",
-              lop: tc.lop || matchedReg?.lop || userProf.lop || "",
-              dia_chi:
-                tc.dia_chi ||
-                tc.que_quan ||
-                matchedReg?.dia_chi ||
-                matchedReg?.que_quan ||
-                userProf.dia_chi ||
-                userProf.que_quan ||
-                "",
-              nguoi_giam_ho:
-                tc.nguoi_giam_ho ||
-                matchedReg?.nguoi_giam_ho ||
-                userProf.nguoi_giam_ho ||
-                "",
-              moi_quan_he:
-                tc.moi_quan_he ||
-                matchedReg?.moi_quan_he ||
-                userProf.moi_quan_he ||
-                "",
-              sdt_nguoi_giam_ho:
-                tc.sdt_nguoi_giam_ho ||
-                matchedReg?.sdt_nguoi_giam_ho ||
-                userProf.sdt_nguoi_giam_ho ||
-                "",
-              ...tc,
-              ngay_dang_ky: tc.ngay_gui || "Hôm nay",
-              loai_phong:
-                tc.loai_yeu_cau ||
-                (tc.loai_don === "TRA_PHONG" ? "Trả phòng" : "Chuyển phòng"),
-              tang_mong_muon: tc.phong_lien_quan || "Tầng 2",
-              muc_gia_mong_muon: tc.ly_do || "Phòng tiêu chuẩn",
-              nam_hoc: "2026-2027",
             });
           }
         });

@@ -14,7 +14,7 @@ import StudentLayout from "../../layouts/Student";
 import occupancyService from "../../services/occupancyService";
 import { VIETNAM_PROVINCES } from "../../data/vietnamAddressData";
 import FeatureLockedNotice from "../../components/FeatureLockedNotice";
-import { resolveStudentStatus, STUDENT_STATUS } from "../../services/studentStatusService";
+import { resolveStudentStatus, STUDENT_STATUS, getInitialStudentStatus } from "../../services/studentStatusService";
 
 export default function RoomTransferPage({ onSelectTab, onNavigate }) {
   // 1. Quản lý tab: 'transfer' (Chuyển phòng) hoặc 'checkout' (Trả phòng)
@@ -27,16 +27,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
     return "transfer";
   });
   const [hasActiveStay, setHasActiveStay] = useState(true);
-  const [studentStatus, setStudentStatus] = useState(() => {
-    try {
-      const currentRoom = localStorage.getItem("dorm_current_room_info");
-      if (currentRoom) {
-        const parsed = JSON.parse(currentRoom);
-        if (parsed?.so_phong) return STUDENT_STATUS.ACTIVE_RESIDENT;
-      }
-    } catch (_) {}
-    return STUDENT_STATUS.ACTIVE_RESIDENT;
-  });
+  const [studentStatus, setStudentStatus] = useState(() => getInitialStudentStatus());
 
   useEffect(() => {
     const checkTabParam = () => {
@@ -324,6 +315,24 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
         ho_ten: localStorage.getItem("ktx_fullname") || "",
       };
 
+      const currentBld = currentRoomInfo.toa || (currentRoomInfo.phong_hien_tai?.match(/Tòa\s+[A-Za-z0-9]+/i)?.[0]) || "";
+      const currentRoomStr = currentRoomInfo.so_phong
+        ? (String(currentRoomInfo.so_phong).startsWith("P") ? currentRoomInfo.so_phong : `P${currentRoomInfo.so_phong}`)
+        : "P101";
+      const fromFormatted = currentBld ? `${currentRoomStr} (${currentBld})` : currentRoomStr;
+
+      let toFormatted = transferForm.phong_mong_muon || "";
+      if (toFormatted.includes(" - ")) {
+        const parts = toFormatted.split(" - ");
+        const rPart = parts[0].trim().startsWith("P") ? parts[0].trim() : `P${parts[0].trim()}`;
+        const bPart = parts[1].trim();
+        toFormatted = `${rPart} (${bPart})`;
+      } else if (toFormatted) {
+        toFormatted = toFormatted.startsWith("P") ? toFormatted : `P${toFormatted}`;
+      }
+      const fullLienQuan = fromFormatted && toFormatted ? `${fromFormatted} → ${toFormatted}` : (toFormatted || fromFormatted);
+      payload.phong_lien_quan = fullLienQuan;
+
       const res = await occupancyService.submitTransferRequest(payload);
       const now = new Date();
       const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -334,7 +343,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
         loai_yeu_cau: "Chuyển phòng",
         loai_don: "CHUYEN_PHONG",
         ngay_gui: fullTimeStr,
-        phong_lien_quan: `${currentRoomInfo.so_phong || ""} → ${transferForm.phong_mong_muon.split(" - ")[0]}`,
+        phong_lien_quan: fullLienQuan,
         trang_thai: "CHO_DUYET",
         trang_thai_label: "Chờ duyệt",
       };

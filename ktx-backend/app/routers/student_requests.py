@@ -351,13 +351,9 @@ def submit_transfer_request(
             # Tra cứu công nợ thực tế của sinh viên
             try:
                 from app.services.debt_service import DebtService
-                debt_resp = DebtService.get_personal_debt(db, clean_msv)
-                if debt_resp and debt_resp.totalDebt > 0:
-                    data["cong_no"] = f"Còn nợ {debt_resp.totalDebt:,.0f} ₫".replace(",", ".")
-                else:
-                    data["cong_no"] = "Đã hoàn thành toàn bộ phí"
+                data["cong_no"] = DebtService.get_student_cong_no_label(db, clean_msv)
             except Exception:
-                data["cong_no"] = "Đã hoàn thành toàn bộ phí"
+                data["cong_no"] = "Chưa thanh toán (Chưa phát hành hóa đơn)"
     stored = occupancy_request_store.add_transfer_request(data)
     return {
         "status": "success",
@@ -400,13 +396,9 @@ def submit_checkout_request(
             # Tra cứu công nợ thực tế của sinh viên
             try:
                 from app.services.debt_service import DebtService
-                debt_resp = DebtService.get_personal_debt(db, clean_msv)
-                if debt_resp and debt_resp.totalDebt > 0:
-                    data["cong_no"] = f"Còn nợ {debt_resp.totalDebt:,.0f} ₫".replace(",", ".")
-                else:
-                    data["cong_no"] = "Đã hoàn thành toàn bộ phí"
+                data["cong_no"] = DebtService.get_student_cong_no_label(db, clean_msv)
             except Exception:
-                data["cong_no"] = "Đã hoàn thành toàn bộ phí"
+                data["cong_no"] = "Chưa thanh toán (Chưa phát hành hóa đơn)"
     stored = occupancy_request_store.add_checkout_request(data)
     return {
         "status": "success",
@@ -445,40 +437,85 @@ def get_current_room(
         return {"data": None, "message": "Chưa xác định được sinh viên"}
 
     def _compute_student_billing(student_msv: str, contract_no: Optional[str] = None):
-        inv_item = None
+        from app.models.invoice import HoaDon, LoaiHoaDon, TrangThaiHoaDon
+        from app.models.reconciliation import GiaoDichNganHang, TrangThaiDoiSoat
+
+        clean_msv = (student_msv or "").strip().upper()
+        
+        # 1. Tìm hóa đơn tiền phòng trực tiếp theo hợp đồng hoặc MSV (CHỈ LẤY TIEN_PHONG, KHÔNG LẤY ĐIỆN NƯỚC)
+        room_inv = None
         if contract_no:
-            inv_item = db.query(HoaDon).filter(HoaDon.ma_hop_dong == contract_no).first()
-        if not inv_item and student_msv:
-            inv_item = (
+            room_inv = (
                 db.query(HoaDon)
-                .filter(HoaDon.msv == student_msv)
+                .filter(
+                    HoaDon.ma_hop_dong == contract_no,
+                    HoaDon.loai_hoa_don == LoaiHoaDon.TIEN_PHONG.value,
+                )
+                .first()
+            )
+        if not room_inv and clean_msv:
+            room_inv = (
+                db.query(HoaDon)
+                .filter(
+                    HoaDon.msv.ilike(clean_msv),
+                    HoaDon.loai_hoa_don == LoaiHoaDon.TIEN_PHONG.value,
+                )
                 .order_by(HoaDon.ngay_lap.desc())
                 .first()
             )
-        try:
-            from app.services.debt_service import DebtService
-            debt_resp = DebtService.get_personal_debt(db, student_msv)
-            if debt_resp and debt_resp.fees:
-                room_fee = next((f for f in debt_resp.fees if "phòng" in f.feeName.lower()), debt_resp.fees[0])
-                amt_str = f"{int(room_fee.amount):,}".replace(",", ".") + " đ"
-                st = "Chưa thanh toán" if debt_resp.totalDebt > 0 else "Đã thanh toán"
-                return {
-                    "amount": amt_str,
-                    "period": "/năm",
-                    "status": st,
-                }
-        except Exception:
-            pass
 
-        if inv_item:
-            so_tien = int(inv_item.so_tien) if inv_item.so_tien else 4800000
-            so_tien_fmt = f"{so_tien:,}".replace(",", ".") + " đ"
-            trang_thai_phi = "Đã thanh toán" if inv_item.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value else "Chưa thanh toán"
+        if room_inv:
+            so_tien = int(room_inv.so_tien) if room_inv.so_tien else 4800000
+            amt_str = f"{so_tien:,}".replace(",", ".") + " đ"
+
+            # Kiểm tra xem tiền phòng đã thanh toán / đối soát thành công chưa
+            is_paid = (room_inv.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value)
+            if not is_paid:
+                matched_tx = (
+                    db.query(GiaoDichNganHang)
+                    .filter(
+                        GiaoDichNganHang.ma_hoa_don == room_inv.ma_hoa_don,
+                        GiaoDichNganHang.trang_thai.in_([
+                            TrangThaiDoiSoat.MATCHED.value,
+                            TrangThaiDoiSoat.AUTO_MATCHED.value,
+                            TrangThaiDoiSoat.MATCHED_MANUALLY.value,
+                        ]),
+                    )
+                    .all()
+                )
+                paid_amt = sum(float(t.so_tien) for t in matched_tx)
+                if paid_amt >= float(room_inv.so_tien):
+                    is_paid = True
+
             return {
-                "amount": so_tien_fmt,
+                "amount": amt_str,
                 "period": "/năm",
-                "status": trang_thai_phi,
+                "status": "Đã thanh toán" if is_paid else "Chưa thanh toán",
             }
+
+        # 2. Nếu chưa có hóa đơn tiền phòng nhưng đang có hợp đồng ACTIVE
+        from app.models.contract import HopDong
+        active_contract = (
+            db.query(HopDong)
+            .filter(HopDong.msv.ilike(clean_msv), HopDong.trang_thai == "ACTIVE")
+            .first()
+        )
+        if active_contract:
+            rent = 4800000
+            if active_contract.tong_tien_thue:
+                rent = int(active_contract.tong_tien_thue)
+            elif active_contract.don_gia_dinh_ky:
+                rent = int(active_contract.don_gia_dinh_ky)
+            elif active_contract.giuong and active_contract.giuong.phong and active_contract.giuong.phong.don_gia:
+                rent = int(active_contract.giuong.phong.don_gia)
+
+            amt_str = f"{rent:,}".replace(",", ".") + " đ"
+            return {
+                "amount": amt_str,
+                "period": "/năm",
+                "status": "Chưa thanh toán",
+            }
+
         return None
 
     # 0. Kiểm tra nếu sinh viên đã được duyệt trả phòng (checkout)

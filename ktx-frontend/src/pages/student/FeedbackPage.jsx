@@ -16,7 +16,7 @@ import StudentLayout from '../../layouts/Student';
 import feedbackService from '../../services/feedbackService';
 import studentNotificationService from '../../services/studentNotificationService';
 import FeatureLockedNotice from '../../components/FeatureLockedNotice';
-import { resolveStudentStatus, STUDENT_STATUS } from '../../services/studentStatusService';
+import { resolveStudentStatus, STUDENT_STATUS, getInitialStudentStatus } from '../../services/studentStatusService';
 
 export default function FeedbackPage({
   userName,
@@ -29,7 +29,7 @@ export default function FeedbackPage({
   onLogout,
 }) {
   const studentMsv = localStorage.getItem('ktx_username') || '';
-  const [studentStatus, setStudentStatus] = useState(STUDENT_STATUS.NOT_REGISTERED);
+  const [studentStatus, setStudentStatus] = useState(() => getInitialStudentStatus(studentMsv));
   const studentName =
     userName ||
     localStorage.getItem('ktx_fullname') ||

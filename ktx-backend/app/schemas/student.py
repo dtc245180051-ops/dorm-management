@@ -39,7 +39,7 @@ class SinhVienCreate(BaseModel):
     ho_ten: str = Field(..., min_length=2, max_length=100, description="Họ và tên sinh viên")
     email: Optional[str] = Field(default=None, max_length=100, description="Email sinh viên")
     so_dien_thoai: Optional[str] = Field(default=None, max_length=20, description="Số điện thoại")
-    lop: Optional[str] = Field(default="CNTTK24", max_length=50, description="Lớp chuyên ngành")
+    lop: Optional[str] = Field(default=None, max_length=50, description="Lớp chuyên ngành")
     gioi_tinh: str = Field(default="Nam", max_length=10, description="Giới tính (Nam, Nu, Nữ)")
     khoa: Optional[str] = Field(default=None, max_length=100, description="Khoa / Viện")
     que_quan: Optional[str] = Field(default=None, max_length=100, description="Quê quán")
@@ -94,7 +94,7 @@ class SinhVienResponse(BaseModel):
     ho_ten: str
     email: Optional[str] = None
     so_dien_thoai: Optional[str] = None
-    lop: str
+    lop: Optional[str] = ""
     gioi_tinh: str
     khoa: Optional[str] = None
     que_quan: Optional[str] = None

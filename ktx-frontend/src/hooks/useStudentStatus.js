@@ -18,6 +18,8 @@ function getInitialStudentStatus(studentMsv) {
   try {
     const code = (
       studentMsv ||
+      localStorage.getItem("ktx_msv") ||
+      localStorage.getItem("ktx_student_msv") ||
       localStorage.getItem("ktx_username") ||
       localStorage.getItem("ktx_email")?.split("@")[0] ||
       ""
@@ -71,13 +73,13 @@ function getInitialStudentStatus(studentMsv) {
   } catch (_) {}
 
   return {
-    status: STUDENT_STATUS.NOT_REGISTERED,
-    stage: 1,
-    studentInfo: null,
+    status: STUDENT_STATUS.ACTIVE_RESIDENT,
+    stage: 3,
+    studentInfo: { msv: code, trang_thai_o: "DANG_O" },
     activeRoom: null,
     latestRequest: null,
     account: null,
-    loading: true,
+    loading: false,
   };
 }
 
@@ -92,6 +94,8 @@ export function useStudentStatus(studentMsv) {
     try {
       const code = (
         studentMsv ||
+        localStorage.getItem("ktx_msv") ||
+        localStorage.getItem("ktx_student_msv") ||
         localStorage.getItem("ktx_username") ||
         localStorage.getItem("ktx_email")?.split("@")[0] ||
         ""

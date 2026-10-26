@@ -1,5 +1,23 @@
 [
   {
+    "id": "PA-41AE96",
+    "ma_phan_anh": "PA-41AE96",
+    "msv": "DTC245180037",
+    "ho_ten": "Ngô Phương Mai",
+    "phong": "P301",
+    "loai_phan_anh": "Vệ sinh",
+    "phan_loai": "Vệ sinh",
+    "tieu_de": "Có chuột",
+    "mo_ta": "phòng em có chuột",
+    "hinh_anh": null,
+    "muc_do_uu_tien": "Thường",
+    "ngay_gui": "2026-10-26",
+    "ngay_tao": "2026-10-26T16:48:18.520449",
+    "trang_thai": "DA_XU_LY",
+    "trang_thai_label": "Đã xử lý",
+    "ghi_chu_xu_ly": ""
+  },
+  {
     "id": "PA-C9967E",
     "ma_phan_anh": "PA-C9967E",
     "msv": "DTC245180037",

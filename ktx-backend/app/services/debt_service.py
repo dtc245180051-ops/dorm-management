@@ -359,3 +359,46 @@ class DebtService:
             success=True,
             message=f"Đã gửi thông báo nhắc nợ thành công tới sinh viên {student_name} ({student_id})!",
         )
+
+    @classmethod
+    def get_student_cong_no_label(cls, db: Session, student_id: str) -> str:
+        """
+        Xác định nhãn công nợ chuẩn xác cho đơn chuyển/trả phòng:
+        - Nếu có nợ thực tế (> 0): 'Còn nợ X ₫'
+        - Nếu có hóa đơn và đã nộp đủ toàn bộ: 'Đã hoàn thành toàn bộ phí'
+        - Nếu có hợp đồng ACTIVE nhưng Kế toán chưa phát hành hóa đơn: 'Chưa thanh toán (Chưa phát hành hóa đơn)'
+        - Nếu có hóa đơn chưa thanh toán: 'Chưa thanh toán'
+        - Còn lại: 'Chưa phát sinh phí'
+        """
+        clean_msv = (student_id or "").strip().upper()
+        if not clean_msv:
+            return "Chưa xác định"
+
+        try:
+            debt_resp = cls.get_personal_debt(db, clean_msv)
+            if debt_resp and debt_resp.totalDebt > 0:
+                return f"Còn nợ {debt_resp.totalDebt:,.0f} ₫".replace(",", ".")
+            if debt_resp and len(debt_resp.fees) > 0 and debt_resp.totalDebt == 0:
+                return "Đã hoàn thành toàn bộ phí"
+        except Exception:
+            pass
+
+        hd_active = db.query(HopDong).filter(HopDong.msv.ilike(clean_msv), HopDong.trang_thai == "ACTIVE").first()
+        invoices = (
+            db.query(HoaDon)
+            .filter(
+                or_(
+                    HoaDon.msv.ilike(clean_msv),
+                    HoaDon.ma_hop_dong == (hd_active.ma_hop_dong if hd_active else ""),
+                )
+            )
+            .all()
+        )
+        if invoices:
+            all_paid = all(inv.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value for inv in invoices)
+            return "Đã hoàn thành toàn bộ phí" if all_paid else "Chưa thanh toán"
+
+        if hd_active:
+            return "Chưa thanh toán (Chưa phát hành hóa đơn)"
+
+        return "Chưa phát sinh phí"

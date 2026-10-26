@@ -38,11 +38,17 @@ class RejectRequestPayload(BaseModel):
     summary="Lấy danh sách tất cả các đơn đăng ký chỗ ở (Quản lý)",
     dependencies=[Depends(RoleChecker(["QuanLy", "KeToan"]))],
 )
-def get_all_requests():
+def get_all_requests(db: Session = Depends(get_db)):
     """
     Trả về danh sách tất cả các đơn đăng ký đang chờ xử lý và lịch sử xử lý.
     """
-    return occupancy_request_store.get_all_requests()
+    from app.services.debt_service import DebtService
+    all_reqs = occupancy_request_store.get_all_requests()
+    for req in all_reqs:
+        msv = (req.get("msv") or "").strip().upper()
+        if msv:
+            req["cong_no"] = DebtService.get_student_cong_no_label(db, msv)
+    return all_reqs
 
 
 @router.get(
@@ -66,11 +72,7 @@ def get_request_detail(
         if msv:
             try:
                 from app.services.debt_service import DebtService
-                debt_resp = DebtService.get_personal_debt(db, msv)
-                if debt_resp and debt_resp.totalDebt > 0:
-                    stored["cong_no"] = f"Còn nợ {debt_resp.totalDebt:,.0f} ₫".replace(",", ".")
-                else:
-                    stored["cong_no"] = "Đã hoàn thành toàn bộ phí"
+                stored["cong_no"] = DebtService.get_student_cong_no_label(db, msv)
             except Exception:
                 pass
 

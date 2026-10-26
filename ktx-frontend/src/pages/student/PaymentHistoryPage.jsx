@@ -1,7 +1,7 @@
-﻿import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import StudentLayout from "../../layouts/Student";
 import FeatureLockedNotice from "../../components/FeatureLockedNotice";
-import { resolveStudentStatus, STUDENT_STATUS } from "../../services/studentStatusService";
+import { resolveStudentStatus, STUDENT_STATUS, getInitialStudentStatus } from "../../services/studentStatusService";
 import { getStudentAccount } from "../../services/studentAccountService";
 import { invoiceService } from "../../services/invoiceService";
 import occupancyService from "../../services/occupancyService";
@@ -308,11 +308,7 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState([]);
-  const [studentStatus, setStudentStatus] = useState(() =>
-    getStudentAccount()?.currentResidence?.isActive
-      ? STUDENT_STATUS.ACTIVE_RESIDENT
-      : STUDENT_STATUS.NOT_REGISTERED,
-  );
+  const [studentStatus, setStudentStatus] = useState(() => getInitialStudentStatus());
   const [roomInfo, setRoomInfo] = useState({
     roomNumber: "",
     building: "",
@@ -443,33 +439,19 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
         const apiInvoices = await invoiceService.getMyInvoices(currentCode);
         if (Array.isArray(apiInvoices)) {
           isApiSuccess = true;
-          list = apiInvoices.map((inv, idx) => {
-            const isDbPaid =
+          // Chỉ lấy các hóa đơn ĐÃ THANH TOÁN (hoàn tất giao dịch) đưa vào Lịch sử thanh toán
+          const paidInvoices = apiInvoices.filter((inv) => {
+            return (
               inv?.trang_thai === "DA_THANH_TOAN" ||
               inv?.trang_thai === "DA_HOAN_TAT" ||
-              inv?.status === "PAID";
-            const isDbPartial = inv?.trang_thai === "CHUYEN_THIEU";
-            const isLocalPending =
-              localPaymentStatus === "pending" &&
-              !isDbPaid &&
-              (inv?.ky_thanh_toan?.includes("10/2026") || inv?.ky_thanh_toan?.includes("09/2026"));
+              inv?.status === "PAID"
+            );
+          });
 
-            let status = "waiting";
-            if (isDbPaid) {
-              status = "paid";
-            } else if (isLocalPending) {
-              status = "pending";
-            } else if (isDbPartial) {
-              status = "partial";
-            } else if (inv?.trang_thai === "QUA_HAN" || isPastDue(inv?.han_thanh_toan)) {
-              status = "overdue";
-            }
-
-            const paymentDateStr = isDbPaid
-              ? (inv?.ngay_thanh_toan ? formatDisplayDate(inv.ngay_thanh_toan) : formatDisplayDate(inv?.ngay_lap))
-              : isLocalPending
-              ? localPaymentDate
-              : "--";
+          list = paidInvoices.map((inv, idx) => {
+            const paymentDateStr = inv?.ngay_thanh_toan
+              ? formatDisplayDate(inv.ngay_thanh_toan)
+              : formatDisplayDate(inv?.ngay_lap || new Date());
 
             // Tạo các dòng chi tiết khoản thu theo loại hóa đơn
             const amountVal = Number(inv?.so_tien || inv?.amount || 0);
@@ -507,9 +489,9 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
               rawPaymentDate: inv?.ngay_thanh_toan || inv?.ngay_lap,
               rawDueDate: inv?.han_thanh_toan,
               dueDate: formatDisplayDate(inv?.han_thanh_toan),
-              method: "Chuyển khoản QR",
+              method: inv?.phuong_thuc || "Chuyển khoản QR",
               amount: amountVal,
-              status: status,
+              status: "paid",
               loai_hoa_don: inv?.loai_hoa_don,
               fees: feeItems,
             };
@@ -519,28 +501,23 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
         console.warn("Lỗi khi tải hóa đơn từ API:", err);
       }
 
-      // Fallback thêm các hóa đơn trong local accountData.bills nếu API gặp lỗi kết nối
+      // Fallback thêm các hóa đơn trong local accountData.bills nếu API gặp lỗi kết nối (chỉ lấy hóa đơn đã thanh toán)
       if (!isApiSuccess && list.length === 0 && Array.isArray(acc?.bills) && acc.bills.length > 0) {
-        list = acc.bills.map((bill, index) => {
-          const isBillPaid = bill?.status === "PAID" || bill?.trang_thai === "DA_THANH_TOAN";
-          const isPending = localPaymentStatus === "pending" && !isBillPaid;
-          const status = isBillPaid ? "paid" : isPending ? "pending" : "waiting";
-
+        const paidBills = acc.bills.filter(
+          (bill) => bill?.status === "PAID" || bill?.trang_thai === "DA_THANH_TOAN" || bill?.trang_thai === "DA_HOAN_TAT"
+        );
+        list = paidBills.map((bill, index) => {
           return {
             id: bill?.id || `BILL-${index + 1}`,
             invoiceNumber: bill?.id || `HD-${index + 1}`,
             period: bill?.title || `Hóa đơn #${bill?.id}`,
-            paymentDate: isBillPaid
-              ? bill?.paymentDate || "02/10/2026"
-              : isPending
-              ? localPaymentDate
-              : "--",
+            paymentDate: bill?.paymentDate || "02/10/2026",
             rawPaymentDate: bill?.paymentDate,
             rawDueDate: bill?.dueDate,
             dueDate: formatDisplayDate(bill?.dueDate),
-            method: "Chuyển khoản QR",
+            method: bill?.method || "Chuyển khoản QR",
             amount: Number(bill?.amount || bill?.so_tien || 0),
-            status: status,
+            status: "paid",
             fees: [
               {
                 label: "Phí phòng KTX",
@@ -582,48 +559,39 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
   // =========================================================================
   const currentYear = new Date().getFullYear();
 
-  const { totalPaid, totalPending, totalOverdue, totalPaidPeriods } = useMemo(() => {
+  const { totalPaid, totalAllPaid, latestPaymentDate, totalPaidPeriods } = useMemo(() => {
     if (!Array.isArray(transactions) || transactions.length === 0) {
       return {
         totalPaid: 0,
-        totalPending: 0,
-        totalOverdue: 0,
+        totalAllPaid: 0,
+        latestPaymentDate: "--",
         totalPaidPeriods: 0,
       };
     }
 
-    let paidSum = 0;
-    let pendingSum = 0;
-    let overdueSum = 0;
-    let paidCount = 0;
+    let paidThisYearSum = 0;
+    let allPaidSum = 0;
+    let latestDate = "--";
 
     transactions.forEach((tx) => {
       const amount = Number(tx?.amount || 0);
+      allPaidSum += amount;
 
-      if (tx?.status === "paid" || tx?.status === "DA_THANH_TOAN") {
-        // Thẻ 1 & Thẻ 4: Đã thanh toán trong năm hiện tại
-        const belongsToYear =
-          String(tx?.rawPaymentDate || "").includes(String(currentYear)) ||
-          String(tx?.period || "").includes(String(currentYear)) ||
-          true; // Mặc định tính cho năm đang theo dõi nếu không ghi năm cụ thể
-        if (belongsToYear) {
-          paidSum += amount;
-          paidCount += 1;
-        }
-      } else if (tx?.status === "overdue" || (tx?.status !== "paid" && isPastDue(tx?.rawDueDate))) {
-        // Thẻ 3: Quá hạn thanh toán
-        overdueSum += amount;
-      } else {
-        // Thẻ 2: Đang chờ thanh toán (trong hạn)
-        pendingSum += amount;
+      const dateStr = String(tx?.rawPaymentDate || tx?.paymentDate || "");
+      if (dateStr.includes(String(currentYear)) || String(tx?.period || "").includes(String(currentYear))) {
+        paidThisYearSum += amount;
+      }
+
+      if (tx?.paymentDate && tx.paymentDate !== "--" && latestDate === "--") {
+        latestDate = tx.paymentDate;
       }
     });
 
     return {
-      totalPaid: paidSum,
-      totalPending: pendingSum,
-      totalOverdue: overdueSum,
-      totalPaidPeriods: paidCount,
+      totalPaid: paidThisYearSum > 0 ? paidThisYearSum : allPaidSum,
+      totalAllPaid: allPaidSum,
+      latestPaymentDate: latestDate,
+      totalPaidPeriods: transactions.length,
     };
   }, [transactions, currentYear]);
 
@@ -663,7 +631,7 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
               Lịch sử thanh toán
             </h1>
             <p className="text-sm text-slate-500">
-              Theo dõi các khoản phí và giao dịch thanh toán KTX.
+              Theo dõi các khoản phí và giao dịch thanh toán KTX đã hoàn tất.
             </p>
           </div>
         </header>
@@ -679,7 +647,7 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
         ) : (
           <>
             {/* ========================================================================= */}
-            {/* 1. 4 THẺ THỐNG KÊ CHỈ SỐ TÀI CHÍNH THỰC TẾ (TÍNH TỪ DỮ LIỆU CƠ SỞ DỮ LIỆU) */}
+            {/* 1. 4 THẺ THỐNG KÊ LỊCH SỬ THANH TOÁN THỰC TẾ                              */}
             {/* ========================================================================= */}
             <section
               aria-label="Thống kê thanh toán"
@@ -693,20 +661,20 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
                 iconStyle="bg-emerald-50 text-emerald-600"
               />
 
-              {/* Thẻ 2: Đang chờ thanh toán */}
+              {/* Thẻ 2: Tổng tiền đã thanh toán */}
               <StatCard
-                icon={Clock}
-                label="Đang chờ thanh toán"
-                value={totalPending > 0 ? formatMoney(totalPending) : "0 đ"}
-                iconStyle="bg-amber-50 text-amber-600"
+                icon={CreditCard}
+                label="Tổng tiền đã thanh toán"
+                value={totalAllPaid > 0 ? formatMoney(totalAllPaid) : "0 đ"}
+                iconStyle="bg-blue-50 text-blue-600"
               />
 
-              {/* Thẻ 3: Quá hạn */}
+              {/* Thẻ 3: Giao dịch gần nhất */}
               <StatCard
-                icon={AlertTriangle}
-                label="Quá hạn"
-                value={totalOverdue > 0 ? formatMoney(totalOverdue) : "0 đ"}
-                iconStyle="bg-rose-50 text-rose-600"
+                icon={Clock}
+                label="Giao dịch gần nhất"
+                value={latestPaymentDate}
+                iconStyle="bg-indigo-50 text-indigo-600"
               />
 
               {/* Thẻ 4: Tổng số kỳ đã đóng */}
@@ -714,7 +682,7 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
                 icon={FileText}
                 label="Tổng số kỳ đã đóng"
                 value={`${totalPaidPeriods} kỳ`}
-                iconStyle="bg-blue-50 text-blue-600"
+                iconStyle="bg-purple-50 text-purple-600"
               />
             </section>
 
@@ -774,19 +742,15 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
                               Chưa ghi nhận lịch sử giao dịch thanh toán nào.
                             </span>
                             <span className="text-xs text-slate-400 max-w-md">
-                              Các giao dịch đóng tiền KTX (tiền phòng, điện nước) sẽ xuất hiện tại đây sau khi Ban Quản lý phát hành đợt thu hoặc bạn thực hiện thanh toán.
+                              Các giao dịch sau khi hoàn tất thanh toán sẽ được lưu trữ và xuất phiếu thu điện tử tại đây. Để nộp phí KTX, vui lòng vào mục "Thanh toán phí KTX".
                             </span>
                           </div>
                         </td>
                       </tr>
                     ) : (
-                      /* DANH SÁCH GIAO DỊCH THỰC TẾ */
+                      /* DANH SÁCH GIAO DỊCH THỰC TẾ ĐÃ THANH TOÁN */
                       paginatedTransactions.map((item) => {
                         const badge = getStatusBadge(item?.status);
-                        const isPayable =
-                          item?.status === "waiting" ||
-                          item?.status === "overdue" ||
-                          item?.status === "partial";
 
                         return (
                           <tr
@@ -805,7 +769,7 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
                             <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-600 sm:px-4">
                               {item?.method}
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm font-bold text-blue-600 sm:px-4">
+                            <td className="whitespace-nowrap px-3 py-4 text-sm font-bold text-emerald-600 sm:px-4">
                               {formatMoney(item?.amount)}
                             </td>
                             <td className="px-3 py-4 sm:px-4">
@@ -816,35 +780,14 @@ export default function PaymentHistoryPage({ onSelectTab, onNavigate }) {
                               </span>
                             </td>
                             <td className="whitespace-nowrap px-3 py-4 text-right sm:px-4">
-                              <div className="flex items-center justify-end gap-3">
-                                {isPayable ? (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={navigateToPayment}
-                                      className="text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl transition cursor-pointer"
-                                    >
-                                      Thanh toán ngay
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setSelectedInvoice(item)}
-                                      className="text-xs font-medium text-slate-500 hover:text-slate-800 transition hover:underline cursor-pointer"
-                                    >
-                                      Chi tiết
-                                    </button>
-                                  </>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedInvoice(item)}
-                                    className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl transition cursor-pointer"
-                                  >
-                                    <span>Xem biên lai</span>
-                                    <ExternalLink className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedInvoice(item)}
+                                className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl transition cursor-pointer"
+                              >
+                                <span>Xem biên lai</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </button>
                             </td>
                           </tr>
                         );

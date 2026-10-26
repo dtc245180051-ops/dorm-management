@@ -55,24 +55,72 @@ export default function ProcessTransferPage({
         const tree = Array.isArray(bedsData) && bedsData.length > 0 ? bedsData : [];
         setBuildingTree(tree);
 
-        // Khớp Tòa - Phòng - Giường theo gợi ý
+        // Khớp Tòa - Phòng - Giường theo đúng nguyện vọng chuyển của sinh viên
         if (tree.length > 0) {
-          const targetBuilding =
-            tree.find((b) => b.ma_toa === 'A' || b.ma_toa.includes('A')) || tree[0];
-          setSelectedBuilding(targetBuilding.ma_toa);
+          const extractRoomDigits = (str = "") => {
+            const m = String(str).match(/\d+/);
+            return m ? m[0] : "";
+          };
 
-          const rooms = targetBuilding.rooms || [];
-          if (rooms.length > 0) {
-            const targetRoom =
-              rooms.find((r) => r.ma_phong === 'A203' || r.so_phong === '203') || rooms[0];
-            setSelectedRoom(targetRoom.ma_phong);
+          const rawTarget =
+            detail?.phong_dich ||
+            detail?.phong_mong_muon ||
+            (detail?.phong_lien_quan && detail.phong_lien_quan.includes("→")
+              ? detail.phong_lien_quan.split("→")[1]
+              : "") ||
+            "";
 
-            const beds = targetRoom.beds || [];
-            if (beds.length > 0) {
-              const targetBed =
-                beds.find((b) => b.ma_giuong === 'G04') || beds[0];
-              setSelectedBed(targetBed.ma_giuong);
+          const targetDigits = extractRoomDigits(rawTarget);
+
+          // Trích xuất gợi ý tòa từ vị trí hiện tại hoặc nguyện vọng
+          const viTri = detail?.vi_tri_hien_tai || "";
+          const toaMatch = viTri.match(/Tòa\s+([A-Za-z0-9]+)/i);
+          const currentBuildingCode = toaMatch ? toaMatch[1].toUpperCase() : "";
+
+          let matchedBuilding = null;
+          let matchedRoom = null;
+
+          if (targetDigits) {
+            for (const bld of tree) {
+              const bldCode = String(bld.ma_toa || "").toUpperCase();
+              const rm = (bld.rooms || []).find((r) => {
+                const rDigits = extractRoomDigits(r.so_phong || r.ma_phong);
+                return rDigits === targetDigits;
+              });
+              if (rm) {
+                if (!matchedBuilding || (currentBuildingCode && bldCode.includes(currentBuildingCode))) {
+                  matchedBuilding = bld;
+                  matchedRoom = rm;
+                  if (currentBuildingCode && bldCode.includes(currentBuildingCode)) {
+                    break;
+                  }
+                }
+              }
             }
+          }
+
+          if (!matchedBuilding) {
+            matchedBuilding =
+              tree.find((b) => currentBuildingCode && String(b.ma_toa).toUpperCase().includes(currentBuildingCode)) ||
+              tree[0];
+          }
+
+          setSelectedBuilding(matchedBuilding.ma_toa);
+
+          const rooms = matchedBuilding.rooms || [];
+          if (rooms.length > 0) {
+            const finalRoom = matchedRoom || rooms[0];
+            setSelectedRoom(finalRoom.ma_phong);
+
+            const beds = finalRoom.beds || [];
+            if (beds.length > 0) {
+              setSelectedBed(beds[0].ma_giuong);
+            } else {
+              setSelectedBed("");
+            }
+          } else {
+            setSelectedRoom("");
+            setSelectedBed("");
           }
         }
       } catch (err) {
@@ -128,10 +176,10 @@ export default function ProcessTransferPage({
     setSubmitting(true);
     try {
       const payload = {
-        ma_toa: selectedBuilding || 'A',
-        phong_id: selectedRoom || 'A203',
-        giuong_id: selectedBed || 'G04',
-        msv: requestData?.msv || requestData?.ma_sinh_vien || "DTC245180037",
+        ma_toa: selectedBuilding,
+        phong_id: selectedRoom,
+        giuong_id: selectedBed,
+        msv: requestData?.msv || requestData?.ma_sinh_vien || "",
       };
 
       const result = await occupancyService.approveTransferRequest(requestId, payload);
@@ -279,6 +327,12 @@ export default function ProcessTransferPage({
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
+                    <span className="text-slate-600 font-medium">Nguyện vọng chuyển tới</span>
+                    <span className="font-bold text-blue-600">
+                      {requestData?.phong_dich ? `Phòng ${requestData.phong_dich.replace(/^P/i, '')}` : (requestData?.phong_lien_quan || '—')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
                     <span className="text-slate-600 font-medium">Công nợ</span>
                     {requestData?.cong_no &&
                     (requestData.cong_no.toLowerCase().includes('nợ') ||
@@ -290,7 +344,7 @@ export default function ProcessTransferPage({
                       </span>
                     ) : (
                       <span className="font-bold text-emerald-600">
-                        {requestData?.cong_no || 'Đã hoàn thành toàn bộ phí'}
+                        {requestData?.cong_no || 'Chưa thanh toán (Chưa phát hành hóa đơn)'}
                       </span>
                     )}
                   </div>
