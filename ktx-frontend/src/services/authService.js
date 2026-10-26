@@ -37,6 +37,9 @@ export const authService = {
           localStorage.removeItem("ktx_student_account");
           localStorage.removeItem("dorm_registration_requests");
           localStorage.removeItem("dorm_current_room_info");
+          localStorage.removeItem("dorm_transfer_checkout_requests");
+          localStorage.removeItem("dorm_student_incidents");
+          localStorage.removeItem("ktx_student_notifications");
           localStorage.removeItem("ktx_payment_2026_09_status");
         }
         localStorage.setItem("token", data.access_token);
@@ -46,6 +49,10 @@ export const authService = {
         localStorage.setItem("user_role", data.role);
         localStorage.setItem("ktx_username", data.username);
         localStorage.setItem("user_name", data.username);
+        if (data.msv) {
+          localStorage.setItem("ktx_msv", data.msv);
+          localStorage.setItem("ktx_student_msv", data.msv);
+        }
         if (data.full_name) {
           localStorage.setItem("ktx_fullname", data.full_name);
         }
@@ -221,13 +228,25 @@ export const authService = {
    * Đăng xuất
    */
   logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("ktx_token");
-    localStorage.removeItem("ktx_user_role");
-    localStorage.removeItem("user_role");
-    localStorage.removeItem("ktx_username");
-    localStorage.removeItem("user_name");
-    localStorage.removeItem("ktx_fullname");
+    const keys = [
+      "token",
+      "access_token",
+      "ktx_token",
+      "ktx_user_role",
+      "user_role",
+      "ktx_username",
+      "user_name",
+      "ktx_fullname",
+      "ktx_msv",
+      "ktx_student_msv",
+      "ktx_email",
+      "ktx_student_account",
+      "dorm_current_room_info",
+      "dorm_registration_requests",
+      "dorm_transfer_checkout_requests",
+      "dorm_student_incidents",
+      "ktx_student_notifications",
+    ];
+    keys.forEach((k) => localStorage.removeItem(k));
   },
 };

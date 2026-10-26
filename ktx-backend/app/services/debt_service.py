@@ -42,6 +42,39 @@ class DebtService:
         return "--"
 
     @classmethod
+    def _is_invoice_applicable_to_contract(cls, u_inv: HoaDon, hd_active: HopDong) -> bool:
+        """
+        Kiểm tra hóa đơn điện nước dùng chung của phòng có áp dụng cho sinh viên không:
+        Hóa đơn điện nước KHÔNG được tính cho sinh viên nếu kỳ phát sinh hoặc hạn thanh toán
+        xảy ra trước ngày sinh viên bắt đầu nhận phòng theo hợp đồng.
+        """
+        if not hd_active or not hd_active.ngay_bat_dau:
+            return True
+
+        contract_start = hd_active.ngay_bat_dau
+
+        # 1. Nếu hạn thanh toán trước ngày hợp đồng bắt đầu -> chắc chắn hóa đơn của kỳ trước
+        if u_inv.han_thanh_toan and u_inv.han_thanh_toan < contract_start:
+            return False
+
+        # 2. Nếu ngày lập hóa đơn trước tháng sinh viên vào ở -> kỳ trước
+        contract_month_start = contract_start.replace(day=1)
+        if u_inv.ngay_lap and u_inv.ngay_lap < contract_month_start:
+            return False
+
+        # 3. Phân tích kỳ thanh toán dạng "Tháng MM/YYYY"
+        if u_inv.ky_thanh_toan:
+            import re
+            m = re.search(r"th[aá]ng\s*0?(\d{1,2})[/-](\d{4})", u_inv.ky_thanh_toan.lower())
+            if m:
+                inv_m = int(m.group(1))
+                inv_y = int(m.group(2))
+                if (inv_y, inv_m) < (contract_start.year, contract_start.month):
+                    return False
+
+        return True
+
+    @classmethod
     def get_debt_summary(cls, db: Session, keyword: Optional[str] = None) -> DebtSummaryResponse:
         """
         Lấy thống kê tổng quan và danh sách chi tiết công nợ sinh viên (Sổ công nợ - Screenshot 1).
@@ -88,16 +121,13 @@ class DebtService:
                     db.query(HoaDon)
                     .filter(
                         HoaDon.loai_hoa_don == LoaiHoaDon.DIEN_NUOC.value,
-                        or_(
-                            HoaDon.ma_phong == p.ma_phong,
-                            HoaDon.so_phong.ilike(f"%{p.so_phong}%"),
-                        ),
+                        HoaDon.ma_phong == p.ma_phong,
                         HoaDon.msv.is_(None),
                     )
                     .all()
                 )
                 for u_inv in room_util_invoices:
-                    if u_inv.ma_hoa_don not in invoices_map:
+                    if u_inv.ma_hoa_don not in invoices_map and cls._is_invoice_applicable_to_contract(u_inv, hd_active):
                         invoices_map[u_inv.ma_hoa_don] = (u_inv, split_ratio)
 
             if not invoices_map:
@@ -144,7 +174,7 @@ class DebtService:
 
             total_debt = room_fee_debt + utility_fee_debt
             if total_debt > 0:
-                deadline_str = earliest_deadline.strftime("%d/%m/%Y") if earliest_deadline else "15/09/2026"
+                deadline_str = earliest_deadline.strftime("%d/%m/%Y") if earliest_deadline else "--"
                 debt_items.append(
                     DebtItemResponse(
                         studentId=sv.msv,
@@ -231,16 +261,13 @@ class DebtService:
                     db.query(HoaDon)
                     .filter(
                         HoaDon.loai_hoa_don == LoaiHoaDon.DIEN_NUOC.value,
-                        or_(
-                            HoaDon.ma_phong == p.ma_phong,
-                            HoaDon.so_phong.ilike(f"%{p.so_phong}%"),
-                        ),
+                        HoaDon.ma_phong == p.ma_phong,
                         HoaDon.msv.is_(None),
                     )
                     .all()
                 )
                 for u_inv in room_util_invoices:
-                    if u_inv.ma_hoa_don not in invoices_map:
+                    if u_inv.ma_hoa_don not in invoices_map and cls._is_invoice_applicable_to_contract(u_inv, hd_active):
                         invoices_map[u_inv.ma_hoa_don] = (u_inv, split_ratio)
 
         fees: List[FeeItemResponse] = []
@@ -332,3 +359,46 @@ class DebtService:
             success=True,
             message=f"Đã gửi thông báo nhắc nợ thành công tới sinh viên {student_name} ({student_id})!",
         )
+
+    @classmethod
+    def get_student_cong_no_label(cls, db: Session, student_id: str) -> str:
+        """
+        Xác định nhãn công nợ chuẩn xác cho đơn chuyển/trả phòng:
+        - Nếu có nợ thực tế (> 0): 'Còn nợ X ₫'
+        - Nếu có hóa đơn và đã nộp đủ toàn bộ: 'Đã hoàn thành toàn bộ phí'
+        - Nếu có hợp đồng ACTIVE nhưng Kế toán chưa phát hành hóa đơn: 'Chưa thanh toán (Chưa phát hành hóa đơn)'
+        - Nếu có hóa đơn chưa thanh toán: 'Chưa thanh toán'
+        - Còn lại: 'Chưa phát sinh phí'
+        """
+        clean_msv = (student_id or "").strip().upper()
+        if not clean_msv:
+            return "Chưa xác định"
+
+        try:
+            debt_resp = cls.get_personal_debt(db, clean_msv)
+            if debt_resp and debt_resp.totalDebt > 0:
+                return f"Còn nợ {debt_resp.totalDebt:,.0f} ₫".replace(",", ".")
+            if debt_resp and len(debt_resp.fees) > 0 and debt_resp.totalDebt == 0:
+                return "Đã hoàn thành toàn bộ phí"
+        except Exception:
+            pass
+
+        hd_active = db.query(HopDong).filter(HopDong.msv.ilike(clean_msv), HopDong.trang_thai == "ACTIVE").first()
+        invoices = (
+            db.query(HoaDon)
+            .filter(
+                or_(
+                    HoaDon.msv.ilike(clean_msv),
+                    HoaDon.ma_hop_dong == (hd_active.ma_hop_dong if hd_active else ""),
+                )
+            )
+            .all()
+        )
+        if invoices:
+            all_paid = all(inv.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value for inv in invoices)
+            return "Đã hoàn thành toàn bộ phí" if all_paid else "Chưa thanh toán"
+
+        if hd_active:
+            return "Chưa thanh toán (Chưa phát hành hóa đơn)"
+
+        return "Chưa phát sinh phí"

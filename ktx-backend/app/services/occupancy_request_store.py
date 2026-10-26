@@ -8,6 +8,7 @@ STORE_FILE = os.path.join(os.path.dirname(__file__), "..", "data_store_requests.
 # In-memory store lưu trữ danh sách các đơn đăng ký chỗ ở để liên kết trực tiếp
 # giữa sinh viên và quản lý KTX
 REGISTRATION_REQUESTS: List[Dict] = []
+TRANSFER_CHECKOUT_REQUESTS: List[Dict] = []
 
 def _save_store():
     try:
@@ -26,7 +27,6 @@ def _load_store():
             with open(STORE_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if "REGISTRATION_REQUESTS" in data and isinstance(data["REGISTRATION_REQUESTS"], list):
-                    # Cập nhật danh sách đơn đăng ký từ file mà không làm mất các đơn đã có
                     loaded_ids = {r.get("id") for r in data["REGISTRATION_REQUESTS"]}
                     merged = list(data["REGISTRATION_REQUESTS"])
                     for r in REGISTRATION_REQUESTS:
@@ -34,6 +34,15 @@ def _load_store():
                             merged.append(r)
                     REGISTRATION_REQUESTS.clear()
                     REGISTRATION_REQUESTS.extend(merged)
+
+                if "TRANSFER_CHECKOUT_REQUESTS" in data and isinstance(data["TRANSFER_CHECKOUT_REQUESTS"], list):
+                    loaded_tc_ids = {r.get("id") for r in data["TRANSFER_CHECKOUT_REQUESTS"]}
+                    merged_tc = list(data["TRANSFER_CHECKOUT_REQUESTS"])
+                    for r in TRANSFER_CHECKOUT_REQUESTS:
+                        if r.get("id") not in loaded_tc_ids:
+                            merged_tc.append(r)
+                    TRANSFER_CHECKOUT_REQUESTS.clear()
+                    TRANSFER_CHECKOUT_REQUESTS.extend(merged_tc)
         except Exception as e:
             print("Lỗi tải file store:", e)
 
@@ -58,9 +67,9 @@ def add_request(req_data: dict) -> dict:
         "lop": req_data.get("lop", ""),
         "dia_chi": req_data.get("dia_chi", ""),
         "doi_tuong_uu_tien": req_data.get("doi_tuong_uu_tien", "Không thuộc diện ưu tiên"),
-        "nguoi_giam_ho": req_data.get("nguoi_giam_ho", ""),
+        "nguoi_giam_ho": req_data.get("nguoi_giam_ho") or req_data.get("ho_ten_nguoi_giam_ho") or req_data.get("ho_ten_phu_huynh") or "",
         "moi_quan_he": req_data.get("moi_quan_he", ""),
-        "sdt_nguoi_giam_ho": req_data.get("sdt_nguoi_giam_ho", ""),
+        "sdt_nguoi_giam_ho": req_data.get("sdt_nguoi_giam_ho") or req_data.get("sdt_phu_huynh") or "",
         "loai_phong": req_data.get("loai_phong", "") or "Phòng tiêu chuẩn",
         "tang_mong_muon": req_data.get("tang_mong_muon", ""),
         "muc_gia_mong_muon": req_data.get("muc_gia_mong_muon", ""),
@@ -127,19 +136,40 @@ def update_request_status(req_id: str, new_status: str, extra_data: Optional[dic
     return None
 
 
-# Danh sách các yêu cầu chuyển phòng và trả phòng
-TRANSFER_CHECKOUT_REQUESTS: List[Dict] = []
+# Các hàm xử lý yêu cầu chuyển phòng và trả phòng
 
 
 def add_transfer_request(data: dict) -> dict:
     req_num = len(TRANSFER_CHECKOUT_REQUESTS) + 231
     req_id = data.get("id") or f"YC-{req_num:04d}"
-    today_str = datetime.datetime.now().strftime("%d/%m/%Y")
+    today_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
     
     phong_hien_tai = data.get("phong_hien_tai", "")
+    toa_hien_tai = data.get("toa_hien_tai", "")
+    if not toa_hien_tai and " - " in data.get("vi_tri_hien_tai", ""):
+        for vp in data.get("vi_tri_hien_tai", "").split(" - "):
+            if "Tòa" in vp:
+                toa_hien_tai = vp.strip()
+                break
+
     phong_mong_muon = data.get("phong_mong_muon", "")
-    target_short = phong_mong_muon.split(" - ")[0] if " - " in phong_mong_muon else phong_mong_muon
-    
+    from_label = f"{phong_hien_tai} ({toa_hien_tai})" if toa_hien_tai and phong_hien_tai and f"({toa_hien_tai})" not in phong_hien_tai else phong_hien_tai
+
+    if " - " in phong_mong_muon:
+        p_parts = phong_mong_muon.split(" - ")
+        to_label = f"{p_parts[0].strip()} ({p_parts[1].strip()})"
+        target_short = p_parts[0].strip()
+    else:
+        to_label = phong_mong_muon.strip()
+        target_short = phong_mong_muon.strip()
+
+    if data.get("phong_lien_quan") and "→" in data.get("phong_lien_quan"):
+        phong_lien_quan = data.get("phong_lien_quan")
+        if "(" not in phong_lien_quan and from_label and to_label:
+            phong_lien_quan = f"{from_label} → {to_label}"
+    else:
+        phong_lien_quan = f"{from_label} → {to_label}" if from_label and to_label else (to_label or from_label)
+
     new_req = {
         "id": req_id,
         "ma_yeu_cau": f"#{req_id}",
@@ -147,25 +177,20 @@ def add_transfer_request(data: dict) -> dict:
         "loai_don": "CHUYEN_PHONG",
         "msv": data.get("msv", ""),
         "ho_ten": data.get("ho_ten", ""),
-        "gioi_tinh": data.get("gioi_tinh", "Nam"),
-        "khoa": data.get("khoa", "Công nghệ thông tin"),
-        "lop": data.get("lop", "DTC-K20"),
-        "vi_tri_hien_tai": data.get("vi_tri_hien_tai", "Phòng A102 - Giường G01"),
-        "cong_no": "Đã hoàn thành toàn bộ phí",
+        "gioi_tinh": data.get("gioi_tinh", ""),
+        "khoa": data.get("khoa", ""),
+        "lop": data.get("lop", ""),
+        "vi_tri_hien_tai": data.get("vi_tri_hien_tai", phong_hien_tai),
+        "cong_no": data.get("cong_no", "Chưa thanh toán (Chưa phát hành hóa đơn)"),
         "ngay_gui": data.get("ngay_gui") or today_str,
-        "phong_lien_quan": f"{phong_hien_tai} → {target_short}" if target_short else phong_hien_tai,
-        "phong_hien_tai": phong_hien_tai,
-        "phong_dich": target_short,
-        "ly_do": data.get("ly_do", "Phòng hiện tại quá tải"),
+        "phong_lien_quan": phong_lien_quan,
+        "phong_hien_tai": from_label,
+        "phong_dich": to_label,
+        "ly_do": data.get("ly_do", "Chuyển phòng"),
         "ngay_mong_muon": data.get("ngay_mong_muon", ""),
-        "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học..."),
+        "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", ""),
         "trang_thai": "CHO_DUYET",
         "trang_thai_label": "Chờ duyệt",
-        "goi_y": {
-            "ma_toa": "A",
-            "ma_phong": "A203",
-            "ma_giuong": "G04",
-        },
     }
     TRANSFER_CHECKOUT_REQUESTS.insert(0, new_req)
     _save_store()
@@ -175,10 +200,33 @@ def add_transfer_request(data: dict) -> dict:
 def add_checkout_request(data: dict) -> dict:
     req_num = len(TRANSFER_CHECKOUT_REQUESTS) + 231
     req_id = data.get("id") or f"YC-{req_num:04d}"
-    today_str = datetime.datetime.now().strftime("%d/%m/%Y")
+    today_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
     
     phong_hien_tai = data.get("phong_hien_tai", "")
     
+    dia_chi_sau_tra = data.get("dia_chi_sau_tra") or data.get("dia_chi_lien_he") or ""
+    dia_chi_chi_tiet = data.get("dia_chi_chi_tiet") or {}
+    if (not dia_chi_chi_tiet or not any(dia_chi_chi_tiet.values())) and dia_chi_sau_tra:
+        parts = [s.strip() for s in dia_chi_sau_tra.split(",") if s.strip()]
+        if len(parts) >= 3:
+            dia_chi_chi_tiet = {
+                "tinh": parts[-1],
+                "huyen": parts[-2],
+                "so_nha": ", ".join(parts[:-2]),
+            }
+        elif len(parts) == 2:
+            dia_chi_chi_tiet = {
+                "tinh": parts[1],
+                "huyen": "",
+                "so_nha": parts[0],
+            }
+        elif len(parts) == 1:
+            dia_chi_chi_tiet = {
+                "tinh": parts[0],
+                "huyen": "",
+                "so_nha": "",
+            }
+
     new_req = {
         "id": req_id,
         "ma_yeu_cau": f"#{req_id}",
@@ -186,23 +234,19 @@ def add_checkout_request(data: dict) -> dict:
         "loai_don": "TRA_PHONG",
         "msv": data.get("msv", ""),
         "ho_ten": data.get("ho_ten", ""),
-        "gioi_tinh": data.get("gioi_tinh", "Nam"),
-        "khoa": data.get("khoa", "Công nghệ thông tin"),
-        "lop": data.get("lop", "DTC-K20"),
-        "vi_tri_hien_tai": data.get("vi_tri_hien_tai", "Phòng A102 - Giường G01"),
-        "cong_no": "Đã hoàn thành toàn bộ phí",
+        "gioi_tinh": data.get("gioi_tinh", ""),
+        "khoa": data.get("khoa", ""),
+        "lop": data.get("lop", ""),
+        "vi_tri_hien_tai": data.get("vi_tri_hien_tai", phong_hien_tai),
+        "cong_no": data.get("cong_no", "Chưa thanh toán (Chưa phát hành hóa đơn)"),
         "ngay_gui": data.get("ngay_gui") or today_str,
         "phong_lien_quan": phong_hien_tai,
         "phong_hien_tai": phong_hien_tai,
-        "ly_do": data.get("ly_do", "Đã tốt nghiệp"),
+        "ly_do": data.get("ly_do", "Trả phòng"),
         "ngay_mong_muon": data.get("ngay_mong_muon", ""),
-        "dia_chi_sau_tra": data.get("dia_chi_lien_he") or data.get("dia_chi_sau_tra", "Số 123 Đường Cầu Giấy, Quận Cầu Giấy, Hà Nội"),
-        "dia_chi_chi_tiet": data.get("dia_chi_chi_tiet", {
-            "tinh": "Hà Nội",
-            "huyen": "Quận Cầu Giấy",
-            "so_nha": "Số 123 Đường Cầu Giấy",
-        }),
-        "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học..."),
+        "dia_chi_sau_tra": dia_chi_sau_tra,
+        "dia_chi_chi_tiet": dia_chi_chi_tiet,
+        "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", ""),
         "trang_thai": "CHO_DUYET",
         "trang_thai_label": "Chờ duyệt",
     }

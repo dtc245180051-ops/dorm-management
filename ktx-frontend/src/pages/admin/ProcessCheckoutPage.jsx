@@ -49,26 +49,36 @@ export default function ProcessCheckoutPage({
         const detail = await occupancyService.getRequestDetail(requestId);
         setRequestData(detail);
 
-        // Trích xuất địa chỉ 3 phần
-        if (detail?.dia_chi_chi_tiet) {
-          setDiaChiTinh(detail.dia_chi_chi_tiet.tinh || "");
-          setDiaChiHuyen(detail.dia_chi_chi_tiet.huyen || "");
-          setDiaChiSoNha(
-            detail.dia_chi_chi_tiet.so_nha ||
-              detail.dia_chi_chi_tiet.duong ||
-              "",
-          );
-        } else if (detail?.dia_chi_sau_tra) {
-          const parts = detail.dia_chi_sau_tra.split(",").map((s) => s.trim());
-          if (parts.length >= 3) {
-            setDiaChiSoNha(parts[0]);
-            setDiaChiHuyen(parts[1]);
-            setDiaChiTinh(parts.slice(2).join(", "));
-          } else if (parts.length === 2) {
-            setDiaChiSoNha(parts[0]);
-            setDiaChiTinh(parts[1]);
-          } else {
-            setDiaChiTinh(detail.dia_chi_sau_tra);
+        // Trích xuất địa chỉ 3 phần (Tỉnh/TP, Quận/Huyện, Số nhà/đường/xã)
+        const ct = detail?.dia_chi_chi_tiet;
+        if (ct && (ct.tinh || ct.huyen || ct.so_nha || ct.duong || ct.xa)) {
+          setDiaChiTinh(ct.tinh || "");
+          setDiaChiHuyen(ct.huyen || "");
+          setDiaChiSoNha(ct.so_nha || ct.duong || ct.xa || "");
+        } else {
+          const rawAddress =
+            detail?.dia_chi_sau_tra ||
+            detail?.dia_chi_lien_he ||
+            detail?.dia_chi ||
+            "";
+          if (rawAddress) {
+            const parts = rawAddress
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean);
+            if (parts.length >= 3) {
+              setDiaChiTinh(parts[parts.length - 1]);
+              setDiaChiHuyen(parts[parts.length - 2]);
+              setDiaChiSoNha(parts.slice(0, parts.length - 2).join(", "));
+            } else if (parts.length === 2) {
+              setDiaChiTinh(parts[1]);
+              setDiaChiHuyen("");
+              setDiaChiSoNha(parts[0]);
+            } else if (parts.length === 1) {
+              setDiaChiTinh(parts[0]);
+              setDiaChiHuyen("");
+              setDiaChiSoNha("");
+            }
           }
         }
       } catch (err) {
@@ -90,6 +100,7 @@ export default function ProcessCheckoutPage({
         ngay_tra:
           requestData?.ngay_tra || new Date().toISOString().split("T")[0],
         ghi_chu: "Phê duyệt trả phòng bởi Quản lý",
+        msv: requestData?.msv || requestData?.ma_sinh_vien || "DTC245180037",
       };
 
       const result = await occupancyService.approveCheckoutRequest(
@@ -122,7 +133,10 @@ export default function ProcessCheckoutPage({
 
     setSubmitting(true);
     try {
-      const payload = { ly_do_tu_choi: rejectReason.trim() };
+      const payload = {
+        ly_do_tu_choi: rejectReason.trim(),
+        msv: requestData?.msv || requestData?.ma_sinh_vien || "DTC245180037",
+      };
       await occupancyService.rejectCheckoutRequest(requestId, payload);
 
       setIsRejectModalOpen(false);
@@ -205,7 +219,7 @@ export default function ProcessCheckoutPage({
                       Họ và tên
                     </span>
                     <span className="font-bold text-slate-900">
-                      {requestData?.ho_ten || "Nguyễn Quốc Huy"}
+                      {requestData?.ho_ten || "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
@@ -213,7 +227,7 @@ export default function ProcessCheckoutPage({
                       Giới tính
                     </span>
                     <span className="text-slate-900 font-medium">
-                      {requestData?.gioi_tinh || "Nam"}
+                      {requestData?.gioi_tinh || "—"}
                     </span>
                   </div>
                 </div>
@@ -226,14 +240,24 @@ export default function ProcessCheckoutPage({
                     </span>
                     <span className="font-semibold text-slate-900">
                       {requestData?.vi_tri_hien_tai ||
-                        "Phòng A102 - Giường G01"}
+                        (requestData?.phong_hien_tai ? `Phòng ${requestData.phong_hien_tai}` : "Chưa xếp phòng")}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
                     <span className="text-slate-600 font-medium">Công nợ</span>
-                    <span className="font-bold text-emerald-600">
-                      {requestData?.cong_no || "Đã hoàn thành toàn bộ phí"}
-                    </span>
+                    {requestData?.cong_no &&
+                    (requestData.cong_no.toLowerCase().includes("nợ") ||
+                      requestData.cong_no.toLowerCase().includes("chưa") ||
+                      requestData.cong_no.toLowerCase().includes("thiếu")) &&
+                    !requestData.cong_no.toLowerCase().includes("không có") ? (
+                      <span className="font-bold text-rose-600">
+                        {requestData.cong_no}
+                      </span>
+                    ) : (
+                      <span className="font-bold text-emerald-600">
+                        {requestData?.cong_no || "Chưa thanh toán (Chưa phát hành hóa đơn)"}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -248,7 +272,7 @@ export default function ProcessCheckoutPage({
                 "
                 {requestData?.mo_ta ||
                   requestData?.ly_do ||
-                  "Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học..."}
+                  "Không có mô tả chi tiết"}
                 "
               </div>
             </div>

@@ -38,11 +38,17 @@ class RejectRequestPayload(BaseModel):
     summary="Lấy danh sách tất cả các đơn đăng ký chỗ ở (Quản lý)",
     dependencies=[Depends(RoleChecker(["QuanLy", "KeToan"]))],
 )
-def get_all_requests():
+def get_all_requests(db: Session = Depends(get_db)):
     """
     Trả về danh sách tất cả các đơn đăng ký đang chờ xử lý và lịch sử xử lý.
     """
-    return occupancy_request_store.get_all_requests()
+    from app.services.debt_service import DebtService
+    all_reqs = occupancy_request_store.get_all_requests()
+    for req in all_reqs:
+        msv = (req.get("msv") or "").strip().upper()
+        if msv:
+            req["cong_no"] = DebtService.get_student_cong_no_label(db, msv)
+    return all_reqs
 
 
 @router.get(
@@ -61,6 +67,15 @@ def get_request_detail(
     # 1. Kiểm tra đơn trong occupancy_request_store trước
     stored = occupancy_request_store.get_request_by_id(clean_id)
     if stored:
+        # Tra cứu công nợ thực tế của sinh viên từ database
+        msv = (stored.get("msv") or "").strip().upper()
+        if msv:
+            try:
+                from app.services.debt_service import DebtService
+                stored["cong_no"] = DebtService.get_student_cong_no_label(db, msv)
+            except Exception:
+                pass
+
         # Tự động cập nhật hoặc sửa gợi ý nếu gợi ý chưa khớp giới tính
         student_gender = stored.get("gioi_tinh", "Nam")
         available_rooms = dorm_service.get_available_beds(db, gender=student_gender)
@@ -280,7 +295,7 @@ def approve_request(
         student = SinhVien(
             msv=clean_msv,
             ma_nguoi_dung=user.ma_nguoi_dung,
-            lop=registration.get("lop") or "DTC-KTX",
+            lop=registration.get("lop") or "",
             gioi_tinh=registration.get("gioi_tinh") or "Nam",
             khoa=registration.get("khoa") or "",
             dia_chi=registration.get("dia_chi") or "",

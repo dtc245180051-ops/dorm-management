@@ -466,10 +466,12 @@
 .rep-table-wrapper {
   overflow-x: auto;
   width: 100%;
+  -webkit-overflow-scrolling: touch;
 }
 
 .rep-table {
   width: 100%;
+  min-width: 1100px;
   border-collapse: collapse;
   text-align: left;
   font-size: 13.5px;
@@ -479,7 +481,7 @@
   background: #f8fafc;
   color: #475569;
   font-weight: 700;
-  padding: 12px 18px;
+  padding: 13px 18px;
   border-bottom: 1px solid #e2e8f0;
   white-space: nowrap;
   font-size: 12.5px;
@@ -488,10 +490,11 @@
 }
 
 .rep-table td {
-  padding: 14px 18px;
+  padding: 13px 18px;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
   color: #334155;
+  white-space: nowrap;
 }
 
 .rep-table tr:hover td {

@@ -106,8 +106,34 @@
 }
 
 .billing-control-box.readonly-box {
-  background-color: #f8fafc;
-  border-color: #e2e8f0;
+  background-color: #ffffff;
+  border: 1.5px solid #d1d5db;
+  cursor: default;
+  user-select: none;
+  outline: none;
+}
+
+.billing-control-box.readonly-box:hover {
+  border-color: #9ca3af;
+}
+
+.billing-control-box.readonly-box:focus,
+.billing-control-box.readonly-box:focus-visible,
+.billing-control-box.readonly-box:focus-within {
+  border-color: #d1d5db;
+  box-shadow: none;
+  outline: none;
+}
+
+.billing-control-box.readonly-box .billing-static-text {
+  color: #1f2937;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.billing-control-box.readonly-box .billing-box-icon {
+  color: #374151;
+  opacity: 1;
 }
 
 .billing-select {
@@ -115,6 +141,7 @@
   height: 100%;
   padding: 0 36px 0 14px;
   border: none;
+  outline: none;
   background: transparent;
   font-size: 14px;
   font-weight: 500;
@@ -124,19 +151,32 @@
   -webkit-appearance: none;
 }
 
+.billing-select:focus {
+  outline: none;
+}
+
 .billing-input {
   width: 100%;
   height: 100%;
   padding: 0 36px 0 14px;
   border: none;
+  outline: none;
   background: transparent;
   font-size: 14px;
   font-weight: 500;
   color: #1f2937;
 }
 
+.billing-input:focus {
+  outline: none;
+}
+
 .billing-static-text {
-  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 36px 0 14px;
   font-size: 14px;
   font-weight: 500;
   color: #1f2937;
@@ -288,10 +328,28 @@
   transform: none;
 }
 
+.billing-btn-download-template {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #059669;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: 1.5px solid #10b981;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.12);
+}
+
 .billing-btn-download-template:hover {
-  background-color: #eff6ff;
-  border-color: #1a73e8;
-  color: #1a73e8;
+  background-color: #ecfdf5;
+  border-color: #059669;
+  color: #047857;
+  transform: translateY(-1px);
 }
 
 .billing-upload-badge {
@@ -326,6 +384,50 @@
   background-color: #fef3c7;
   color: #92400e;
   border: 1px solid #fde68a;
+}
+
+.room-type-tag.tag-issued {
+  background-color: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+/* Status banner thông báo tình trạng đợt phát hành */
+.billing-status-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+  font-size: 13.5px;
+  color: #166534;
+}
+
+.billing-status-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.billing-toggle-btn {
+  background-color: #ffffff;
+  border: 1px solid #86efac;
+  color: #15803d;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.billing-toggle-btn:hover {
+  background-color: #dcfce7;
 }
 
 /* ================= TABLE ================= */

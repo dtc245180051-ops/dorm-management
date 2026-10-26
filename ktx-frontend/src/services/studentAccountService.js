@@ -6,18 +6,18 @@
 const STORAGE_KEY = "ktx_student_account";
 
 export const DEFAULT_STUDENT_ACCOUNT = {
-  studentId: "dtc245180051",
-  fullName: "Nguyễn Thị Ánh",
+  studentId: "",
+  fullName: "",
   currentResidence: {
-    isActive: true,
-    building: "Tòa A1",
-    roomNumber: "101",
-    roomType: "Phòng tiêu chuẩn",
-    contractStatus: "ACTIVE",
-    startDate: "01/09/2026",
-    endDate: "30/06/2027",
-    bed: "G04",
-    members: "4/4",
+    isActive: false,
+    building: "",
+    roomNumber: "",
+    roomType: "",
+    contractStatus: "",
+    startDate: "",
+    endDate: "",
+    bed: "",
+    members: "",
   },
   registrationHistory: [],
   residenceHistory: [],
@@ -31,6 +31,7 @@ export const DEFAULT_STUDENT_ACCOUNT = {
 export function getStudentAccount(studentId) {
   const currentId = (
     studentId ||
+    localStorage.getItem("ktx_msv") ||
     localStorage.getItem("ktx_username") ||
     ""
   )
@@ -53,12 +54,14 @@ export function getStudentAccount(studentId) {
   }
 
   // Khởi tạo mặc định trống nếu chưa có
-  const defaultAcc = {
+  const defaultAcc = normalizeAccount({
     ...DEFAULT_STUDENT_ACCOUNT,
-    studentId: currentId || DEFAULT_STUDENT_ACCOUNT.studentId,
-    fullName: localStorage.getItem("ktx_fullname") || DEFAULT_STUDENT_ACCOUNT.fullName,
-  };
-  saveStudentAccount(defaultAcc);
+    studentId: currentId || "",
+    fullName: localStorage.getItem("ktx_fullname") || "",
+  });
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultAcc));
+  } catch (_) {}
   return defaultAcc;
 }
 
@@ -66,25 +69,20 @@ export function getStudentAccount(studentId) {
  * Chuẩn hóa object tài khoản đảm bảo đúng 100% schema và không thiếu trường
  */
 function normalizeAccount(acc) {
-  const isDefaultStudent = !acc?.studentId || String(acc?.studentId).toLowerCase() === "dtc245180051";
-  const defRes = DEFAULT_STUDENT_ACCOUNT.currentResidence;
-
   const normalized = {
-    studentId: String(acc?.studentId || "dtc245180051").toLowerCase(),
-    fullName: acc?.fullName || (isDefaultStudent ? "Nguyễn Thị Ánh" : ""),
+    studentId: String(acc?.studentId || "").toLowerCase(),
+    fullName: acc?.fullName || localStorage.getItem("ktx_fullname") || "",
     currentResidence: {
-      isActive: acc?.currentResidence?.isActive !== undefined 
-        ? Boolean(acc.currentResidence.isActive) 
-        : (isDefaultStudent ? true : false),
-      building: acc?.currentResidence?.building || (isDefaultStudent ? defRes.building : ""),
-      roomNumber: acc?.currentResidence?.roomNumber || (isDefaultStudent ? defRes.roomNumber : ""),
-      floor: acc?.currentResidence?.floor || (isDefaultStudent ? "1" : ""),
-      bed: acc?.currentResidence?.bed || (isDefaultStudent ? defRes.bed : "G04"),
-      members: acc?.currentResidence?.members || (isDefaultStudent ? defRes.members : "4/4"),
-      roomType: acc?.currentResidence?.roomType || (isDefaultStudent ? defRes.roomType : ""),
-      contractStatus: acc?.currentResidence?.contractStatus || (isDefaultStudent ? "ACTIVE" : (acc?.currentResidence?.isActive ? "ACTIVE" : "EXPIRED")),
-      startDate: acc?.currentResidence?.startDate || (isDefaultStudent ? defRes.startDate : ""),
-      endDate: acc?.currentResidence?.endDate || (isDefaultStudent ? defRes.endDate : ""),
+      isActive: Boolean(acc?.currentResidence?.isActive),
+      building: acc?.currentResidence?.building || "",
+      roomNumber: acc?.currentResidence?.roomNumber || "",
+      floor: acc?.currentResidence?.floor || "",
+      bed: acc?.currentResidence?.bed || "",
+      members: acc?.currentResidence?.members || "",
+      roomType: acc?.currentResidence?.roomType || "",
+      contractStatus: acc?.currentResidence?.contractStatus || (acc?.currentResidence?.isActive ? "ACTIVE" : ""),
+      startDate: acc?.currentResidence?.startDate || "",
+      endDate: acc?.currentResidence?.endDate || "",
     },
     registrationHistory: Array.isArray(acc?.registrationHistory) ? acc.registrationHistory : [],
     residenceHistory: Array.isArray(acc?.residenceHistory) ? acc.residenceHistory : [],

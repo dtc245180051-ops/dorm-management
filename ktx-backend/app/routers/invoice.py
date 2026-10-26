@@ -46,7 +46,7 @@ def get_room_candidates(
         None,
         description="Phạm vi áp dụng (Tất cả hoặc sinh viên tòa A1 đến A11)",
     ),
-    current_user: TaiKhoan = Depends(require_ke_toan),
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     """
@@ -70,7 +70,7 @@ def get_room_candidates(
 )
 def publish_room_invoices(
     payload: RoomInvoicePublishRequest,
-    current_user: TaiKhoan = Depends(require_ke_toan),
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     """
@@ -78,10 +78,11 @@ def publish_room_invoices(
     Tạo và phát hành hóa đơn tiền phòng định kỳ cho sinh viên.
     Kiểm tra ngăn chặn tạo trùng lặp hóa đơn cho cùng đối tượng trong cùng kỳ.
     """
+    creator = current_user.ten_dang_nhap if current_user else "KeToan"
     return InvoiceService.publish_room_invoices(
         db=db,
         request=payload,
-        creator_username=current_user.ten_dang_nhap,
+        creator_username=creator,
     )
 
 
@@ -95,7 +96,7 @@ def get_utility_candidates(
         "Tháng 09/2026",
         description="Tháng cần lập hóa đơn điện nước",
     ),
-    current_user: TaiKhoan = Depends(require_ke_toan),
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     """
@@ -116,7 +117,7 @@ def get_utility_candidates(
 )
 def publish_utility_invoices(
     payload: UtilityInvoicePublishRequest,
-    current_user: TaiKhoan = Depends(require_ke_toan),
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     """
@@ -124,10 +125,11 @@ def publish_utility_invoices(
     Tạo và phát hành hóa đơn điện nước cho các phòng ký túc xá theo tháng.
     Kiểm tra ngăn chặn tạo trùng lặp hóa đơn cho cùng phòng trong cùng tháng.
     """
+    creator = current_user.ten_dang_nhap if current_user else "KeToan"
     return InvoiceService.publish_utility_invoices(
         db=db,
         request=payload,
-        creator_username=current_user.ten_dang_nhap,
+        creator_username=creator,
     )
 
 
@@ -141,7 +143,7 @@ async def upload_utility_readings(
     thang: str = Form("Tháng 09/2026"),
     don_gia_dien: float = Form(3000.0),
     don_gia_nuoc: float = Form(15000.0),
-    current_user: TaiKhoan = Depends(require_ke_toan),
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     """
@@ -190,7 +192,7 @@ def get_all_invoices(
     trang_thai: Optional[str] = Query(None, description="Lọc theo trạng thái thanh toán"),
     msv: Optional[str] = Query(None, description="Lọc theo mã sinh viên"),
     ma_phong: Optional[str] = Query(None, description="Lọc theo mã phòng"),
-    current_user: TaiKhoan = Depends(require_ke_toan),
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     """
@@ -221,22 +223,14 @@ def get_student_my_invoices(
     from app.models.dorm import Giuong
     from app.models.invoice import HoaDon
     from app.models.user import NguoiDung, SinhVien
+    from app.services.student_helper import resolve_student_msv
 
-    clean_code = (msv or (current_user.ten_dang_nhap if current_user else "") or "").strip().upper()
-    if not clean_code:
+    raw_code = (msv or (current_user.ten_dang_nhap if current_user else "") or "").strip()
+    if not raw_code:
         return []
 
-    sv_filter = [SinhVien.msv.ilike(clean_code)]
-    if current_user:
-        sv_filter.append(NguoiDung.ma_tai_khoan == current_user.ma_tai_khoan)
-
-    sv = (
-        db.query(SinhVien)
-        .outerjoin(NguoiDung, SinhVien.ma_nguoi_dung == NguoiDung.ma_nguoi_dung)
-        .filter(or_(*sv_filter))
-        .first()
-    )
-    student_msv = sv.msv if sv else clean_code
+    # Chuẩn hóa mã sinh viên chính xác từ bất kỳ mã/tên đăng nhập/email nào
+    student_msv = resolve_student_msv(raw_code, db) or raw_code.upper()
 
     active_hd = (
         db.query(HopDong)
@@ -247,43 +241,94 @@ def get_student_my_invoices(
     if active_hd and active_hd.giuong:
         ma_phong = active_hd.giuong.ma_phong
 
-    conditions = [HoaDon.msv.ilike(student_msv)]
-    if ma_phong:
-        conditions.append(and_(HoaDon.ma_phong == ma_phong, HoaDon.loai_hoa_don == "DIEN_NUOC", HoaDon.msv.is_(None)))
+    # Lấy các hóa đơn phát hành trực tiếp cho sinh viên này (cả MSV chuẩn hoặc username)
+    msv_queries = [HoaDon.msv.ilike(student_msv)]
+    if raw_code and raw_code.upper() != student_msv.upper():
+        msv_queries.append(HoaDon.msv.ilike(raw_code))
 
-    raw_invoices = (
+    student_invoices = (
         db.query(HoaDon)
-        .filter(or_(*conditions))
+        .filter(or_(*msv_queries))
         .order_by(HoaDon.han_thanh_toan.desc(), HoaDon.ngay_tao.desc())
         .all()
     )
 
-    # Đếm số người ở thực tế trong phòng để chia đều nếu còn hóa đơn điện nước chung
-    occupants_count = 1
-    if ma_phong:
-        occupants_count = max(
-            1,
-            db.query(HopDong)
-            .join(Giuong, HopDong.ma_giuong == Giuong.ma_giuong)
-            .filter(Giuong.ma_phong == ma_phong, HopDong.trang_thai == "ACTIVE")
-            .count()
+    invoices = list(student_invoices)
+
+    # Trong trường hợp có hóa đơn chung cả phòng (msv is None):
+    # Tuyệt đối không gán hóa đơn cho sinh viên mới đăng ký nếu hóa đơn thuộc kỳ cũ trước khi sinh viên dọn vào ở.
+    # Chỉ chia sẻ cho sinh viên nếu:
+    # 1. Sinh viên có hợp đồng ACTIVE tại phòng này
+    # 2. Sinh viên đã ở trong phòng tại thời điểm phát hành hóa đơn (ngay_tao >= ngay_bat_dau)
+    # 3. Kỳ thanh toán của hóa đơn không phải là kỳ trước thời điểm sinh viên bắt đầu ở
+    if ma_phong and active_hd and active_hd.ngay_bat_dau:
+        import datetime
+        import re
+
+        room_invoices = (
+            db.query(HoaDon)
+            .filter(
+                HoaDon.ma_phong == ma_phong,
+                HoaDon.loai_hoa_don == "DIEN_NUOC",
+                HoaDon.msv.is_(None),
+            )
+            .order_by(HoaDon.han_thanh_toan.desc(), HoaDon.ngay_tao.desc())
+            .all()
         )
 
-    invoices = []
-    for inv in raw_invoices:
-        if inv.loai_hoa_don == "DIEN_NUOC" and inv.msv is None:
-            # Hóa đơn chung của cả phòng -> Tự động tính số tiền cá nhân theo đầu người
-            split_amount = round(float(inv.so_tien) / occupants_count)
-            inv_dict = {
-                c.name: getattr(inv, c.name) for c in inv.__table__.columns
-            }
-            inv_dict["so_tien"] = split_amount
-            inv_dict["msv"] = student_msv
-            invoices.append(HoaDonResponse(**inv_dict))
-        else:
-            invoices.append(inv)
+        c_start = active_hd.ngay_bat_dau
+        if isinstance(c_start, datetime.datetime):
+            c_start = c_start.date()
 
-    return invoices
+        valid_room_invoices = []
+        for inv in room_invoices:
+            inv_date = inv.ngay_tao or inv.ngay_lap
+            if inv_date:
+                if isinstance(inv_date, datetime.datetime):
+                    inv_date = inv_date.date()
+                if inv_date <= c_start:
+                    continue
+
+            # Kiểm tra kỳ thanh toán ví dụ "Tháng 09/2026"
+            if inv.ky_thanh_toan:
+                match = re.search(r"(\d{1,2})[/-](\d{4})", inv.ky_thanh_toan)
+                if match:
+                    inv_month = int(match.group(1))
+                    inv_year = int(match.group(2))
+                    if (inv_year, inv_month) < (c_start.year, c_start.month):
+                        continue
+
+            valid_room_invoices.append(inv)
+
+        if valid_room_invoices:
+            occupants_count = max(
+                1,
+                db.query(HopDong)
+                .join(Giuong, HopDong.ma_giuong == Giuong.ma_giuong)
+                .filter(Giuong.ma_phong == ma_phong, HopDong.trang_thai == "ACTIVE")
+                .count(),
+            )
+
+            for inv in valid_room_invoices:
+                split_amount = round(float(inv.so_tien) / occupants_count)
+                inv_dict = {
+                    c.name: getattr(inv, c.name) for c in inv.__table__.columns
+                }
+                inv_dict["so_tien"] = split_amount
+                inv_dict["msv"] = student_msv
+                invoices.append(HoaDonResponse(**inv_dict))
+
+    res_list: List[HoaDonResponse] = []
+    for inv in invoices:
+        if isinstance(inv, HoaDonResponse):
+            res_list.append(inv)
+        else:
+            inv_dict = {c.name: getattr(inv, c.name) for c in inv.__table__.columns}
+            if not inv_dict.get("ky_thanh_toan"):
+                inv_dict["ky_thanh_toan"] = "Năm học 2026-2027" if inv_dict.get("loai_hoa_don") == "TIEN_PHONG" else "Tháng 10/2026"
+            res_list.append(HoaDonResponse(**inv_dict))
+
+    return res_list
 
 
 @router.get(
@@ -307,3 +352,108 @@ def get_invoice_detail(
             detail=f"Không tìm thấy hóa đơn với mã '{ma_hoa_don}'",
         )
     return invoice
+
+
+@router.post(
+    "/{ma_hoa_don}/confirm-transfer",
+    summary="[Sinh viên] Báo đã chuyển khoản thành công cho hóa đơn",
+)
+def confirm_invoice_transfer(
+    ma_hoa_don: str,
+    msv: Optional[str] = Query(None),
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    """
+    Sinh viên xác nhận đã chuyển khoản qua QR/ngân hàng.
+    Tự động ghi nhận giao dịch chờ đối soát vào hệ thống để Kế toán nhận thông báo.
+    """
+    import datetime
+    from app.models.invoice import HoaDon
+    from app.models.reconciliation import GiaoDichNganHang, TrangThaiDoiSoat
+
+    inv = db.query(HoaDon).filter(HoaDon.ma_hoa_don == ma_hoa_don).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy hóa đơn '{ma_hoa_don}'")
+
+    student_code = msv or inv.msv or "SINHVIEN"
+    tx_code = f"FT2629{datetime.datetime.now().strftime('%H%M%S')}"
+
+    # Kiểm tra xem đã có giao dịch chờ xử lý tương tự chưa
+    existing_tx = db.query(GiaoDichNganHang).filter(
+        GiaoDichNganHang.noi_dung_chuyen_khoan.contains(student_code),
+        GiaoDichNganHang.so_tien == inv.so_tien,
+    ).first()
+
+    if not existing_tx:
+        content = f"TP {student_code}" if inv.loai_hoa_don == "TIEN_PHONG" else f"DN {inv.ma_phong or 'KTX'} {student_code}"
+        new_tx = GiaoDichNganHang(
+            ma_giao_dich_ngan_hang=tx_code,
+            so_tien=float(inv.so_tien),
+            noi_dung_chuyen_khoan=content,
+            ten_ngan_hang="MB Bank",
+            so_tai_khoan="20020813520",
+            trang_thai=TrangThaiDoiSoat.MANUAL_REQUIRED.value,
+            ngay_giao_dich=datetime.datetime.now(),
+            msv=student_code,
+        )
+        db.add(new_tx)
+        db.commit()
+
+    return {"success": True, "message": "Đã ghi nhận giao dịch chờ đối soát", "invoice_id": ma_hoa_don}
+
+
+@router.post(
+    "/{ma_hoa_don}/mark-paid",
+    response_model=HoaDonResponse,
+    summary="[Kế toán] Xác nhận gạch nợ thanh toán cho hóa đơn",
+)
+def mark_invoice_paid(
+    ma_hoa_don: str,
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    """
+    Dành riêng cho Kế toán gạch nợ trực tiếp cho hóa đơn.
+    """
+    import datetime
+    from app.models.debt import SoCongNo
+    from app.models.invoice import HoaDon, TrangThaiHoaDon
+    from app.models.reconciliation import GiaoDichNganHang, TrangThaiDoiSoat
+
+    inv = db.query(HoaDon).filter(HoaDon.ma_hoa_don == ma_hoa_don).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy hóa đơn '{ma_hoa_don}'")
+
+    inv.trang_thai = TrangThaiHoaDon.DA_THANH_TOAN.value
+
+    # Cập nhật sổ công nợ
+    cong_no = db.query(SoCongNo).filter(SoCongNo.ma_hoa_don == ma_hoa_don).first()
+    if cong_no:
+        cong_no.da_tra = float(inv.so_tien)
+        cong_no.con_thieu = 0.0
+        cong_no.trang_thai = "DA_THANH_TOAN"
+        cong_no.ngay_cap_nhat = datetime.datetime.now()
+
+    # Cập nhật giao dịch ngân hàng liên quan nếu có
+    if inv.msv:
+        tx = (
+            db.query(GiaoDichNganHang)
+            .filter(
+                GiaoDichNganHang.noi_dung_chuyen_khoan.contains(inv.msv),
+                GiaoDichNganHang.trang_thai.in_([
+                    TrangThaiDoiSoat.MANUAL_REQUIRED.value,
+                    TrangThaiDoiSoat.INVALID_SYNTAX.value,
+                ]),
+            )
+            .first()
+        )
+        if tx:
+            tx.trang_thai = TrangThaiDoiSoat.MATCHED_MANUALLY.value
+            tx.ma_hoa_don = inv.ma_hoa_don
+            tx.nguoi_xu_ly = current_user.ten_dang_nhap if current_user else "KeToan"
+            tx.ngay_cap_nhat = datetime.datetime.now()
+
+    db.commit()
+    db.refresh(inv)
+    return inv

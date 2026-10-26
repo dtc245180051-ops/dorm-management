@@ -607,39 +607,34 @@ export default function PeriodicReports({ searchTerm: parentSearch = '' }) {
                 </tr>
               ) : (
                 currentItems.map((row) => (
-                  <tr key={row.invoiceId}>
-                    <td className="font-semibold text-blue-600">{row.invoiceId}</td>
-                    <td>
+                  <tr key={row.invoiceId} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="font-semibold text-blue-600 font-mono text-xs whitespace-nowrap">
+                      {row.invoiceId}
+                    </td>
+                    <td className="whitespace-nowrap">
                       <div className="font-medium text-slate-900">{row.studentName}</div>
                       {row.studentId && (
-                        <div className="text-xs text-slate-500">{row.studentId}</div>
+                        <div className="text-xs text-slate-500 font-mono mt-0.5">{row.studentId}</div>
                       )}
                     </td>
-                    <td>
+                    <td className="whitespace-nowrap">
                       <span className="font-semibold text-slate-800">{row.room}</span>
-                      <div className="text-xs text-slate-500">{row.roomType}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">{row.roomType}</div>
                     </td>
-                    <td>
-                      <span className="inline-flex items-center gap-1">
-                        {row.feeType === 'Điện nước' ? (
-                          <Zap className="w-3.5 h-3.5 text-amber-500" />
-                        ) : (
-                          <Bed className="w-3.5 h-3.5 text-blue-500" />
-                        )}
-                        <span>{row.feeType}</span>
-                      </span>
+                    <td className="whitespace-nowrap font-medium text-slate-700">
+                      {row.feeType}
                     </td>
-                    <td className="text-slate-600 text-xs">{row.period}</td>
-                    <td className="text-right font-medium text-slate-900">
+                    <td className="text-slate-600 text-xs whitespace-nowrap">{row.period}</td>
+                    <td className="text-right font-medium text-slate-900 whitespace-nowrap">
                       {formatVND(row.amount)}
                     </td>
-                    <td className="text-right font-semibold text-emerald-600">
+                    <td className="text-right font-semibold text-emerald-600 whitespace-nowrap">
                       {formatVND(row.paid)}
                     </td>
-                    <td className="text-right font-bold text-rose-600">
+                    <td className="text-right font-bold text-rose-600 whitespace-nowrap">
                       {formatVND(row.remaining)}
                     </td>
-                    <td className="text-center">
+                    <td className="text-center whitespace-nowrap">
                       {row.status === 'PAID' && (
                         <span className="rep-badge rep-badge-paid">
                           <Check className="w-3 h-3" />
@@ -663,7 +658,7 @@ export default function PeriodicReports({ searchTerm: parentSearch = '' }) {
                         </span>
                       )}
                     </td>
-                    <td className="text-xs text-slate-500">{row.dueDate || '--'}</td>
+                    <td className="text-xs text-slate-500 whitespace-nowrap">{row.dueDate || '--'}</td>
                   </tr>
                 ))
               )}

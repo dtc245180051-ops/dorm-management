@@ -151,7 +151,7 @@ def register(
             sv = SinhVien(
                 msv=msv_val,
                 ma_nguoi_dung=new_user.ma_nguoi_dung,
-                lop="DTC-KTX",
+                lop="",
                 gioi_tinh=user_in.gender or "Nam",
             )
             db.add(sv)
@@ -221,6 +221,9 @@ def login(
     )
 
     full_name_val = account.nguoi_dung.ho_ten if account.nguoi_dung else None
+    msv_val = None
+    if account.nguoi_dung and account.nguoi_dung.sinh_vien:
+        msv_val = account.nguoi_dung.sinh_vien.msv
 
     return Token(
         access_token=access_token,
@@ -228,6 +231,7 @@ def login(
         role=role_value,
         username=account.ten_dang_nhap,
         full_name=full_name_val,
+        msv=msv_val,
     )
 
 
@@ -305,7 +309,7 @@ def google_auth(
             sv = SinhVien(
                 msv=msv_val,
                 ma_nguoi_dung=new_user.ma_nguoi_dung,
-                lop="DTC-KTX",
+                lop="",
                 gioi_tinh="Nam",
             )
             db.add(sv)
@@ -326,6 +330,9 @@ def google_auth(
     )
 
     full_name_val = account.nguoi_dung.ho_ten if account.nguoi_dung else account.ten_dang_nhap
+    msv_val = None
+    if account.nguoi_dung and account.nguoi_dung.sinh_vien:
+        msv_val = account.nguoi_dung.sinh_vien.msv
 
     return Token(
         access_token=access_token,
@@ -333,6 +340,7 @@ def google_auth(
         role=role_value,
         username=account.ten_dang_nhap,
         full_name=full_name_val,
+        msv=msv_val,
     )
 
 

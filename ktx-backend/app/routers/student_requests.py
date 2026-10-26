@@ -239,7 +239,7 @@ def register_room(
         new_sv = SinhVien(
             msv=clean_msv,
             ma_nguoi_dung=user.ma_nguoi_dung,
-            lop=req.lop or "DTC-KTX",
+            lop=req.lop or "",
             gioi_tinh=req.gioi_tinh or "Nam",
             khoa=req.khoa or "",
             dia_chi=req.dia_chi or "",
@@ -270,16 +270,28 @@ def register_room(
 
 
 @router.get(
+    "/registration-history",
+    summary="Lấy danh sách các đơn đăng ký của sinh viên (alias)",
+)
+@router.get(
     "/my-requests",
     summary="Lấy danh sách các đơn đăng ký của sinh viên",
 )
-def get_my_registration_requests(msv: Optional[str] = None):
+def get_my_registration_requests(
+    msv: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
     """Trả về danh sách các đơn đăng ký chỗ ở của sinh viên."""
     from app.services import occupancy_request_store
+    from app.services.student_helper import resolve_student_msv
     requests = occupancy_request_store.get_registration_requests()
     if msv:
-        clean_msv = msv.strip().upper()
-        return [r for r in requests if r.get("msv", "").strip().upper() == clean_msv]
+        raw_msv = msv.strip()
+        clean_msv = resolve_student_msv(raw_msv, db) or raw_msv.upper()
+        return [
+            r for r in requests
+            if r.get("msv", "").strip().upper() in (clean_msv, raw_msv.upper())
+        ]
     return requests
 
 
@@ -300,6 +312,8 @@ class CheckoutRoomRequest(BaseModel):
     ly_do: str
     ngay_mong_muon: str
     dia_chi_lien_he: str
+    dia_chi_sau_tra: Optional[str] = None
+    dia_chi_chi_tiet: Optional[Dict[str, Any]] = None
     mo_ta_chi_tiet: Optional[str] = ""
 
 @router.post(
@@ -313,7 +327,34 @@ def submit_transfer_request(
 ):
     """Tiếp nhận yêu cầu xin chuyển phòng từ sinh viên."""
     from app.services import occupancy_request_store
-    stored = occupancy_request_store.add_transfer_request(req.model_dump())
+    data = req.model_dump()
+    clean_msv = (req.msv or "").strip().upper()
+    if clean_msv:
+        student = db.query(SinhVien).filter(SinhVien.msv == clean_msv).first()
+        if student:
+            if not data.get("ho_ten") and student.nguoi_dung:
+                data["ho_ten"] = student.nguoi_dung.ho_ten
+            data["gioi_tinh"] = student.gioi_tinh or data.get("gioi_tinh") or "Nam"
+            data["khoa"] = student.khoa or data.get("khoa") or ""
+            data["lop"] = student.lop or data.get("lop") or ""
+
+            # Tra cứu vị trí phòng hiện tại từ hợp đồng ACTIVE
+            active_c = db.query(HopDong).filter(HopDong.msv == clean_msv, HopDong.trang_thai == "ACTIVE").first()
+            if active_c and active_c.giuong and active_c.giuong.phong:
+                p = active_c.giuong.phong
+                t = p.tang.toa_nha if p.tang else None
+                b_name = t.ten_toa if t else (f"Tòa {p.tang.ma_toa}" if p.tang and p.tang.ma_toa else "KTX")
+                g_code = active_c.giuong.ma_giuong.split("_")[-1] if active_c.giuong.ma_giuong else ""
+                data["vi_tri_hien_tai"] = f"Phòng P{p.so_phong} - {b_name} - Giường {g_code}"
+                data["phong_hien_tai"] = f"P{p.so_phong}"
+
+            # Tra cứu công nợ thực tế của sinh viên
+            try:
+                from app.services.debt_service import DebtService
+                data["cong_no"] = DebtService.get_student_cong_no_label(db, clean_msv)
+            except Exception:
+                data["cong_no"] = "Chưa thanh toán (Chưa phát hành hóa đơn)"
+    stored = occupancy_request_store.add_transfer_request(data)
     return {
         "status": "success",
         "message": "Gửi yêu cầu chuyển phòng thành công",
@@ -332,7 +373,33 @@ def submit_checkout_request(
 ):
     """Tiếp nhận yêu cầu xin trả phòng từ sinh viên."""
     from app.services import occupancy_request_store
-    stored = occupancy_request_store.add_checkout_request(req.model_dump())
+    data = req.model_dump()
+    clean_msv = (req.msv or "").strip().upper()
+    if clean_msv:
+        student = db.query(SinhVien).filter(SinhVien.msv == clean_msv).first()
+        if student:
+            if not data.get("ho_ten") and student.nguoi_dung:
+                data["ho_ten"] = student.nguoi_dung.ho_ten
+            data["gioi_tinh"] = student.gioi_tinh or data.get("gioi_tinh") or "Nam"
+            data["khoa"] = student.khoa or data.get("khoa") or ""
+            data["lop"] = student.lop or data.get("lop") or ""
+
+            active_c = db.query(HopDong).filter(HopDong.msv == clean_msv, HopDong.trang_thai == "ACTIVE").first()
+            if active_c and active_c.giuong and active_c.giuong.phong:
+                p = active_c.giuong.phong
+                t = p.tang.toa_nha if p.tang else None
+                b_name = t.ten_toa if t else (f"Tòa {p.tang.ma_toa}" if p.tang and p.tang.ma_toa else "KTX")
+                g_code = active_c.giuong.ma_giuong.split("_")[-1] if active_c.giuong.ma_giuong else ""
+                data["vi_tri_hien_tai"] = f"Phòng P{p.so_phong} - {b_name} - Giường {g_code}"
+                data["phong_hien_tai"] = f"P{p.so_phong}"
+
+            # Tra cứu công nợ thực tế của sinh viên
+            try:
+                from app.services.debt_service import DebtService
+                data["cong_no"] = DebtService.get_student_cong_no_label(db, clean_msv)
+            except Exception:
+                data["cong_no"] = "Chưa thanh toán (Chưa phát hành hóa đơn)"
+    stored = occupancy_request_store.add_checkout_request(data)
     return {
         "status": "success",
         "message": "Gửi yêu cầu trả phòng thành công",
@@ -359,15 +426,252 @@ def get_current_room(
     from sqlalchemy.orm import joinedload
 
     # Lấy MSV từ query param hoặc tài khoản đang đăng nhập
-    target_msv = msv
-    if not target_msv and current_user and current_user.nguoi_dung and current_user.nguoi_dung.sinh_vien:
-        target_msv = current_user.nguoi_dung.sinh_vien.msv
-    if not target_msv and current_user and current_user.ten_dang_nhap and "DTC" in current_user.ten_dang_nhap.upper():
-        target_msv = current_user.ten_dang_nhap.upper()
-    if not target_msv:
-        target_msv = "DTC245180051"
+    target_msv = (msv or "").strip().upper() if msv else None
+    if not target_msv and current_user:
+        if current_user.nguoi_dung and current_user.nguoi_dung.sinh_vien:
+            target_msv = current_user.nguoi_dung.sinh_vien.msv
+        elif current_user.ten_dang_nhap:
+            target_msv = current_user.ten_dang_nhap.upper()
 
-    # Tìm hợp đồng ACTIVE cho MSV
+    if not target_msv:
+        return {"data": None, "message": "Chưa xác định được sinh viên"}
+
+    def _compute_student_billing(student_msv: str, contract_no: Optional[str] = None):
+        from app.models.invoice import HoaDon, LoaiHoaDon, TrangThaiHoaDon
+        from app.models.reconciliation import GiaoDichNganHang, TrangThaiDoiSoat
+
+        clean_msv = (student_msv or "").strip().upper()
+        
+        # 1. Tìm hóa đơn tiền phòng trực tiếp theo hợp đồng hoặc MSV (CHỈ LẤY TIEN_PHONG, KHÔNG LẤY ĐIỆN NƯỚC)
+        room_inv = None
+        if contract_no:
+            room_inv = (
+                db.query(HoaDon)
+                .filter(
+                    HoaDon.ma_hop_dong == contract_no,
+                    HoaDon.loai_hoa_don == LoaiHoaDon.TIEN_PHONG.value,
+                )
+                .first()
+            )
+        if not room_inv and clean_msv:
+            room_inv = (
+                db.query(HoaDon)
+                .filter(
+                    HoaDon.msv.ilike(clean_msv),
+                    HoaDon.loai_hoa_don == LoaiHoaDon.TIEN_PHONG.value,
+                )
+                .order_by(HoaDon.ngay_lap.desc())
+                .first()
+            )
+
+        if room_inv:
+            so_tien = int(room_inv.so_tien) if room_inv.so_tien else 4800000
+            amt_str = f"{so_tien:,}".replace(",", ".") + " đ"
+
+            # Kiểm tra xem tiền phòng đã thanh toán / đối soát thành công chưa
+            is_paid = (room_inv.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value)
+            if not is_paid:
+                matched_tx = (
+                    db.query(GiaoDichNganHang)
+                    .filter(
+                        GiaoDichNganHang.ma_hoa_don == room_inv.ma_hoa_don,
+                        GiaoDichNganHang.trang_thai.in_([
+                            TrangThaiDoiSoat.MATCHED.value,
+                            TrangThaiDoiSoat.AUTO_MATCHED.value,
+                            TrangThaiDoiSoat.MATCHED_MANUALLY.value,
+                        ]),
+                    )
+                    .all()
+                )
+                paid_amt = sum(float(t.so_tien) for t in matched_tx)
+                if paid_amt >= float(room_inv.so_tien):
+                    is_paid = True
+
+            return {
+                "amount": amt_str,
+                "period": "/năm",
+                "status": "Đã thanh toán" if is_paid else "Chưa thanh toán",
+            }
+
+        # 2. Nếu chưa có hóa đơn tiền phòng nhưng đang có hợp đồng ACTIVE
+        from app.models.contract import HopDong
+        active_contract = (
+            db.query(HopDong)
+            .filter(HopDong.msv.ilike(clean_msv), HopDong.trang_thai == "ACTIVE")
+            .first()
+        )
+        if active_contract:
+            rent = 4800000
+            if active_contract.tong_tien_thue:
+                rent = int(active_contract.tong_tien_thue)
+            elif active_contract.don_gia_dinh_ky:
+                rent = int(active_contract.don_gia_dinh_ky)
+            elif active_contract.giuong and active_contract.giuong.phong and active_contract.giuong.phong.don_gia:
+                rent = int(active_contract.giuong.phong.don_gia)
+
+            amt_str = f"{rent:,}".replace(",", ".") + " đ"
+            return {
+                "amount": amt_str,
+                "period": "/năm",
+                "status": "Chưa thanh toán",
+            }
+
+        return None
+
+    # 0. Kiểm tra nếu sinh viên đã được duyệt trả phòng (checkout)
+    checkout_req = next(
+        (
+            r for r in occupancy_request_store.get_transfer_checkout_requests()
+            if r.get("msv", "").strip().upper() == target_msv
+            and (r.get("trang_thai") in ("DA_DUYET", "APPROVED") or r.get("trang_thai_label") == "Đã duyệt")
+            and r.get("loai_don") == "TRA_PHONG"
+        ),
+        None,
+    )
+    if checkout_req:
+        return {"data": None, "message": "Sinh viên đã hoàn tất thủ tục trả phòng"}
+
+    # 1. Kiểm tra nếu sinh viên đã được duyệt chuyển phòng trong occupancy_request_store
+    transfer_req = next(
+        (
+            r for r in occupancy_request_store.get_transfer_checkout_requests()
+            if r.get("msv", "").strip().upper() == target_msv
+            and (r.get("trang_thai") in ("DA_DUYET", "APPROVED") or r.get("trang_thai_label") == "Đã duyệt")
+            and r.get("loai_don") == "CHUYEN_PHONG"
+        ),
+        None,
+    )
+    if transfer_req and transfer_req.get("xep_phong"):
+        import re
+        xp = transfer_req["xep_phong"]
+        raw_toa = str(xp.get("ma_toa", "A1"))
+        toa_clean = raw_toa.replace("TOA_", "").replace("Tòa ", "").replace("Tòa", "").strip() or "A1"
+        toa_label = f"Tòa {toa_clean}"
+        raw_phong = str(xp.get("phong_id", "203"))
+        match_num = re.search(r"\d+", raw_phong)
+        phong_clean = match_num.group(0) if match_num else "203"
+        raw_giuong = str(xp.get("giuong_id", "G01"))
+        giuong_clean = raw_giuong.split("_")[-1].replace("Giường ", "").strip() or "G01"
+        tang_val = phong_clean[0] if (phong_clean and phong_clean[0].isdigit()) else "2"
+        date_gui = transfer_req.get("ngay_gui", "19/10/2026")
+        if " " in date_gui:
+            date_gui = date_gui.split(" ")[0]
+
+        stu_record = db.query(SinhVien).filter(SinhVien.msv == target_msv).first()
+        user_record = stu_record.nguoi_dung if stu_record else None
+        stu_name = user_record.ho_ten if user_record else (transfer_req.get("ho_ten") or "Sinh viên")
+        stu_phone = user_record.so_dien_thoai if user_record else (transfer_req.get("so_dien_thoai") or "")
+        stu_lop = stu_record.lop if stu_record else (transfer_req.get("lop") or "")
+        stu_khoa = stu_record.khoa if stu_record else (transfer_req.get("khoa") or "")
+
+        target_phong = db.query(Phong).filter(
+            (Phong.so_phong == phong_clean) | (Phong.ma_phong.ilike(f"%{phong_clean}%"))
+        ).first()
+
+        members_transfer = []
+        if target_phong:
+            room_beds = db.query(Giuong).filter(Giuong.ma_phong == target_phong.ma_phong).all()
+            room_contracts = (
+                db.query(HopDong)
+                .options(joinedload(HopDong.sinh_vien).joinedload(SinhVien.nguoi_dung))
+                .filter(HopDong.ma_giuong.in_([b.ma_giuong for b in room_beds]), HopDong.trang_thai == "ACTIVE")
+                .all()
+            )
+            contract_by_bed = {c.ma_giuong: c for c in room_contracts}
+            for b in room_beds:
+                short_b = b.ma_giuong.split("_")[-1]
+                if short_b == giuong_clean or b.ma_giuong == xp.get("giuong_id"):
+                    members_transfer.append({
+                        "msv": target_msv,
+                        "ho_ten": stu_name,
+                        "giuong": short_b,
+                        "so_giuong": short_b,
+                        "lop": stu_lop,
+                        "khoa": stu_khoa,
+                        "so_dien_thoai": stu_phone,
+                        "vai_tro": "Bạn (Trưởng phòng)",
+                        "ngay_vao": date_gui,
+                        "trang_thai": "DANG_O",
+                        "trang_thai_label": "Đang ở",
+                        "is_current_user": True,
+                    })
+                elif b.ma_giuong in contract_by_bed and contract_by_bed[b.ma_giuong].sinh_vien:
+                    bed_c = contract_by_bed[b.ma_giuong]
+                    sv_user = bed_c.sinh_vien.nguoi_dung
+                    members_transfer.append({
+                        "msv": bed_c.msv,
+                        "ho_ten": sv_user.ho_ten if sv_user else "Sinh viên",
+                        "giuong": short_b,
+                        "so_giuong": short_b,
+                        "lop": bed_c.sinh_vien.lop or "",
+                        "khoa": bed_c.sinh_vien.khoa or "",
+                        "so_dien_thoai": sv_user.so_dien_thoai if sv_user else "",
+                        "vai_tro": "Thành viên",
+                        "ngay_vao": bed_c.ngay_bat_dau.strftime("%d/%m/%Y") if bed_c.ngay_bat_dau else date_gui,
+                        "trang_thai": "DANG_O",
+                        "trang_thai_label": "Đang ở",
+                        "is_current_user": False,
+                    })
+                else:
+                    members_transfer.append({
+                        "msv": None,
+                        "ho_ten": "Chưa có người ở",
+                        "giuong": short_b,
+                        "so_giuong": short_b,
+                        "lop": None,
+                        "khoa": None,
+                        "so_dien_thoai": None,
+                        "vai_tro": "Chỗ trống",
+                        "ngay_vao": None,
+                        "trang_thai": "TRONG",
+                        "trang_thai_label": "Còn trống",
+                        "is_empty": True,
+                    })
+        else:
+            members_transfer.append({
+                "msv": target_msv,
+                "ho_ten": stu_name,
+                "giuong": giuong_clean,
+                "so_giuong": giuong_clean,
+                "lop": stu_lop,
+                "khoa": stu_khoa,
+                "so_dien_thoai": stu_phone,
+                "vai_tro": "Bạn (Trưởng phòng)",
+                "ngay_vao": date_gui,
+                "trang_thai": "DANG_O",
+                "trang_thai_label": "Đang ở",
+                "is_current_user": True,
+            })
+
+        actual_members_count = len([m for m in members_transfer if not m.get("is_empty") and m.get("msv")]) or 1
+        room_capacity = target_phong.suc_chua if (target_phong and target_phong.suc_chua) else 4
+
+        return {
+            "data": {
+                "so_phong": phong_clean,
+                "phong": f"P{phong_clean}",
+                "toa": toa_label,
+                "tang": tang_val,
+                "loai_phong": (target_phong.loai_phong if target_phong and target_phong.loai_phong else "Phòng tiêu chuẩn"),
+                "roomType": (target_phong.loai_phong if target_phong and target_phong.loai_phong else "Phòng tiêu chuẩn"),
+                "thanh_vien": f"{actual_members_count}/{room_capacity} người",
+                "so_thanh_vien": actual_members_count,
+                "suc_chua": f"{room_capacity} người",
+                "ma_giuong": f"P{phong_clean}_{giuong_clean}",
+                "giuong": giuong_clean,
+                "so_giuong": giuong_clean,
+                "ma_hop_dong": f"HD26-{toa_clean}{phong_clean}-{giuong_clean}",
+                "ngay_nhan_phong": date_gui,
+                "ngay_duyet": date_gui,
+                "ngay_bat_dau": date_gui,
+                "ngay_ket_thuc": "30/06/2027",
+                "thoi_gian_luu_tru": f"{date_gui} – Nay",
+                "billing": _compute_student_billing(target_msv),
+                "danh_sach_thanh_vien": members_transfer,
+            }
+        }
+
+    # Tìm hợp đồng ACTIVE cho MSV thực tế
     active_contract = (
         db.query(HopDong)
         .options(
@@ -379,20 +683,6 @@ def get_current_room(
         .filter(HopDong.msv == target_msv, HopDong.trang_thai == "ACTIVE")
         .first()
     )
-
-    # Nếu không thấy hợp đồng của DTC245180051, thử tìm theo tên sinh viên hoặc DTC245180028
-    if not active_contract and target_msv in ["DTC245180051", "dtc245180051"]:
-        active_contract = (
-            db.query(HopDong)
-            .options(
-                joinedload(HopDong.giuong)
-                .joinedload(Giuong.phong)
-                .joinedload(Phong.tang)
-                .joinedload(Tang.toa_nha)
-            )
-            .filter(HopDong.msv.in_(["DTC245180028", "DTC245180051"]), HopDong.trang_thai == "ACTIVE")
-            .first()
-        )
 
     if not active_contract or not active_contract.giuong or not active_contract.giuong.phong:
         return {"data": None, "message": "Sinh viên chưa được xếp phòng"}
@@ -412,55 +702,67 @@ def get_current_room(
     suc_chua = room.suc_chua or 4
     thanh_vien = f"{occupied_count}/{suc_chua} người"
 
-    # Tìm khoản phí hoặc hóa đơn liên quan đến hợp đồng này
-    inv = (
-        db.query(HoaDon)
-        .filter(HoaDon.ma_hop_dong == active_contract.ma_hop_dong)
-        .first()
-    )
-    if not inv and target_msv:
-        inv = (
-            db.query(HoaDon)
-            .filter(HoaDon.msv == target_msv)
-            .first()
-        )
+    # Lấy thông tin thanh toán công nợ thực tế của sinh viên
+    billing = _compute_student_billing(target_msv, active_contract.ma_hop_dong)
 
-    phi = (
-        db.query(Phi)
-        .filter(Phi.ma_hop_dong == active_contract.ma_hop_dong, Phi.loai_phi == "TIEN_PHONG")
-        .first()
-    )
-
-    billing = None
-    if inv:
-        so_tien = int(inv.so_tien) if inv.so_tien else 400000
-        so_tien_fmt = f"{so_tien:,}".replace(",", ".") + " đ"
-        trang_thai_phi = "Đã thanh toán" if inv.trang_thai == TrangThaiHoaDon.DA_THANH_TOAN.value else "Chưa thanh toán"
-        billing = {
-            "amount": so_tien_fmt,
-            "period": "/tháng",
-            "status": trang_thai_phi,
-        }
-    elif phi:
-        so_tien = int(phi.so_tien) if phi.so_tien else 350000
-        so_tien_fmt = f"{so_tien:,}".replace(",", ".") + " đ"
-        is_paid = len(phi.thanh_toans) > 0 if phi.thanh_toans else False
-        billing = {
-            "amount": so_tien_fmt,
-            "period": "/tháng",
-            "status": "Đã thanh toán" if is_paid else "Chưa thanh toán",
-        }
-    else:
-        billing = {
-            "amount": "400.000 đ",
-            "period": "/tháng",
-            "status": "Đã thanh toán",
-        }
-
-    toa_label = building.ten_toa if building else (f"Tòa {floor.ma_toa}" if floor and floor.ma_toa else "Tòa A1")
+    toa_label = building.ten_toa if building else (f"Tòa {floor.ma_toa}" if floor and floor.ma_toa else "KTX")
     tang_val = str(floor.so_tang) if floor and floor.so_tang else "1"
-    clean_so_phong = str(room.so_phong).replace("P", "").strip() if room.so_phong else "101"
-    bed_code = bed.ma_giuong.split("_")[-1] if bed.ma_giuong else "G04"
+    clean_so_phong = str(room.so_phong).replace("P", "").strip() if room.so_phong else ""
+    bed_code = bed.ma_giuong.split("_")[-1] if bed.ma_giuong else ""
+
+    # Lấy danh sách thành viên theo giường trong phòng từ DB
+    room_beds = db.query(Giuong).filter(Giuong.ma_phong == room.ma_phong).all()
+    room_contracts = (
+        db.query(HopDong)
+        .options(joinedload(HopDong.sinh_vien).joinedload(SinhVien.nguoi_dung))
+        .filter(HopDong.ma_giuong.in_([b.ma_giuong for b in room_beds]), HopDong.trang_thai == "ACTIVE")
+        .all()
+    )
+    contract_by_bed = {c.ma_giuong: c for c in room_contracts}
+    members_list = []
+    for b in room_beds:
+        bed_c = contract_by_bed.get(b.ma_giuong)
+        short_b = b.ma_giuong.split("_")[-1]
+        if bed_c and bed_c.sinh_vien:
+            sv_user = bed_c.sinh_vien.nguoi_dung
+            is_me = (bed_c.msv or "").upper() == (target_msv or "").upper()
+            members_list.append({
+                "msv": bed_c.msv,
+                "ho_ten": sv_user.ho_ten if sv_user else "Sinh viên",
+                "giuong": short_b,
+                "so_giuong": short_b,
+                "lop": bed_c.sinh_vien.lop or "",
+                "khoa": bed_c.sinh_vien.khoa or "",
+                "so_dien_thoai": sv_user.so_dien_thoai if sv_user else "",
+                "vai_tro": "Bạn (Trưởng phòng)" if is_me else "Thành viên",
+                "ngay_vao": bed_c.ngay_bat_dau.strftime("%d/%m/%Y") if bed_c.ngay_bat_dau else "01/09/2026",
+                "trang_thai": "DANG_O",
+                "trang_thai_label": "Đang ở",
+                "is_current_user": is_me,
+            })
+        else:
+            members_list.append({
+                "msv": None,
+                "ho_ten": "Chưa có người ở",
+                "giuong": short_b,
+                "so_giuong": short_b,
+                "lop": None,
+                "khoa": None,
+                "so_dien_thoai": None,
+                "vai_tro": "Chỗ trống",
+                "ngay_vao": None,
+                "trang_thai": "TRONG",
+                "trang_thai_label": "Còn trống",
+                "is_empty": True,
+            })
+
+    loai_phong_val = room.loai_phong
+    if not loai_phong_val:
+        reg_item = occupancy_request_store.get_request_by_id(target_msv)
+        if reg_item:
+            loai_phong_val = reg_item.get("loai_phong")
+    if not loai_phong_val:
+        loai_phong_val = "Phòng dịch vụ" if (room.gia_tien_nam and room.gia_tien_nam > 5000000) else "Phòng tiêu chuẩn"
 
     return {
         "data": {
@@ -468,6 +770,8 @@ def get_current_room(
             "phong": clean_so_phong,
             "toa": toa_label,
             "tang": tang_val,
+            "loai_phong": loai_phong_val,
+            "roomType": loai_phong_val,
             "thanh_vien": thanh_vien,
             "so_thanh_vien": occupied_count,
             "suc_chua": f"{suc_chua} người",
@@ -480,6 +784,7 @@ def get_current_room(
             "ngay_bat_dau": active_contract.ngay_bat_dau.strftime("%d/%m/%Y") if active_contract.ngay_bat_dau else "01/09/2026",
             "ngay_ket_thuc": (active_contract.ngay_ket_thuc or active_contract.ngay_bat_dau.replace(year=active_contract.ngay_bat_dau.year + 1)).strftime("%d/%m/%Y") if active_contract.ngay_bat_dau else "30/06/2027",
             "billing": billing,
+            "danh_sach_thanh_vien": members_list,
         },
         "message": "OK",
     }
@@ -489,10 +794,51 @@ def get_current_room(
     "/transfer-checkout-history",
     summary="Lấy lịch sử các yêu cầu chuyển và trả phòng",
 )
-def get_transfer_checkout_history():
+def get_transfer_checkout_history(db: Session = Depends(get_db)):
     """Lấy danh sách lịch sử yêu cầu chuyển và trả phòng."""
     from app.services import occupancy_request_store
-    return occupancy_request_store.get_transfer_checkout_requests()
+    from app.models.user import SinhVien
+    reqs = occupancy_request_store.get_transfer_checkout_requests()
+    reg_reqs = occupancy_request_store.get_all_requests()
+    enriched = []
+    for r in reqs:
+        item = dict(r)
+        r_msv = (item.get("msv") or "").strip().upper()
+        # 1. Đồng bộ thông tin từ REGISTRATION_REQUESTS
+        reg = next((reg for reg in reg_reqs if (reg.get("msv") or "").strip().upper() == r_msv), None)
+        if reg:
+            for field in [
+                "ngay_sinh", "cccd", "so_dien_thoai", "email", "dia_chi",
+                "que_quan", "khoa", "lop", "nguoi_giam_ho", "moi_quan_he",
+                "sdt_nguoi_giam_ho", "doi_tuong_uu_tien",
+            ]:
+                if not item.get(field) and reg.get(field):
+                    item[field] = reg.get(field)
+        # 2. Tìm thông tin trong DB SinhVien nếu vẫn còn thiếu
+        if r_msv:
+            sv = db.query(SinhVien).filter(SinhVien.msv == r_msv).first()
+            if sv:
+                u = sv.nguoi_dung
+                if not item.get("ho_ten") and u and u.ho_ten:
+                    item["ho_ten"] = u.ho_ten
+                if not item.get("email") and u and u.email:
+                    item["email"] = u.email
+                if not item.get("so_dien_thoai") and u and u.so_dien_thoai:
+                    item["so_dien_thoai"] = u.so_dien_thoai
+                if not item.get("cccd") and sv.cccd:
+                    item["cccd"] = sv.cccd
+                if not item.get("ngay_sinh") and sv.ngay_sinh:
+                    item["ngay_sinh"] = sv.ngay_sinh.strftime("%Y-%m-%d") if hasattr(sv.ngay_sinh, "strftime") else str(sv.ngay_sinh)
+                if not item.get("dia_chi") and (sv.dia_chi or sv.que_quan):
+                    item["dia_chi"] = sv.dia_chi or sv.que_quan
+                if not item.get("nguoi_giam_ho") and sv.nguoi_giam_ho:
+                    item["nguoi_giam_ho"] = sv.nguoi_giam_ho
+                if not item.get("moi_quan_he") and sv.moi_quan_he:
+                    item["moi_quan_he"] = sv.moi_quan_he
+                if not item.get("sdt_nguoi_giam_ho") and sv.sdt_nguoi_giam_ho:
+                    item["sdt_nguoi_giam_ho"] = sv.sdt_nguoi_giam_ho
+        enriched.append(item)
+    return enriched
 
 
 @router.get(
@@ -506,13 +852,41 @@ def get_my_stay_contracts(
     """Trả về danh sách các hợp đồng/lịch sử ở của sinh viên."""
     if not msv:
         return []
+    from sqlalchemy import or_
     from app.models.contract import HopDong
     from app.models.dorm import Giuong, Phong, Tang, ToaNha
+    from app.services.student_helper import resolve_student_msv
 
-    clean_msv = msv.strip().upper()
+    raw_msv = msv.strip()
+    clean_msv = resolve_student_msv(raw_msv, db) or raw_msv.upper()
+    from app.services import occupancy_request_store
+    import re
+
+    # 1. Kiểm tra yêu cầu chuyển phòng đã duyệt
+    transfer_req = next(
+        (
+            r for r in occupancy_request_store.get_transfer_checkout_requests()
+            if r.get("msv", "").strip().upper() in (clean_msv, raw_msv.upper())
+            and (r.get("trang_thai") in ("DA_DUYET", "APPROVED") or r.get("trang_thai_label") == "Đã duyệt")
+            and r.get("loai_don") == "CHUYEN_PHONG"
+        ),
+        None,
+    )
+
+    # 2. Kiểm tra yêu cầu trả phòng đã duyệt
+    checkout_req = next(
+        (
+            r for r in occupancy_request_store.get_transfer_checkout_requests()
+            if r.get("msv", "").strip().upper() in (clean_msv, raw_msv.upper())
+            and (r.get("trang_thai") in ("DA_DUYET", "APPROVED") or r.get("trang_thai_label") == "Đã duyệt")
+            and r.get("loai_don") == "TRA_PHONG"
+        ),
+        None,
+    )
+
     contracts = (
         db.query(HopDong)
-        .filter(HopDong.msv == clean_msv)
+        .filter(or_(HopDong.msv == clean_msv, HopDong.msv == raw_msv.upper()))
         .order_by(HopDong.ngay_bat_dau.desc())
         .all()
     )
@@ -524,11 +898,20 @@ def get_my_stay_contracts(
         toa = db.query(ToaNha).filter(ToaNha.ma_toa == tang.ma_toa).first() if tang else None
 
         status_val = c.trang_thai.value if hasattr(c.trang_thai, "value") else str(c.trang_thai)
-        status_label = (
-            "Đang ở" if status_val == "ACTIVE"
-            else "Đã kết thúc" if status_val == "TERMINATED"
-            else "Đã chuyển phòng"
-        )
+        if checkout_req:
+            final_status = "DA_TRA_PHONG"
+            final_label = "Đã kết thúc"
+        elif transfer_req:
+            final_status = "DA_CHUYEN"
+            final_label = "Đã chuyển phòng"
+        else:
+            final_status = "DANG_O" if status_val == "ACTIVE" else "KET_THUC"
+            final_label = (
+                "Đang ở" if status_val == "ACTIVE"
+                else "Đã kết thúc" if status_val == "TERMINATED"
+                else "Đã chuyển phòng"
+            )
+
         # Sức chứa thực tế từ CSDL
         suc_chua_val = f"{phong.suc_chua} người" if phong and phong.suc_chua else "4 người"
 
@@ -569,8 +952,52 @@ def get_my_stay_contracts(
             "thoi_han_hop_dong": f"{start_date_str} - {end_date_str}",
             "thoi_gian_o": "2026-2027",
             "nam_hoc": "2026-2027",
-            "trang_thai": "DANG_O" if status_val == "ACTIVE" else "KET_THUC",
-            "trang_thai_label": status_label,
+            "trang_thai": final_status,
+            "trang_thai_label": final_label,
+            "status": "TRANSFERRED" if final_status == "DA_CHUYEN" else ("ACTIVE" if final_status == "DANG_O" else "COMPLETED"),
         })
+
+    # Nếu có yêu cầu chuyển phòng được duyệt, chèn hợp đồng phòng mới lên đầu
+    if transfer_req and transfer_req.get("xep_phong") and not checkout_req:
+        xp = transfer_req["xep_phong"]
+        raw_toa = str(xp.get("ma_toa", "A1"))
+        toa_clean = raw_toa.replace("TOA_", "").replace("Tòa ", "").replace("Tòa", "").strip() or "A1"
+        toa_label = f"Tòa {toa_clean}"
+        raw_phong = str(xp.get("phong_id", "203"))
+        match_num = re.search(r"\d+", raw_phong)
+        phong_clean = match_num.group(0) if match_num else "203"
+        raw_giuong = str(xp.get("giuong_id", "G01"))
+        giuong_clean = raw_giuong.split("_")[-1].replace("Giường ", "").strip() or "G01"
+        tang_val = phong_clean[0] if (phong_clean and phong_clean[0].isdigit()) else "2"
+        date_gui = transfer_req.get("ngay_gui", "19/10/2026")
+        if " " in date_gui:
+            date_gui = date_gui.split(" ")[0]
+
+        results.insert(0, {
+            "id": f"HD-{toa_clean}{phong_clean}-{giuong_clean}",
+            "ma_hop_dong": f"HD26-{toa_clean}{phong_clean}-{giuong_clean}",
+            "msv": clean_msv,
+            "phong": f"P{phong_clean}",
+            "so_phong": phong_clean,
+            "ma_phong": f"P{phong_clean}_{toa_clean}",
+            "toa": toa_label,
+            "tang": tang_val,
+            "giuong": giuong_clean,
+            "so_giuong": giuong_clean,
+            "ma_giuong": f"P{phong_clean}_{toa_clean}_{giuong_clean}",
+            "loai_phong": "Phòng tiêu chuẩn",
+            "suc_chua": "4 người",
+            "ngay_nhan_phong": date_gui,
+            "ngay_bat_dau": date_gui,
+            "ngay_duyet": date_gui,
+            "ngay_ket_thuc": "30/06/2027",
+            "thoi_han_hop_dong": f"{date_gui} - 30/06/2027",
+            "thoi_gian_o": "2026-2027",
+            "nam_hoc": "2026-2027",
+            "trang_thai": "DANG_O",
+            "trang_thai_label": "Đang ở",
+            "status": "ACTIVE",
+        })
+
     return results
 

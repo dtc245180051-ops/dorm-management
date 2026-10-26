@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 /**
  * Service gọi API quản lý Hóa đơn định kỳ dành cho Kế toán (KeToan)
@@ -241,6 +241,53 @@ export const invoiceService = {
     } catch (error) {
       console.warn('Lỗi getMyInvoices:', error);
       return [];
+    }
+  },
+
+  /**
+   * Sinh viên báo đã chuyển khoản thành công cho hóa đơn
+   */
+  async confirmTransfer(invoiceId, msv) {
+    try {
+      const headers = await this.getAuthHeaders();
+      const params = new URLSearchParams();
+      if (msv) params.append('msv', msv);
+
+      const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/confirm-transfer?${params.toString()}`, {
+        method: 'POST',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Lỗi confirmTransfer: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.warn('Lỗi confirmTransfer:', error);
+      return { success: false };
+    }
+  },
+
+  /**
+   * Kế toán gạch nợ trực tiếp cho hóa đơn
+   */
+  async markInvoicePaid(invoiceId) {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/mark-paid`, {
+        method: 'POST',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Lỗi markInvoicePaid: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.warn('Lỗi markInvoicePaid:', error);
+      return null;
     }
   },
 };

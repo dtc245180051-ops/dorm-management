@@ -65,6 +65,10 @@ class PhanAnh(Base):
         Text,
         nullable=True,
     )
+    ghi_chu_xu_ly: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
     ngay_tao: Mapped[Optional[datetime.datetime]] = mapped_column(
         DateTime,
         nullable=True,
@@ -104,6 +108,52 @@ class ViPham(Base):
     hinh_thuc_xu_ly: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
+    )
+    trang_thai: Mapped[str] = mapped_column(
+        String(20),
+        default="CHO_XU_LY",
+        nullable=False,
+    )
+    dia_diem: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    thoi_diem: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    nhom_vi_pham: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    bang_chung: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    nguoi_lap: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    ghi_chu: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    sub_status: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        default="CHO_GIAI_TRINH",
+        nullable=True,
+    )
+    quyet_dinh: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    giai_trinh: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    giai_trinh_at: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
     )
 
     # Quan hệ N-1 với SinhVien

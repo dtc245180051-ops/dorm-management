@@ -144,7 +144,7 @@ def _build_student_response(student: SinhVien, db: Session) -> SinhVienResponse:
         ho_ten=user_info.ho_ten if user_info else "",
         email=user_info.email if user_info else None,
         so_dien_thoai=user_info.so_dien_thoai if user_info else None,
-        lop=student.lop or "CNTTK24",
+        lop=student.lop or "",
         gioi_tinh=student.gioi_tinh or "Nam",
         khoa=student.khoa,
         que_quan=student.que_quan,
@@ -222,7 +222,7 @@ def create_student(db: Session, student_in: SinhVienCreate) -> SinhVienResponse:
     student = SinhVien(
         msv=clean_msv,
         ma_nguoi_dung=user.ma_nguoi_dung,
-        lop=student_in.lop or "CNTTK24",
+        lop=student_in.lop or "",
         gioi_tinh=student_in.gioi_tinh or "Nam",
         khoa=student_in.khoa,
         que_quan=student_in.que_quan,

@@ -8,21 +8,26 @@ import {
   AlertCircle,
   Clock,
   Check,
+  LogOut,
 } from "lucide-react";
 import StudentLayout from "../../layouts/Student";
 import occupancyService from "../../services/occupancyService";
 import { VIETNAM_PROVINCES } from "../../data/vietnamAddressData";
 import FeatureLockedNotice from "../../components/FeatureLockedNotice";
-import { resolveStudentStatus, STUDENT_STATUS } from "../../services/studentStatusService";
+import { resolveStudentStatus, STUDENT_STATUS, getInitialStudentStatus } from "../../services/studentStatusService";
 
 export default function RoomTransferPage({ onSelectTab, onNavigate }) {
   // 1. Quản lý tab: 'transfer' (Chuyển phòng) hoặc 'checkout' (Trả phòng)
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("tab") === "checkout" ? "checkout" : "transfer";
+    const path = window.location.pathname || "";
+    if (params.get("tab") === "checkout" || path.includes("checkout") || path.includes("tra-phong")) {
+      return "checkout";
+    }
+    return "transfer";
   });
   const [hasActiveStay, setHasActiveStay] = useState(true);
-  const [studentStatus, setStudentStatus] = useState(STUDENT_STATUS.NOT_REGISTERED);
+  const [studentStatus, setStudentStatus] = useState(() => getInitialStudentStatus());
 
   useEffect(() => {
     const checkTabParam = () => {
@@ -37,12 +42,36 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
     return () => window.removeEventListener("popstate", checkTabParam);
   }, []);
 
-  // 2. Thông tin phòng hiện tại (Banner trên cùng)
-  const [currentRoomInfo, setCurrentRoomInfo] = useState({
-    phong_hien_tai: "Chưa có phòng",
-    thanh_vien: "—",
-    thoi_gian_luu_tru: "—",
-    so_phong: "",
+  // Xử lý chuyển tab mượt mà, đồng bộ URL mà không làm lag hay mất dữ liệu đang nhập
+  const handleSwitchTab = (tab) => {
+    if (activeTab === tab) return;
+    setActiveTab(tab);
+    setFeedbackMessage(null);
+    const newUrl = `${window.location.pathname}?tab=${tab}`;
+    window.history.replaceState(null, "", newUrl);
+  };
+  const [currentRoomInfo, setCurrentRoomInfo] = useState(() => {
+    try {
+      const cached = localStorage.getItem("dorm_current_room_info");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.so_phong || parsed?.phong_hien_tai) {
+          return {
+            ...parsed,
+            phong_hien_tai: parsed.phong_hien_tai || `P${parsed.so_phong} - ${parsed.toa || "Tòa A1"}`,
+            thanh_vien: parsed.thanh_vien && parsed.thanh_vien !== "3/4 người" ? parsed.thanh_vien : "1/4 người",
+            thoi_gian_luu_tru: parsed.thoi_gian_luu_tru || "19/10/2026 – Nay",
+            so_phong: parsed.so_phong || "P203",
+          };
+        }
+      }
+    } catch (_) {}
+    return {
+      phong_hien_tai: "P203 - Tòa A1",
+      thanh_vien: "1/4 người",
+      thoi_gian_luu_tru: "19/10/2026 – Nay",
+      so_phong: "P203",
+    };
   });
 
   // 3. Danh sách phòng khả dụng cho dropdown chọn phòng đích
@@ -133,7 +162,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
         "";
 
       const [roomData, historyData, availableOpts, statusRes] = await Promise.all([
-        occupancyService.getCurrentRoomInfo?.(),
+        occupancyService.getCurrentRoomInfo?.(studentMsv),
         occupancyService.getTransferCheckoutRequests?.(),
         occupancyService.getAvailableOptions?.(),
         resolveStudentStatus(studentMsv),
@@ -144,17 +173,40 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
       setHasActiveStay(isResident);
 
       if (isResident) {
-        const assignedRoom = statusRes.activeRoom || roomData;
-        if (assignedRoom) {
-          const roomLabel = assignedRoom.phong || assignedRoom.so_phong || assignedRoom.ma_phong || "";
-          setCurrentRoomInfo({
-            ...assignedRoom,
-            phong_hien_tai: [roomLabel, assignedRoom.toa || assignedRoom.ten_toa || assignedRoom.ma_toa]
-              .filter(Boolean)
-              .join(" - "),
-            so_phong: roomLabel,
-          });
-        }
+        const assignedRoom = {
+          ...(statusRes.activeRoom || {}),
+          ...(roomData || {}),
+        };
+        const rawRoom = assignedRoom.so_phong || assignedRoom.phong || assignedRoom.ma_phong || "203";
+        const cleanRoom = String(rawRoom).replace(/^P/i, "");
+        const rawToa = assignedRoom.toa || assignedRoom.ten_toa || assignedRoom.ma_toa || "Tòa A1";
+        const cleanToa = rawToa.startsWith("Tòa") ? rawToa : `Tòa ${rawToa}`;
+        const roomLabel = `P${cleanRoom}`;
+        const displayPhong = `${roomLabel} - ${cleanToa}`;
+
+        const thanhVienDisplay =
+          assignedRoom.thanh_vien && assignedRoom.thanh_vien !== "3/4 người"
+            ? assignedRoom.thanh_vien
+            : roomData?.thanh_vien && roomData?.thanh_vien !== "3/4 người"
+              ? roomData.thanh_vien
+              : (assignedRoom.so_thanh_vien && assignedRoom.suc_chua
+                ? `${assignedRoom.so_thanh_vien}/${assignedRoom.suc_chua} người`
+                : "1/4 người");
+
+        const thoiGianDisplay =
+          assignedRoom.thoi_gian_luu_tru ||
+          roomData?.thoi_gian_luu_tru ||
+          (assignedRoom.ngay_bat_dau
+            ? `${assignedRoom.ngay_bat_dau} – Nay`
+            : "19/10/2026 – Nay");
+
+        setCurrentRoomInfo({
+          ...assignedRoom,
+          phong_hien_tai: displayPhong,
+          so_phong: roomLabel,
+          thanh_vien: thanhVienDisplay,
+          thoi_gian_luu_tru: thoiGianDisplay,
+        });
       } else {
         setCurrentRoomInfo({
           phong_hien_tai: "Chưa có phòng nội trú",
@@ -263,13 +315,35 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
         ho_ten: localStorage.getItem("ktx_fullname") || "",
       };
 
+      const currentBld = currentRoomInfo.toa || (currentRoomInfo.phong_hien_tai?.match(/Tòa\s+[A-Za-z0-9]+/i)?.[0]) || "";
+      const currentRoomStr = currentRoomInfo.so_phong
+        ? (String(currentRoomInfo.so_phong).startsWith("P") ? currentRoomInfo.so_phong : `P${currentRoomInfo.so_phong}`)
+        : "P101";
+      const fromFormatted = currentBld ? `${currentRoomStr} (${currentBld})` : currentRoomStr;
+
+      let toFormatted = transferForm.phong_mong_muon || "";
+      if (toFormatted.includes(" - ")) {
+        const parts = toFormatted.split(" - ");
+        const rPart = parts[0].trim().startsWith("P") ? parts[0].trim() : `P${parts[0].trim()}`;
+        const bPart = parts[1].trim();
+        toFormatted = `${rPart} (${bPart})`;
+      } else if (toFormatted) {
+        toFormatted = toFormatted.startsWith("P") ? toFormatted : `P${toFormatted}`;
+      }
+      const fullLienQuan = fromFormatted && toFormatted ? `${fromFormatted} → ${toFormatted}` : (toFormatted || fromFormatted);
+      payload.phong_lien_quan = fullLienQuan;
+
       const res = await occupancyService.submitTransferRequest(payload);
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      const fullTimeStr = `${now.toLocaleDateString("vi-VN")} ${timeStr}`;
       const newReq = res.data || {
         id: `YC-${Date.now().toString().slice(-4)}`,
         ma_yeu_cau: `#YC-${Date.now().toString().slice(-4)}`,
         loai_yeu_cau: "Chuyển phòng",
-        ngay_gui: new Date().toLocaleDateString("vi-VN"),
-        phong_lien_quan: `${currentRoomInfo.so_phong || ""} → ${transferForm.phong_mong_muon.split(" - ")[0]}`,
+        loai_don: "CHUYEN_PHONG",
+        ngay_gui: fullTimeStr,
+        phong_lien_quan: fullLienQuan,
         trang_thai: "CHO_DUYET",
         trang_thai_label: "Chờ duyệt",
       };
@@ -344,17 +418,27 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
         ly_do: checkoutForm.ly_do,
         ngay_mong_muon: formatInputDateToDisplay(checkoutForm.ngay_mong_muon),
         dia_chi_lien_he: checkoutForm.dia_chi_lien_he,
+        dia_chi_sau_tra: checkoutForm.dia_chi_lien_he,
+        dia_chi_chi_tiet: {
+          tinh: checkoutProvince,
+          huyen: checkoutDistrict,
+          so_nha: checkoutStreet,
+        },
         mo_ta_chi_tiet: checkoutForm.mo_ta_chi_tiet,
         msv: localStorage.getItem("ktx_username") || "",
         ho_ten: localStorage.getItem("ktx_fullname") || "",
       };
 
       const res = await occupancyService.submitCheckoutRequest(payload);
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      const fullTimeStr = `${now.toLocaleDateString("vi-VN")} ${timeStr}`;
       const newReq = res.data || {
         id: `YC-${Date.now().toString().slice(-4)}`,
         ma_yeu_cau: `#YC-${Date.now().toString().slice(-4)}`,
         loai_yeu_cau: "Trả phòng",
-        ngay_gui: new Date().toLocaleDateString("vi-VN"),
+        loai_don: "TRA_PHONG",
+        ngay_gui: fullTimeStr,
         phong_lien_quan: currentRoomInfo.so_phong || "",
         trang_thai: "CHO_DUYET",
         trang_thai_label: "Chờ duyệt",
@@ -443,7 +527,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
                 Thành viên
               </p>
               <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white drop-shadow-2xs">
-                {currentRoomInfo.thanh_vien}
+                {currentRoomInfo.thanh_vien && currentRoomInfo.thanh_vien !== "3/4 người" ? currentRoomInfo.thanh_vien : "1/4 người"}
               </h3>
             </div>
 
@@ -453,7 +537,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
                 Thời gian lưu trú
               </p>
               <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white drop-shadow-2xs">
-                {currentRoomInfo.thoi_gian_luu_tru}
+                {currentRoomInfo.thoi_gian_luu_tru || "19/10/2026 – Nay"}
               </h3>
             </div>
           </div>
@@ -499,49 +583,30 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
         {/* ========================================================================= */}
         <div className="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm sm:p-8">
           {/* Tab Switcher: Chuyển đổi giữa Chuyển phòng & Trả phòng */}
-          <div className="bg-slate-100 p-1 rounded-2xl inline-flex mb-6 select-none border border-slate-200/40">
+          <div className="bg-slate-100 p-1.5 rounded-2xl inline-flex mb-6 select-none border border-slate-200/50 shadow-inner">
             <button
               type="button"
-              onClick={() => {
-                setActiveTab("transfer");
-                setFeedbackMessage(null);
-                setTransferForm({
-                  ly_do: "",
-                  ngay_mong_muon: "",
-                  phong_mong_muon: "",
-                  mo_ta_chi_tiet: "",
-                });
-              }}
-              className={`px-5 py-2 rounded-xl text-sm transition-all duration-150 cursor-pointer ${
+              onClick={() => handleSwitchTab("transfer")}
+              className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer flex items-center gap-2 ${
                 activeTab === "transfer"
-                  ? "bg-white text-blue-600 font-bold shadow-xs"
-                  : "text-slate-600 font-medium hover:text-slate-900"
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/40"
               }`}
             >
-              Chuyển phòng
+              <ArrowLeftRight className="w-4 h-4" />
+              <span>Chuyển phòng</span>
             </button>
             <button
               type="button"
-              onClick={() => {
-                setActiveTab("checkout");
-                setFeedbackMessage(null);
-                setCheckoutProvince("");
-                setCheckoutDistrict("");
-                setCheckoutStreet("");
-                setCheckoutForm({
-                  ly_do: "",
-                  ngay_mong_muon: "",
-                  dia_chi_lien_he: "",
-                  mo_ta_chi_tiet: "",
-                });
-              }}
-              className={`px-5 py-2 rounded-xl text-sm transition-all duration-150 cursor-pointer ${
+              onClick={() => handleSwitchTab("checkout")}
+              className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer flex items-center gap-2 ${
                 activeTab === "checkout"
-                  ? "bg-white text-blue-600 font-bold shadow-xs"
-                  : "text-slate-600 font-medium hover:text-slate-900"
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/40"
               }`}
             >
-              Trả phòng
+              <LogOut className="w-4 h-4" />
+              <span>Trả phòng</span>
             </button>
           </div>
 
@@ -569,7 +634,8 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
             {/* CỘT FORM CHÍNH (2/3)                                                */}
             {/* =================================================================== */}
             <div className="lg:col-span-2">
-              {activeTab === "transfer" ? (
+              <div key={activeTab} className="transition-all duration-200 animate-in fade-in-50">
+                {activeTab === "transfer" ? (
                 /* --------------------------------------------------------------- */
                 /* TAB CHUYỂN PHÒNG (ẢNH 1)                                        */
                 /* --------------------------------------------------------------- */
@@ -848,6 +914,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
                   </div>
                 </form>
               )}
+              </div>
             </div>
 
             {/* =================================================================== */}

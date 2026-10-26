@@ -1007,13 +1007,16 @@ class ReconciliationService:
 
         # 2. Parse dữ liệu các dòng
         raw_rows = []
-        is_excel = clean_filename.lower().endswith((".xlsx", ".xls"))
+        is_xlsx = clean_filename.lower().endswith(".xlsx")
+        is_xls = clean_filename.lower().endswith(".xls")
+        is_excel = is_xlsx or is_xls
 
         if is_excel:
+            read_success = False
+            # 1. Thử dùng openpyxl (ưu tiên cho .xlsx)
             try:
                 from openpyxl import load_workbook
                 wb = load_workbook(io.BytesIO(file_bytes), data_only=True)
-                # Tìm sheet phù hợp nhất (ưu tiên sheet có chữ 'sao kê', 'saoke', 'giao dịch', 'trans', hoặc sheet có nhiều dòng dữ liệu nhất)
                 target_ws = None
                 for sname in wb.sheetnames:
                     s_clean = sname.lower().replace(" ", "").replace("_", "")
@@ -1033,10 +1036,46 @@ class ReconciliationService:
                 for row in target_ws.iter_rows(values_only=True):
                     if row and any(c is not None and str(c).strip() != "" for c in row):
                         raw_rows.append([str(c).strip() if c is not None else "" for c in row])
-            except Exception as e:
+                read_success = len(raw_rows) > 0
+            except Exception:
+                pass
+
+            # 2. Nếu openpyxl không đọc được hoặc là file .xls cũ, dùng xlrd
+            if not read_success:
+                try:
+                    import xlrd
+                    wb_xls = xlrd.open_workbook(file_contents=file_bytes)
+                    sheet = wb_xls.sheet_by_index(0)
+                    for r_idx in range(sheet.nrows):
+                        row = [str(sheet.cell_value(r_idx, c_idx)).strip() for c_idx in range(sheet.ncols)]
+                        if any(c for c in row):
+                            raw_rows.append(row)
+                    read_success = len(raw_rows) > 0
+                except Exception:
+                    pass
+
+            # 3. Nếu vẫn không đọc được, thử giải mã dạng text/csv (nhiều ngân hàng xuất file text đổi đuôi .xls)
+            if not read_success:
+                for enc in ["utf-8-sig", "utf-8", "cp1258", "latin1"]:
+                    try:
+                        decoded_text = file_bytes.decode(enc)
+                        lines = [line.strip() for line in decoded_text.splitlines() if line.strip()]
+                        if lines:
+                            delim = "\t" if "\t" in lines[0] else (";" if lines[0].count(";") > lines[0].count(",") else ",")
+                            reader = csv.reader(io.StringIO(decoded_text), delimiter=delim)
+                            for row in reader:
+                                if row and any(c.strip() for c in row):
+                                    raw_rows.append([c.strip() for c in row])
+                            if raw_rows:
+                                read_success = True
+                                break
+                    except Exception:
+                        pass
+
+            if not read_success and not raw_rows:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Không thể đọc file Excel: {str(e)}",
+                    detail=f"Không thể đọc file Excel {clean_filename}. Vui lòng kiểm tra định dạng hoặc lưu thành file .xlsx/.csv chuẩn.",
                 )
         else:
             # File CSV / text
@@ -1051,7 +1090,7 @@ class ReconciliationService:
                 decoded = file_bytes.decode("utf-8", errors="ignore")
 
             first_line = decoded.splitlines()[0] if decoded.splitlines() else ""
-            delim = ";" if first_line.count(";") > first_line.count(",") else ","
+            delim = "\t" if "\t" in first_line else (";" if first_line.count(";") > first_line.count(",") else ",")
             reader = csv.reader(io.StringIO(decoded), delimiter=delim)
             for row in reader:
                 if row and any(c.strip() for c in row):
@@ -1071,21 +1110,29 @@ class ReconciliationService:
         col_content = 3
         col_acc = 5
 
+        header_keywords = [
+            "mã gd", "mã giao dịch", "số gd", "ngày", "số tiền", "nội dung",
+            "diễn giải", "amount", "transaction", "content", "tham chiếu",
+            "chứng từ", "phát sinh", "ghi có", "credit"
+        ]
+
         for i, row in enumerate(raw_rows):
             row_str = " ".join([c.lower() for c in row])
-            if any(k in row_str for k in ["mã gd", "mã giao dịch", "ngày", "số tiền", "nội dung", "amount", "transaction", "content"]):
+            if any(k in row_str for k in header_keywords):
                 header_idx = i
                 for c_idx, cell in enumerate(row):
                     cl = cell.lower().strip()
-                    if any(k in cl for k in ["mã", "ref", "số gd", "trans"]):
+                    if any(k in cl for k in ["mã", "ref", "số gd", "trans", "chứng từ", "tham chiếu", "bút toán"]):
                         col_code = c_idx
-                    elif any(k in cl for k in ["ngày", "thời gian", "date", "time"]):
+                    elif any(k in cl for k in ["ngày", "thời gian", "date", "time", "hạch toán"]):
                         col_date = c_idx
-                    elif any(k in cl for k in ["tiền", "amount", "ghi có", "credit"]):
+                    elif any(k in cl for k in ["ghi có", "credit", "phát sinh có", "ps có", "tiền vào"]):
                         col_amount = c_idx
-                    elif any(k in cl for k in ["nội dung", "diễn giải", "desc", "remark"]):
+                    elif any(k in cl for k in ["số tiền", "tiền", "amount", "giá trị"]):
+                        col_amount = c_idx
+                    elif any(k in cl for k in ["nội dung", "diễn giải", "desc", "remark", "chi tiết", "thanh toán"]):
                         col_content = c_idx
-                    elif any(k in cl for k in ["tài khoản", "account"]):
+                    elif any(k in cl for k in ["tài khoản", "account", "stk"]):
                         col_acc = c_idx
                 break
 

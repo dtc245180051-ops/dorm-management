@@ -151,10 +151,12 @@ class InvoiceService:
                 raw_loai = (p.loai_phong or "").lower()
                 if "dịch vụ" in raw_loai or "dich vu" in raw_loai or "service" in raw_loai:
                     loai_phong_label = "Phòng dịch vụ"
-                    unit_price = float(p.gia_tien_nam or 0) / 12
+                    gia_nam = float(p.gia_tien_nam) if (p.gia_tien_nam and float(p.gia_tien_nam) > 0) else 8200000.0
+                    unit_price = round(gia_nam / 11)
                 else:
                     loai_phong_label = "Phòng tiêu chuẩn"
-                    unit_price = float(p.gia_tien_nam or 0) / 12
+                    gia_nam = float(p.gia_tien_nam) if (p.gia_tien_nam and float(p.gia_tien_nam) > 0) else 4800000.0
+                    unit_price = round(gia_nam / 11)
 
             # Nếu đơn giá tháng được truyền vào khác mặc định thì áp dụng
             if don_gia_thang is not None and don_gia_thang > 0:
@@ -174,11 +176,6 @@ class InvoiceService:
                     if m and m.group(0).upper() not in phong_str.upper():
                         continue
 
-            # Định dạng thời hạn hợp đồng
-            start_str = hd.ngay_bat_dau.strftime("%d/%m/%Y") if hd.ngay_bat_dau else ""
-            end_str = hd.ngay_ket_thuc.strftime("%d/%m/%Y") if hd.ngay_ket_thuc else "Hiện tại"
-            term_str = f"{start_str} - {end_str}".strip(" -")
-
             # Kiểm tra xem hợp đồng này đã lập hóa đơn chưa cho kỳ này
             existing_inv = (
                 db.query(HoaDon)
@@ -190,7 +187,16 @@ class InvoiceService:
                 .first()
             )
 
-            current_amount = unit_price * thoi_gian_o_thang
+            # Định dạng thời hạn hợp đồng
+            start_str = hd.ngay_bat_dau.strftime("%d/%m/%Y") if hd.ngay_bat_dau else ""
+            end_str = hd.ngay_ket_thuc.strftime("%d/%m/%Y") if hd.ngay_ket_thuc else "Hiện tại"
+            term_str = f"{start_str} - {end_str}".strip(" -")
+
+            is_annual = "năm" in (ky_thanh_toan or "").lower() or "nam" in (ky_thanh_toan or "").lower() or thoi_gian_o_thang >= 10
+            if is_annual:
+                current_amount = gia_nam
+            else:
+                current_amount = unit_price * thoi_gian_o_thang
 
             candidates.append(
                 RoomBillingCandidate(
@@ -316,10 +322,12 @@ class InvoiceService:
                     raw_loai = (p.loai_phong or "").lower()
                     if "dịch vụ" in raw_loai or "dich vu" in raw_loai or "service" in raw_loai:
                         loai_phong_label = "Phòng dịch vụ"
-                        unit_price = float(p.gia_tien_nam or 0) / 12
+                        gia_nam = float(p.gia_tien_nam) if (p.gia_tien_nam and float(p.gia_tien_nam) > 0) else 8200000.0
+                        unit_price = round(gia_nam / 11)
                     else:
                         loai_phong_label = "Phòng tiêu chuẩn"
-                        unit_price = float(p.gia_tien_nam or 0) / 12
+                        gia_nam = float(p.gia_tien_nam) if (p.gia_tien_nam and float(p.gia_tien_nam) > 0) else 4800000.0
+                        unit_price = round(gia_nam / 11)
 
                 # Áp dụng đơn giá tháng nếu có truyền vào khác mặc định
                 if request.don_gia_thang is not None and request.don_gia_thang > 0:
@@ -348,7 +356,11 @@ class InvoiceService:
                     already_issued_info.append(f"{hd.msv} (HĐ: {hd.ma_hop_dong})")
                     continue
 
-                current_student_amount = unit_price * request.thoi_gian_o_thang
+                is_annual = "năm" in (request.ky_thanh_toan or "").lower() or "nam" in (request.ky_thanh_toan or "").lower() or request.thoi_gian_o_thang >= 10
+                if is_annual:
+                    current_student_amount = gia_nam
+                else:
+                    current_student_amount = unit_price * request.thoi_gian_o_thang
 
                 # Sinh mã hóa đơn duy nhất dạng HDTP-YYYYMMDD-UUID4[:6]
                 today_str = datetime.date.today().strftime("%Y%m%d")
@@ -503,17 +515,17 @@ class InvoiceService:
                     so_phong=so_p,
                     toa_nha=toa_ten,
                     so_sinh_vien=student_count if student_count > 0 else (r.suc_chua or 4),
-                    chi_so_dien_cu_moi="1000 - 1100",
-                    so_dien_kwh=100,
-                    chi_so_nuoc_cu_moi="400 - 410",
-                    so_nuoc_m3=10,
-                    tong_tien=450000.0,
-                    so_dien_cu=1000,
-                    so_dien_moi=1100,
-                    so_nuoc_cu=400,
-                    so_nuoc_moi=410,
-                    tien_dien=300000.0,
-                    tien_nuoc=150000.0,
+                    chi_so_dien_cu_moi="--",
+                    so_dien_kwh=0,
+                    chi_so_nuoc_cu_moi="--",
+                    so_nuoc_m3=0,
+                    tong_tien=0.0,
+                    so_dien_cu=0,
+                    so_dien_moi=0,
+                    so_nuoc_cu=0,
+                    so_nuoc_moi=0,
+                    tien_dien=0.0,
+                    tien_nuoc=0.0,
                     da_lap_hoa_don=existing is not None,
                 )
             )
@@ -618,7 +630,9 @@ class InvoiceService:
             else:
                 calculated_amount = (c.so_dien_kwh * request.don_gia_dien) + (c.so_nuoc_m3 * request.don_gia_nuoc)
                 if calculated_amount <= 0:
-                    calculated_amount = c.tong_tien
+                    calculated_amount = float(c.tong_tien or 0.0)
+                if calculated_amount <= 0:
+                    continue  # Bỏ qua các phòng chưa có chỉ số điện nước thực tế
                 note_str = request.ghi_chu or f"Hóa đơn tiền điện nước {request.thang} (Phòng {c.so_phong} - {c.toa_nha})"
 
             # Tìm danh sách sinh viên đang lưu trú tại phòng này (Hợp đồng ACTIVE / DANG_O)
@@ -692,8 +706,10 @@ class InvoiceService:
                     created_invoices.append(new_invoice)
             else:
                 # Phòng chưa có sinh viên ở -> Giữ hóa đơn chung cho phòng
+                u_suffix = uuid.uuid4().hex[:6].upper()
+                empty_room_ma_hd = f"HDDN-{today_str}-{u_suffix}"
                 new_invoice = HoaDon(
-                    ma_hoa_don=ma_hd,
+                    ma_hoa_don=empty_room_ma_hd,
                     ma_hop_dong=None,
                     msv=None,
                     ho_ten=None,
@@ -710,6 +726,7 @@ class InvoiceService:
                     ngay_tao=datetime.datetime.now(),
                 )
                 db.add(new_invoice)
+                created_invoices.append(new_invoice)
 
                 so_cong_no_rec = SoCongNo(
                     ma_hoa_don=new_invoice.ma_hoa_don,
@@ -838,58 +855,193 @@ class InvoiceService:
                 detail="File chỉ số trống hoặc không có dòng dữ liệu hợp lệ",
             )
 
+        def clean_norm(val: any) -> str:
+            if val is None:
+                return ""
+            s = strip_accents(str(val))
+            # Thay thế ký tự lũy thừa và đơn vị đo
+            s = s.replace("³", "3").replace("²", "2")
+            return re.sub(r"[^a-z0-9]", "", s)
+
         header_idx = -1
         col_room = -1
+        col_toa = -1
         col_elec_old = -1
         col_elec_new = -1
+        col_elec_pair = -1
         col_water_old = -1
         col_water_new = -1
+        col_water_pair = -1
+        col_elec_usage = -1
+        col_water_usage = -1
 
-        for idx, r in enumerate(raw_rows[:10]):
-            r_normalized = [strip_accents(str(c)).replace(" ", "").replace("_", "") for c in r]
-            for c_idx, cell in enumerate(r_normalized):
-                if any(k in cell for k in ["phong", "maphong", "sophong", "room"]):
-                    col_room = c_idx
-                elif any(k in cell for k in ["diencu", "chisodiencu", "oldelec", "dien_cu"]):
-                    col_elec_old = c_idx
-                elif any(k in cell for k in ["dienmoi", "chisodienmoi", "newelec", "dien_moi"]):
-                    col_elec_new = c_idx
-                elif any(k in cell for k in ["nuoccu", "chisonuoccu", "oldwater", "nuoc_cu"]):
-                    col_water_old = c_idx
-                elif any(k in cell for k in ["nuocmoi", "chisonuocmoi", "newwater", "nuoc_moi"]):
-                    col_water_new = c_idx
+        # 1. Tìm dòng tiêu đề thông minh (Hỗ trợ tiêu đề 1 dòng, 2 dòng gộp ô, cột gộp cũ-mới, và tên cột biến thiên)
+        for idx in range(min(15, len(raw_rows))):
+            r = raw_rows[idx]
+            prev_r = raw_rows[idx - 1] if idx > 0 else []
 
-            if col_room != -1 and ((col_elec_old != -1 and col_elec_new != -1) or (col_water_old != -1 and col_water_new != -1)):
+            # Bỏ qua dòng nếu rõ ràng là dòng dữ liệu (ví dụ: ô đầu là số thứ tự 1, 2, 3... và có nhiều ô là số)
+            first_val = str(r[0] if len(r) > 0 and r[0] is not None else "").strip()
+            num_numeric = sum(1 for c in r if str(c).strip().replace(".", "").replace(",", "").isdigit())
+            if first_val in ["1", "01"] and num_numeric >= 3:
+                continue
+
+            # Tạo danh sách tiêu đề cha từ dòng phía trên (hỗ trợ merged cells ngang/dọc)
+            filled_parents = []
+            last_parent = ""
+            for c_i in range(len(r)):
+                parent_val = str(prev_r[c_i]).strip() if (prev_r and c_i < len(prev_r) and prev_r[c_i] is not None) else ""
+                if parent_val:
+                    if len(parent_val) <= 45:
+                        last_parent = parent_val
+                    else:
+                        last_parent = ""
+                filled_parents.append(last_parent)
+
+            tmp_room = -1
+            tmp_toa = -1
+            tmp_e_old = -1
+            tmp_e_new = -1
+            tmp_e_pair = -1
+            tmp_w_old = -1
+            tmp_w_new = -1
+            tmp_w_pair = -1
+            tmp_e_usage = -1
+            tmp_w_usage = -1
+
+            old_new_pairs = []
+
+            for c_idx, cell in enumerate(r):
+                # Kế thừa từ dòng trên nếu ô hiện tại rỗng
+                cell_raw = str(cell).strip() if cell is not None else ""
+                parent_direct = str(prev_r[c_idx]).strip() if (prev_r and c_idx < len(prev_r) and prev_r[c_idx] is not None) else ""
+                effective_cell = cell_raw or parent_direct
+
+                c_norm = clean_norm(effective_cell)
+                cell_only_norm = clean_norm(cell_raw)
+                p_norm = clean_norm(filled_parents[c_idx]) if c_idx < len(filled_parents) else ""
+                combined = f"{p_norm}_{c_norm}"
+
+                # Nhận diện cột phòng (loại trừ các trường loại phòng, tên phòng, tiền, ghi chú)
+                if not any(ex in c_norm for ex in ["loaiphong", "tenphong", "ghichu", "songuoi", "thanhvien", "sothanhvien", "tiendien", "tiennuoc", "tongtien", "dongia", "giaphong", "tien", "stt"]):
+                    if c_norm in ["phong", "sophong", "maphong", "room", "phongso", "phongktx"]:
+                        tmp_room = c_idx
+                    elif "phong" in c_norm and not any(ex in c_norm for ex in ["dien", "nuoc", "tien", "phi", "stt"]):
+                        if tmp_room == -1:
+                            tmp_room = c_idx
+
+                # Nhận diện cột tòa
+                if not any(ex in c_norm for ex in ["phong", "tien", "dien", "nuoc", "phi", "stt"]):
+                    if any(k in c_norm for k in ["toanha", "toa", "building", "block", "khu", "day"]):
+                        tmp_toa = c_idx
+
+                # Nhận diện đặc tính điện / nước
+                is_dien = any(k in cell_only_norm for k in ["dien", "elec", "kwh"]) or any(k in combined for k in ["dien", "elec", "kwh"])
+                is_nuoc = any(k in cell_only_norm for k in ["nuoc", "water", "m3", "khoinuoc"]) or any(k in combined for k in ["nuoc", "water", "m3", "khoinuoc"])
+                if not is_nuoc and any(k in cell_only_norm for k in ["tieuthu", "sudung"]) and cell_only_norm.endswith("m"):
+                    is_nuoc = True
+
+                # Nhận diện đặc tính cũ / mới hoặc cột gộp cũ - mới
+                has_old = any(k in cell_only_norm for k in ["cu", "dau", "truoc", "old", "start", "begin"])
+                has_new = any(k in cell_only_norm for k in ["moi", "cuoi", "nay", "new", "end", "hientai"])
+
+                if is_dien:
+                    if has_old and has_new:
+                        tmp_e_pair = c_idx
+                    elif has_old:
+                        tmp_e_old = c_idx
+                    elif has_new:
+                        tmp_e_new = c_idx
+                elif is_nuoc:
+                    if has_old and has_new:
+                        tmp_w_pair = c_idx
+                    elif has_old:
+                        tmp_w_old = c_idx
+                    elif has_new:
+                        tmp_w_new = c_idx
+
+                # Nhận diện cột tiêu thụ
+                is_usage = any(k in cell_only_norm for k in ["tieuthu", "sudung", "luong", "sanluong"])
+                if is_dien and (is_usage or cell_only_norm in ["kwh", "sokwh"]):
+                    tmp_e_usage = c_idx
+                elif is_nuoc and (is_usage or cell_only_norm in ["m3", "som3", "tieuthum", "tieuthum3"]):
+                    tmp_w_usage = c_idx
+
+                if has_old and not has_new and not is_dien and not is_nuoc:
+                    old_new_pairs.append(("old", c_idx))
+                elif has_new and not has_old and not is_dien and not is_nuoc:
+                    old_new_pairs.append(("new", c_idx))
+
+            # Nếu tiêu đề chung có 2 cặp Số cũ - Số mới liên tiếp
+            if tmp_e_old == -1 and len(old_new_pairs) >= 4:
+                old_list = [c for t, c in old_new_pairs if t == "old"]
+                new_list = [c for t, c in old_new_pairs if t == "new"]
+                if len(old_list) >= 2 and len(new_list) >= 2:
+                    tmp_e_old = old_list[0]
+                    tmp_e_new = new_list[0]
+                    tmp_w_old = old_list[1]
+                    tmp_w_new = new_list[1]
+
+            has_room = tmp_room != -1
+            has_elec = (tmp_e_pair != -1) or (tmp_e_old != -1 and tmp_e_new != -1) or tmp_e_usage != -1
+            has_water = (tmp_w_pair != -1) or (tmp_w_old != -1 and tmp_w_new != -1) or tmp_w_usage != -1
+
+            if has_room and (has_elec or has_water):
                 header_idx = idx
+                col_room = tmp_room
+                col_toa = tmp_toa
+                col_elec_old = tmp_e_old
+                col_elec_new = tmp_e_new
+                col_elec_pair = tmp_e_pair
+                col_water_old = tmp_w_old
+                col_water_new = tmp_w_new
+                col_water_pair = tmp_w_pair
+                col_elec_usage = tmp_e_usage
+                col_water_usage = tmp_w_usage
                 break
 
+        # Nếu không tự động bắt được tiêu đề, suy đoán dự phòng an toàn theo thứ tự cột chuẩn
         if header_idx == -1:
-            header_idx = 0
-            if len(raw_rows[0]) >= 6:
+            for idx in range(min(5, len(raw_rows))):
+                r = raw_rows[idx]
+                if len(r) >= 5 and any(re.search(r"\b\d{3}\b", str(c)) for c in r):
+                    header_idx = max(0, idx - 1)
+                    break
+            if header_idx == -1:
+                header_idx = 0
+
+            first_data_row = raw_rows[min(header_idx + 1, len(raw_rows) - 1)]
+            row_len = len(first_data_row)
+            if row_len >= 6:
                 col_room = 1
                 col_elec_old = 2
                 col_elec_new = 3
                 col_water_old = 4
                 col_water_new = 5
-            elif len(raw_rows[0]) >= 5:
+            elif row_len >= 5:
                 col_room = 0
                 col_elec_old = 1
                 col_elec_new = 2
                 col_water_old = 3
                 col_water_new = 4
 
-        # Danh sách phòng trong DB để đối chiếu
+        # Xây dựng danh sách tra cứu phòng đa chiều từ CSDL
         db_rooms = db.query(Phong).all()
-        room_map = {}
+        map_by_code = {}
+        map_by_pair = {}
+        map_by_num = {}
+
         for r in db_rooms:
             toa = r.tang.toa_nha.ten_toa if r.tang and r.tang.toa_nha else "Tòa A1"
-            clean_so = r.so_phong.lstrip("Pp")
-            room_map[r.ma_phong.upper()] = (r.ma_phong, r.so_phong, toa)
-            room_map[r.so_phong.upper()] = (r.ma_phong, r.so_phong, toa)
-            room_map[clean_so.upper()] = (r.ma_phong, r.so_phong, toa)
-            room_map[f"P{clean_so}".upper()] = (r.ma_phong, r.so_phong, toa)
-            room_map[f"P{clean_so} - {toa}".upper()] = (r.ma_phong, r.so_phong, toa)
-            room_map[f"{clean_so} - {toa}".upper()] = (r.ma_phong, r.so_phong, toa)
+            clean_so = re.sub(r"[^0-9]", "", r.so_phong or "")
+            so_display = r.so_phong if (r.so_phong and r.so_phong.upper().startswith("P")) else f"P{r.so_phong}"
+            info = (r.ma_phong, so_display, toa)
+
+            map_by_code[r.ma_phong.upper()] = info
+            if clean_so:
+                toa_norm = clean_norm(toa)
+                map_by_pair[(clean_so, toa_norm)] = info
+                map_by_num.setdefault(clean_so, []).append(info)
 
         items: List[UtilityBillingCandidate] = []
         total_amount = 0.0
@@ -900,44 +1052,134 @@ class InvoiceService:
                 continue
 
             raw_room = str(row[col_room]).strip()
-            norm_raw_room = strip_accents(raw_room)
-            if any(k in norm_raw_room for k in ["phong", "tong", "stt"]):
-                if not any(c.isdigit() for c in norm_raw_room):
-                    continue
+            norm_room = clean_norm(raw_room)
 
-            elec_old = parse_meter_number(row[col_elec_old]) if 0 <= col_elec_old < len(row) else 1000
-            elec_new = parse_meter_number(row[col_elec_new]) if 0 <= col_elec_new < len(row) else elec_old + 100
-            water_old = parse_meter_number(row[col_water_old]) if 0 <= col_water_old < len(row) else 400
-            water_new = parse_meter_number(row[col_water_new]) if 0 <= col_water_new < len(row) else water_old + 10
+            # Bỏ qua các dòng tổng cộng, người lập, tiêu đề lặp lại
+            if not norm_room or any(k in norm_room for k in ["tongcong", "tongso", "nguoilap", "ketoantruong", "banquanly", "kyten"]):
+                continue
+            if norm_room in ["phong", "sophong", "stt", "maphong"]:
+                continue
 
-            elec_usage = max(0, elec_new - elec_old)
-            water_usage = max(0, water_new - water_old)
+            # Lấy thông tin tòa nhà từ cột riêng hoặc từ chuỗi phòng ("203 - Tòa A1")
+            row_toa = str(row[col_toa]).strip() if 0 <= col_toa < len(row) else ""
+            toa_norm = clean_norm(row_toa)
+            clean_digits = re.findall(r"\d+", raw_room)
+            room_digits = clean_digits[0] if clean_digits else ""
+
+            target_toa_display = ""
+            if row_toa:
+                target_toa_display = row_toa
+            elif "toaa1" in norm_room or "a1" in norm_room:
+                target_toa_display = "Tòa A1"
+                toa_norm = "toaa1"
+            elif "toaa2" in norm_room or "a2" in norm_room:
+                target_toa_display = "Tòa A2"
+                toa_norm = "toaa2"
+            elif "toab" in norm_room or "b" in norm_room:
+                target_toa_display = "Tòa B"
+                toa_norm = "toab"
+            else:
+                target_toa_display = "Tòa A1"
+                toa_norm = "toaa1"
+
+            # Tìm kiếm phòng chính xác trong CSDL
+            found = None
+            clean_code = re.sub(r"[^a-zA-Z0-9_]", "", raw_room).upper()
+            if clean_code in map_by_code:
+                found = map_by_code[clean_code]
+            elif room_digits and toa_norm and (room_digits, toa_norm) in map_by_pair:
+                found = map_by_pair[(room_digits, toa_norm)]
+            elif room_digits and room_digits in map_by_num:
+                cand_list = map_by_num[room_digits]
+                # Chỉ match nếu tòa nhà tương ứng hoặc tương đồng, tuyệt đối không gán sang tòa khác
+                matched = [c for c in cand_list if toa_norm and (toa_norm in clean_norm(c[2]) or clean_norm(c[2]) in toa_norm)]
+                if matched:
+                    found = matched[0]
+
+            if found:
+                ma_p, so_p, toa_p = found
+            else:
+                # Phòng không có sẵn trong DB: bảo toàn đúng số phòng và tòa nhà người dùng nhập
+                clean_so_clean = room_digits or raw_room
+                so_p = f"P{clean_so_clean}" if not str(clean_so_clean).upper().startswith("P") else str(clean_so_clean)
+                toa_p = target_toa_display
+                toa_prefix = "A1" if "a1" in toa_norm else ("B" if "b" in toa_norm else "KTX")
+                ma_p = f"{toa_prefix}_{so_p}"
+
+            # 2. Tính toán chính xác điện
+            elec_old = 0
+            elec_new = 0
+            elec_usage = 0
+
+            # 2.1 Nếu có cột gộp chỉ số (cũ - mới) dạng "1240 - 1385"
+            if col_elec_pair != -1 and 0 <= col_elec_pair < len(row):
+                cell_pair_str = str(row[col_elec_pair]).strip()
+                nums = re.findall(r"\d+", cell_pair_str)
+                if len(nums) >= 2:
+                    elec_old = int(nums[0])
+                    elec_new = int(nums[1])
+                    elec_usage = max(0, elec_new - elec_old)
+                elif len(nums) == 1:
+                    elec_old = int(nums[0])
+
+            # 2.2 Nếu có 2 cột riêng cũ và mới
+            if col_elec_old != -1 and col_elec_new != -1 and col_elec_pair == -1:
+                elec_old = parse_meter_number(row[col_elec_old]) if col_elec_old < len(row) else 0
+                elec_new = parse_meter_number(row[col_elec_new]) if col_elec_new < len(row) else elec_old
+                elec_usage = max(0, elec_new - elec_old)
+
+            # 2.3 Cột tiêu thụ điện riêng
+            if col_elec_usage != -1 and 0 <= col_elec_usage < len(row):
+                val_u = parse_meter_number(row[col_elec_usage])
+                if val_u > 0:
+                    elec_usage = val_u
+                    if elec_old > 0 and (elec_new == 0 or elec_new <= elec_old):
+                        elec_new = elec_old + elec_usage
+                    elif elec_old == 0 and elec_new > 0:
+                        elec_old = max(0, elec_new - elec_usage)
+
+            # 3. Tính toán chính xác nước
+            water_old = 0
+            water_new = 0
+            water_usage = 0
+
+            # 3.1 Nếu có cột gộp chỉ số nước (cũ - mới) dạng "45 - 58"
+            if col_water_pair != -1 and 0 <= col_water_pair < len(row):
+                cell_pair_str = str(row[col_water_pair]).strip()
+                nums = re.findall(r"\d+", cell_pair_str)
+                if len(nums) >= 2:
+                    water_old = int(nums[0])
+                    water_new = int(nums[1])
+                    water_usage = max(0, water_new - water_old)
+                elif len(nums) == 1:
+                    water_old = int(nums[0])
+
+            # 3.2 Nếu có 2 cột riêng cũ và mới
+            if col_water_old != -1 and col_water_new != -1 and col_water_pair == -1:
+                water_old = parse_meter_number(row[col_water_old]) if col_water_old < len(row) else 0
+                water_new = parse_meter_number(row[col_water_new]) if col_water_new < len(row) else water_old
+                water_usage = max(0, water_new - water_old)
+
+            # 3.3 Cột tiêu thụ nước riêng
+            if col_water_usage != -1 and 0 <= col_water_usage < len(row):
+                val_w = parse_meter_number(row[col_water_usage])
+                if val_w > 0:
+                    water_usage = val_w
+                    if water_old > 0 and (water_new == 0 or water_new <= water_old):
+                        water_new = water_old + water_usage
+                    elif water_old == 0 and water_new > 0:
+                        water_old = max(0, water_new - water_usage)
+
             tien_dien = elec_usage * don_gia_dien
             tien_nuoc = water_usage * don_gia_nuoc
             row_total = tien_dien + tien_nuoc
             total_amount += row_total
 
-            clean_r = re.sub(r"[^a-zA-Z0-9]", "", raw_room).upper()
-            found = room_map.get(clean_r) or room_map.get(raw_room.upper())
-            digits = re.findall(r"\d+", raw_room)
-            if not found:
-                if digits and digits[0] in room_map:
-                    found = room_map[digits[0]]
-                elif digits and f"P{digits[0]}" in room_map:
-                    found = room_map[f"P{digits[0]}"]
-
-            if found:
-                ma_p, so_p, toa_p = found
-            else:
-                ma_p = clean_r or f"P{r_idx}"
-                so_p = digits[0] if digits else raw_room
-                toa_p = "Tòa A1"
-
-            # Đếm số sinh viên thực tế trong phòng
+            # Đếm số sinh viên thực tế đang cư trú trong phòng (Hợp đồng ACTIVE hoặc DANG_O)
             student_count = (
                 db.query(HopDong)
                 .join(Giuong, HopDong.ma_giuong == Giuong.ma_giuong)
-                .filter(Giuong.ma_phong == ma_p, HopDong.trang_thai == "ACTIVE")
+                .filter(Giuong.ma_phong == ma_p, HopDong.trang_thai.in_(["ACTIVE", "DANG_O", "CON_HAN"]))
                 .count()
             )
 
@@ -956,7 +1198,7 @@ class InvoiceService:
                     ma_phong=ma_p,
                     so_phong=so_p,
                     toa_nha=toa_p,
-                    so_sinh_vien=student_count if student_count > 0 else 4,
+                    so_sinh_vien=student_count,
                     chi_so_dien_cu_moi=f"{elec_old} - {elec_new}",
                     so_dien_kwh=elec_usage,
                     chi_so_nuoc_cu_moi=f"{water_old} - {water_new}",
@@ -974,7 +1216,7 @@ class InvoiceService:
 
         return UtilityMeterUploadResponse(
             success=True,
-            message=f"Đã tính toán thành công chỉ số điện nước cho {len(items)} phòng từ file {filename}",
+            message=f"Đã đọc và tính toán thành công chỉ số điện nước cho {len(items)} phòng từ file {filename}",
             fileName=filename,
             totalRooms=len(items),
             totalAmount=total_amount,
@@ -982,9 +1224,9 @@ class InvoiceService:
         )
 
     @staticmethod
-    def generate_utility_template() -> bytes:
+    def generate_utility_template(db: Optional[Session] = None) -> bytes:
         """
-        Tạo file Excel mẫu nhập chỉ số điện nước KTX
+        Tạo file Excel mẫu chuẩn nhập chỉ số điện nước KTX, tự động điền danh sách phòng thực tế
         """
         if not HAS_OPENPYXL:
             raise HTTPException(
@@ -1006,9 +1248,40 @@ class InvoiceService:
         ]
         ws.append(headers)
 
-        sample_data = []
-        for row in sample_data:
-            ws.append(row)
+        if db:
+            try:
+                rooms = (
+                    db.query(Phong)
+                    .join(Tang, Phong.ma_tang == Tang.ma_tang)
+                    .join(ToaNha, Tang.ma_toa == ToaNha.ma_toa)
+                    .order_by(ToaNha.ten_toa, Phong.so_phong)
+                    .all()
+                )
+                for idx, p in enumerate(rooms, start=1):
+                    toa_name = p.tang.toa_nha.ten_toa if p.tang and p.tang.toa_nha else "Tòa A1"
+                    so_p = p.so_phong if p.so_phong.upper().startswith("P") else f"P{p.so_phong}"
+                    ws.append([
+                        idx,
+                        f"{so_p} - {toa_name}",
+                        1000,
+                        1050,
+                        400,
+                        410,
+                        p.loai_phong or "Phòng tiêu chuẩn",
+                    ])
+            except Exception:
+                pass
+        else:
+            # Mẫu dữ liệu mô phỏng
+            sample_rooms = [
+                ("P201 - Tòa A1", 1000, 1052, 400, 408, "Phòng tiêu chuẩn"),
+                ("P202 - Tòa A1", 1020, 1085, 410, 421, "Phòng tiêu chuẩn"),
+                ("P203 - Tòa A1", 950, 1015, 380, 392, "Phòng tiêu chuẩn"),
+                ("P301 - Tòa A1", 1100, 1170, 450, 465, "Phòng dịch vụ"),
+                ("P101 - Tòa B", 880, 940, 350, 360, "Phòng tiêu chuẩn"),
+            ]
+            for idx, r in enumerate(sample_rooms, start=1):
+                ws.append([idx, r[0], r[1], r[2], r[3], r[4], r[5]])
 
         header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
         header_fill = PatternFill(start_color="2B85EC", end_color="2B85EC", fill_type="solid")
@@ -1019,12 +1292,12 @@ class InvoiceService:
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
         ws.column_dimensions["A"].width = 8
-        ws.column_dimensions["B"].width = 20
+        ws.column_dimensions["B"].width = 22
         ws.column_dimensions["C"].width = 24
         ws.column_dimensions["D"].width = 24
         ws.column_dimensions["E"].width = 24
         ws.column_dimensions["F"].width = 24
-        ws.column_dimensions["G"].width = 18
+        ws.column_dimensions["G"].width = 20
 
         buf = io.BytesIO()
         wb.save(buf)

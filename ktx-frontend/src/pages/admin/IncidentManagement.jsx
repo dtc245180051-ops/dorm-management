@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import feedbackService from '../../services/feedbackService';
 import IncidentSummaryCard from '../../components/IncidentSummaryCard';
+import studentNotificationService from '../../services/studentNotificationService';
 
 export default function IncidentManagement({ searchTerm = '' }) {
   const [incidents, setIncidents] = useState([]);
@@ -69,6 +70,54 @@ export default function IncidentManagement({ searchTerm = '' }) {
         newStatus,
         processNote.trim()
       );
+
+      try {
+        const statusMap = {
+          CHO_XU_LY: "Chờ tiếp nhận",
+          DANG_XU_LY: "Đang xử lý",
+          HOAN_THANH: "Đã hoàn thành",
+          DA_GIAI_QUYET: "Đã giải quyết",
+          DA_XU_LY: "Đã giải quyết",
+          TU_CHOI: "Từ chối xử lý",
+        };
+        const statusText = statusMap[newStatus] || newStatus;
+        const targetMsv = (selectedIncident.msv || selectedIncident.ma_sinh_vien || "DTC245180037").trim().replace(/@.*$/, "").toUpperCase();
+        
+        let notifTitle = "Cập nhật phản ánh sự cố";
+        let notifContent = `Phản ánh sự cố "${selectedIncident.tieu_de || selectedIncident.mo_ta || selectedIncident.ma_phan_anh || "Báo hỏng"}" của bạn đã được Ban quản lý KTX chuyển sang trạng thái: ${statusText}.${processNote.trim() ? ` Ghi chú: ${processNote.trim()}` : ""}`;
+
+        if (newStatus === "DA_XU_LY" || newStatus === "HOAN_THANH" || newStatus === "DA_GIAI_QUYET") {
+          notifTitle = "Phản ánh sự cố đã được xử lý hoàn tất";
+          notifContent = `Phản ánh sự cố "${selectedIncident.tieu_de || selectedIncident.mo_ta || selectedIncident.ma_phan_anh || "Báo hỏng"}" của bạn đã được Ban quản lý KTX giải quyết thành công.${processNote.trim() ? ` Ghi chú kết quả: ${processNote.trim()}` : ""}`;
+        } else if (newStatus === "DANG_XU_LY") {
+          notifTitle = "Ban quản lý KTX đã tiếp nhận xử lý phản ánh";
+          notifContent = `Phản ánh sự cố "${selectedIncident.tieu_de || selectedIncident.mo_ta || selectedIncident.ma_phan_anh || "Báo hỏng"}" của bạn đang được Ban quản lý KTX và kỹ thuật viên tiến hành xử lý/khắc phục.${processNote.trim() ? ` Kế hoạch xử lý: ${processNote.trim()}` : ""}`;
+        } else if (newStatus === "TU_CHOI") {
+          notifTitle = "Ban quản lý KTX từ chối xử lý phản ánh";
+          notifContent = `Phản ánh sự cố "${selectedIncident.tieu_de || selectedIncident.mo_ta || selectedIncident.ma_phan_anh || "Báo hỏng"}" của bạn đã bị từ chối tiếp nhận/xử lý.${processNote.trim() ? ` Lý do: ${processNote.trim()}` : ""}`;
+        }
+
+        const notifId = `incident-status-${selectedIncident.ma_phan_anh || selectedIncident.id}-${newStatus.toLowerCase()}`;
+
+        studentNotificationService.notifyFromManagement({
+          id: notifId,
+          title: notifTitle,
+          content: notifContent,
+          type: "inspection",
+          actionUrl: "/student/feedback",
+          actionLabel: "Xem phản ánh",
+          msv: targetMsv,
+        });
+
+        try {
+          localStorage.setItem("ktx_notif_tick", Date.now().toString());
+          window.dispatchEvent(new Event("ktx-notifications-updated"));
+          window.dispatchEvent(new Event("student-incidents-updated"));
+          window.dispatchEvent(new Event("storage"));
+        } catch (_) {}
+      } catch (errNotif) {
+        console.warn("Lỗi gửi thông báo cho sinh viên:", errNotif);
+      }
 
       setNotification({
         type: 'success',

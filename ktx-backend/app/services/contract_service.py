@@ -264,6 +264,37 @@ def get_contract_detail(db: Session, ma_hop_dong: str) -> HopDongDetailResponse:
     student_name = nd.ho_ten if nd and nd.ho_ten else (sv.msv if sv else "")
     student_phone = nd.so_dien_thoai if nd and nd.so_dien_thoai else ""
     student_email = nd.email if nd and nd.email else (f"{hd.msv.lower()}@ictu.edu.vn" if hd.msv else "")
+    final_cccd = sv.cccd if sv and sv.cccd else ""
+
+    # Bổ sung thông tin từ đơn đăng ký nếu dữ liệu trong DB còn thiếu
+    if hd.msv and (not ngay_sinh_str or not final_cccd or not student_phone):
+        from app.services import occupancy_request_store
+        for r in occupancy_request_store.get_all_requests():
+            if (r.get("msv") or "").strip().upper() == hd.msv.strip().upper():
+                if not ngay_sinh_str and r.get("ngay_sinh"):
+                    raw_d = str(r.get("ngay_sinh")).strip()
+                    if "-" in raw_d and len(raw_d.split("-")) == 3:
+                        parts = raw_d.split("-")
+                        if len(parts[0]) == 4:
+                            ngay_sinh_str = f"{parts[2]}/{parts[1]}/{parts[0]}"
+                        else:
+                            ngay_sinh_str = raw_d
+                    else:
+                        ngay_sinh_str = raw_d
+                if not final_cccd and r.get("cccd"):
+                    final_cccd = r.get("cccd")
+                if not student_phone and r.get("so_dien_thoai"):
+                    student_phone = r.get("so_dien_thoai")
+                if not student_name and r.get("ho_ten"):
+                    student_name = r.get("ho_ten")
+                if not lien_he_str and r.get("sdt_nguoi_giam_ho"):
+                    rel = [r.get("moi_quan_he"), r.get("nguoi_giam_ho")]
+                    rel_filtered = [str(item).strip() for item in rel if item and str(item).strip()]
+                    if rel_filtered:
+                        lien_he_str = f"{r.get('sdt_nguoi_giam_ho')} ({' - '.join(rel_filtered)})"
+                    else:
+                        lien_he_str = str(r.get("sdt_nguoi_giam_ho"))
+                break
 
     return HopDongDetailResponse(
         ma_hop_dong=hd.ma_hop_dong,
@@ -271,7 +302,7 @@ def get_contract_detail(db: Session, ma_hop_dong: str) -> HopDongDetailResponse:
         msv=hd.msv,
         gioi_tinh=sv.gioi_tinh if sv and sv.gioi_tinh else "Nam",
         ngay_sinh=ngay_sinh_str,
-        cccd=sv.cccd if sv and sv.cccd else "",
+        cccd=final_cccd,
         so_dien_thoai=student_phone,
         email=student_email,
         khoa=sv.khoa if sv and sv.khoa else "Công nghệ thông tin",

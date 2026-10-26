@@ -28,6 +28,7 @@ app = FastAPI(
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(os.path.join(UPLOADS_DIR, "rooms"), exist_ok=True)
+os.makedirs(os.path.join(UPLOADS_DIR, "avatars"), exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 # Cấu hình CORS cho phép Frontend truy cập

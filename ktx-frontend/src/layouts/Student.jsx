@@ -16,10 +16,14 @@ import {
   Send,
   Menu,
   Lock,
+  Scale,
+  AlertTriangle,
+  ChevronRight,
 } from "lucide-react";
 import { askGeminiChatbot } from "../services/geminiService";
 import AppFooter from "../components/AppFooter";
 import { useStudentStatus } from "../hooks/useStudentStatus";
+import studentNotificationService from "../services/studentNotificationService";
 
 const STUDENT_AVATAR_STORAGE_KEY = "ktx_student_avatar";
 const STUDENT_ANNOUNCEMENTS_KEY = "ktx_announcements";
@@ -55,6 +59,13 @@ export default function StudentLayout({
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [showAnnouncements, setShowAnnouncements] = useState(false);
   const [announcements, setAnnouncements] = useState(getAnnouncements);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(() => {
+    try {
+      return studentNotificationService.getUnreadCount();
+    } catch {
+      return 0;
+    }
+  });
   const [avatarUrl, setAvatarUrl] = useState(
     () => localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY) || "",
   );
@@ -89,14 +100,52 @@ export default function StudentLayout({
 
   useEffect(() => {
     const syncAnnouncements = () => setAnnouncements(getAnnouncements());
+    const syncNotifications = () => {
+      try {
+        setUnreadNotifCount(studentNotificationService.getUnreadCount());
+      } catch {
+        setUnreadNotifCount(0);
+      }
+    };
+
+    // Đồng bộ tức thì và tự động quét thông báo từ Backend (Hóa đơn, BQL, Sự cố)
+    syncNotifications();
+    studentNotificationService.syncFromBackend().then(() => syncNotifications());
+
+    // Quét định kỳ mỗi 3 giây để nhận thông báo mới nhất ngay khi Kế toán hoặc BQL thao tác
+    const intervalId = setInterval(() => {
+      studentNotificationService.syncFromBackend().then(() => syncNotifications());
+    }, 3000);
+
+    const onWindowFocus = () => {
+      studentNotificationService.syncFromBackend().then(() => syncNotifications());
+    };
+    window.addEventListener("focus", onWindowFocus);
+
     window.addEventListener("storage", syncAnnouncements);
     window.addEventListener("ktx-announcements-updated", syncAnnouncements);
+    window.addEventListener("storage", syncNotifications);
+    window.addEventListener("ktx-notifications-updated", syncNotifications);
+    window.addEventListener("occupancy-updated", syncNotifications);
+    window.addEventListener("student-account-updated", syncNotifications);
+    window.addEventListener("ktx-payment-updated", syncNotifications);
+
     return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("focus", onWindowFocus);
       window.removeEventListener("storage", syncAnnouncements);
       window.removeEventListener(
         "ktx-announcements-updated",
         syncAnnouncements,
       );
+      window.removeEventListener("storage", syncNotifications);
+      window.removeEventListener(
+        "ktx-notifications-updated",
+        syncNotifications,
+      );
+      window.removeEventListener("occupancy-updated", syncNotifications);
+      window.removeEventListener("student-account-updated", syncNotifications);
+      window.removeEventListener("ktx-payment-updated", syncNotifications);
     };
   }, []);
 
@@ -191,6 +240,8 @@ export default function StudentLayout({
       "dang-ky": "/student/register",
       transfer: "/student/transfer-room",
       "chuyen-phong": "/student/transfer-room",
+      checkout: "/student/transfer-room?tab=checkout",
+      "tra-phong": "/student/transfer-room?tab=checkout",
       lookup: "/student/lookup",
       "tra-cuu": "/student/lookup",
       "search-rooms": "/student/lookup",
@@ -202,6 +253,8 @@ export default function StudentLayout({
       payment_history: "/student/payment-history",
       profile: "/student/profile",
       "thong-tin-ca-nhan": "/student/profile",
+      notifications: "/student/notifications",
+      "thong-bao": "/student/notifications",
     };
     const targetPath = pathMap[tabId];
     if (targetPath) {
@@ -210,6 +263,38 @@ export default function StudentLayout({
       window.dispatchEvent(
         new CustomEvent("student-navigate", { detail: { path: targetPath } }),
       );
+    }
+  };
+
+  const handleToggleNotifications = () => {
+    const currentPath = (window.location.pathname || "").split("?")[0];
+    const isCurrentlyOnNotifications =
+      activeTab === "notifications" ||
+      currentPath === "/student/notifications" ||
+      currentPath.includes("/notifications");
+
+    if (isCurrentlyOnNotifications) {
+      // Đang ở trang thông báo -> Ấn lần nữa thì mất thông báo đi (quay về trang trước đó hoặc dashboard)
+      const prevPath = sessionStorage.getItem("ktx_student_prev_path");
+      const targetPath =
+        prevPath && !prevPath.includes("/notifications")
+          ? prevPath
+          : "/student/dashboard";
+      if (onSelectTab) {
+        onSelectTab("dashboard");
+      }
+      window.history.pushState({}, "", targetPath);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      window.dispatchEvent(
+        new CustomEvent("student-navigate", { detail: { path: targetPath } }),
+      );
+    } else {
+      // Chưa ở trang thông báo -> Lưu lại trang hiện tại và chuyển sang trang thông báo đầy đủ như cũ
+      sessionStorage.setItem(
+        "ktx_student_prev_path",
+        currentPath || "/student/dashboard",
+      );
+      handleTabClick("notifications");
     }
   };
 
@@ -273,57 +358,34 @@ export default function StudentLayout({
 
         {/* Khối cá nhân & Thông báo bên phải */}
         <div className="flex items-center gap-3 sm:gap-5 shrink-0">
-          {/* Nút chuông thông báo kèm chấm đỏ */}
+          {/* Nút chuông thông báo: Bấm lần 1 mở trang Thông báo đầy đủ như cũ, bấm lần 2 đóng lại (quay về trang trước) */}
           <div className="relative">
             <button
               type="button"
-              onClick={() => setShowAnnouncements((open) => !open)}
-              className="relative p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-full transition cursor-pointer"
-              title="Thông báo"
-              aria-expanded={showAnnouncements}
+              onClick={handleToggleNotifications}
+              className={`relative p-2 text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-full transition cursor-pointer ${
+                activeTab === "notifications" ||
+                (typeof window !== "undefined" &&
+                  window.location.pathname.includes("/notifications"))
+                  ? "text-blue-600 bg-blue-50 ring-2 ring-blue-100"
+                  : ""
+              }`}
+              title={
+                activeTab === "notifications" ||
+                (typeof window !== "undefined" &&
+                  window.location.pathname.includes("/notifications"))
+                  ? "Đóng thông báo (quay lại)"
+                  : `Xem thông báo sinh viên${unreadNotifCount > 0 ? ` (${unreadNotifCount} chưa đọc)` : ""}`
+              }
+              aria-label="Thông báo sinh viên"
             >
               <Bell className="w-5 h-5" />
-              {announcements.length > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white"></span>
+              {unreadNotifCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-white leading-none shadow-xs">
+                  {unreadNotifCount > 99 ? "99+" : unreadNotifCount}
+                </span>
               )}
             </button>
-            {showAnnouncements && (
-              <div className="absolute right-0 top-12 z-50 w-[min(90vw,22rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-                <div className="border-b border-slate-100 px-4 py-3">
-                  <h2 className="text-sm font-bold text-slate-900">
-                    Thông báo KTX
-                  </h2>
-                </div>
-                <div className="max-h-80 overflow-y-auto">
-                  {announcements.length ? (
-                    announcements.slice(0, 10).map((announcement) => (
-                      <article
-                        key={announcement.id}
-                        className="border-b border-slate-100 px-4 py-3 last:border-0"
-                      >
-                        <h3 className="text-sm font-semibold text-slate-800">
-                          {announcement.title}
-                        </h3>
-                        <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-600">
-                          {announcement.body}
-                        </p>
-                        <time className="mt-2 block text-[10px] text-slate-400">
-                          {announcement.createdAt
-                            ? new Date(announcement.createdAt).toLocaleString(
-                              "vi-VN",
-                            )
-                            : ""}
-                        </time>
-                      </article>
-                    ))
-                  ) : (
-                    <p className="px-4 py-6 text-center text-xs text-slate-500">
-                      Chưa có thông báo mới.
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* User profile */}
@@ -338,9 +400,8 @@ export default function StudentLayout({
                   src={avatarUrl}
                   alt="Avatar"
                   className="h-full w-full object-cover"
-                  onError={() => {
-                    localStorage.removeItem(STUDENT_AVATAR_STORAGE_KEY);
-                    setAvatarUrl("");
+                  onError={(e) => {
+                    e.currentTarget.src = "/avatar.png";
                   }}
                 />
               ) : (
@@ -498,13 +559,20 @@ export default function StudentLayout({
                         key={item.id}
                         type="button"
                         onClick={() => handleTabClick(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition text-left cursor-pointer ${isActive
                           ? "bg-[#e0f2fe] text-[#0284c7] font-bold"
                           : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
                           }`}
                       >
-                        <Icon className="w-4 h-4 shrink-0 text-slate-400" />
-                        <span>{item.label}</span>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Icon className="w-4 h-4 shrink-0 text-slate-400" />
+                          <span>{item.label}</span>
+                        </div>
+                        {item.badgeCount > 0 && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-bold bg-rose-500 text-white rounded-full leading-none shrink-0 shadow-xs">
+                            {item.badgeCount > 99 ? "99+" : item.badgeCount}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -545,7 +613,11 @@ export default function StudentLayout({
                     if (
                       window.confirm("Bạn có chắc chắn muốn đăng xuất không?")
                     ) {
+                      const savedAvatar = localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY);
                       localStorage.clear();
+                      if (savedAvatar) {
+                        localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, savedAvatar);
+                      }
                       window.location.href = "/";
                     }
                   }}

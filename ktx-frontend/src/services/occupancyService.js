@@ -1,5 +1,6 @@
 import api, { dormService } from "./api";
 import { getStudentAccount, saveStudentAccount } from "./studentAccountService";
+import studentNotificationService from "./studentNotificationService";
 
 const STORAGE_KEY = "dorm_registration_requests";
 
@@ -80,63 +81,106 @@ function saveLocalTransferCheckoutRequests(reqs) {
 
 function getLocalCurrentRoomInfo() {
   try {
-    const acc = getStudentAccount();
-    if (acc?.currentResidence?.isActive && acc.currentResidence.contractStatus === "ACTIVE") {
-      const cr = acc.currentResidence;
-      const roomNum = String(cr.roomNumber || "101").replace(/^P/i, "");
-      const bld = cr.building || "Tòa A1";
-      const floor = cr.floor || (roomNum.startsWith("5") ? "5" : (roomNum[0] || "1"));
+    const studentMsv = (localStorage.getItem("ktx_username") || "").trim().toUpperCase();
+    const trans = getLocalTransferCheckoutRequests();
+    
+    // Kiểm tra nếu có đơn trả phòng đã duyệt
+    const approvedCheckout = trans.find(
+      (t) =>
+        (!studentMsv || (t.msv || "").trim().toUpperCase() === studentMsv) &&
+        (t.trang_thai === "DA_DUYET" || t.trang_thai === "APPROVED" || t.trang_thai_label === "Đã duyệt") &&
+        t.loai_don === "TRA_PHONG"
+    );
+    if (approvedCheckout) {
+      return null;
+    }
+
+    // Kiểm tra nếu có đơn chuyển phòng đã duyệt
+    const approvedTransfer = trans.find(
+      (t) =>
+        (!studentMsv || (t.msv || "").trim().toUpperCase() === studentMsv) &&
+        (t.trang_thai === "DA_DUYET" || t.trang_thai === "APPROVED" || t.trang_thai_label === "Đã duyệt") &&
+        t.loai_don === "CHUYEN_PHONG"
+    );
+    if (approvedTransfer && approvedTransfer.xep_phong) {
+      const xp = approvedTransfer.xep_phong;
+      const rawPhong = String(xp.phong_id || "203");
+      const matchNum = rawPhong.match(/\d+/);
+      const roomClean = matchNum ? matchNum[0] : "203";
+      const rawToa = String(xp.ma_toa || "A1").replace("TOA_", "").replace("Tòa ", "").replace("Tòa", "").trim() || "A1";
+      const toaLabel = `Tòa ${rawToa}`;
+      const giuongClean = String(xp.giuong_id || "G01").split("_").pop() || "G01";
+      const tangVal = roomClean[0] || "2";
       return {
-        phong_hien_tai: `${roomNum} - ${bld}`,
-        so_phong: roomNum,
-        phong: roomNum,
-        toa: bld,
-        tang: floor,
-        giuong: cr.bed || "G04",
-        so_giuong: cr.bed || "G04",
-        so_thanh_vien: 4,
+        phong_hien_tai: `${roomClean} – ${toaLabel}`,
+        so_phong: roomClean,
+        phong: `P${roomClean}`,
+        toa: toaLabel,
+        tang: tangVal,
+        giuong: giuongClean,
+        so_giuong: giuongClean,
+        so_thanh_vien: 1,
         suc_chua: "4 người",
-        thanh_vien: cr.members || "4/4 người",
-        thoi_gian_luu_tru: cr.startDate ? `${cr.startDate} – Nay` : "01/09/2026 – Nay",
-        ngay_nhan_phong: cr.startDate || "01/09/2026",
-        ngay_bat_dau: cr.startDate || "01/09/2026",
-        loai_phong: cr.roomType || "Phòng tiêu chuẩn",
+        thanh_vien: "1/4 người",
+        thoi_gian_luu_tru: `${approvedTransfer.ngay_gui || "19/10/2026"} – Nay`,
+        ngay_nhan_phong: approvedTransfer.ngay_gui || "19/10/2026",
+        ngay_bat_dau: approvedTransfer.ngay_gui || "19/10/2026",
+        loai_phong: "Phòng tiêu chuẩn",
         billing: {
-          amount: "400.000 đ",
-          period: "/tháng",
+          amount: "4.800.000 đ",
+          period: "/năm",
           status: "Đã thanh toán",
         },
+        danh_sach_thanh_vien: [
+          {
+            msv: studentMsv || localStorage.getItem("ktx_username") || "",
+            ho_ten: localStorage.getItem("ktx_fullname") || "Sinh viên",
+            giuong: giuongClean,
+            so_giuong: giuongClean,
+            lop: localStorage.getItem("ktx_lop") || "",
+            khoa: localStorage.getItem("ktx_khoa") || "",
+            so_dien_thoai: localStorage.getItem("ktx_phone") || "",
+            vai_tro: "Bạn (Trưởng phòng)",
+            ngay_vao: approvedTransfer.ngay_gui || "19/10/2026",
+            trang_thai: "DANG_O",
+            trang_thai_label: "Đang ở",
+            is_current_user: true,
+          },
+        ],
       };
     }
+
     const raw = localStorage.getItem(CURRENT_ROOM_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.so_phong) return parsed;
     }
-    // Fallback chuẩn theo hồ sơ mặc định của sinh viên Nguyễn Thị Ánh (DTC245180051)
-    const currentCode = (localStorage.getItem("ktx_username") || "").trim().toUpperCase();
-    if (!currentCode || currentCode === "DTC245180051" || currentCode === "ADMIN" || currentCode === "QUANLY") {
-      return {
-        phong_hien_tai: "101 - Tòa A1",
-        so_phong: "101",
-        phong: "101",
-        toa: "Tòa A1",
-        tang: "1",
-        giuong: "G04",
-        so_giuong: "G04",
-        so_thanh_vien: 4,
-        suc_chua: "4 người",
-        thanh_vien: "4/4 người",
-        thoi_gian_luu_tru: "01/09/2026 – Nay",
-        ngay_nhan_phong: "01/09/2026",
-        ngay_bat_dau: "01/09/2026",
-        loai_phong: "Phòng tiêu chuẩn",
-        billing: {
-          amount: "400.000 đ",
-          period: "/tháng",
-          status: "Đã thanh toán",
-        },
-      };
+
+    const acc = getStudentAccount();
+    if (acc?.currentResidence?.isActive && acc.currentResidence.contractStatus === "ACTIVE") {
+      const cr = acc.currentResidence;
+      const roomNum = String(cr.roomNumber || "").replace(/^P/i, "");
+      if (roomNum) {
+        const bld = cr.building || "";
+        const floor = cr.floor || (roomNum.startsWith("5") ? "5" : (roomNum[0] || "1"));
+        return {
+          phong_hien_tai: bld ? `${roomNum} - ${bld}` : roomNum,
+          so_phong: roomNum,
+          phong: roomNum,
+          toa: bld,
+          tang: floor,
+          giuong: cr.bed || "",
+          so_giuong: cr.bed || "",
+          so_thanh_vien: 4,
+          suc_chua: "4 người",
+          thanh_vien: cr.members || "4/4 người",
+          thoi_gian_luu_tru: cr.startDate ? `${cr.startDate} – Nay` : "",
+          ngay_nhan_phong: cr.startDate || "",
+          ngay_bat_dau: cr.startDate || "",
+          loai_phong: cr.roomType || "Phòng tiêu chuẩn",
+          billing: null,
+        };
+      }
     }
     return null;
   } catch (e) {
@@ -146,7 +190,35 @@ function getLocalCurrentRoomInfo() {
 
 function saveLocalCurrentRoomInfo(info) {
   try {
-    localStorage.setItem(CURRENT_ROOM_STORAGE_KEY, JSON.stringify(info));
+    const newJson = JSON.stringify(info || null);
+    const oldJson = localStorage.getItem(CURRENT_ROOM_STORAGE_KEY);
+    if (newJson === oldJson) return; // Không thay đổi thì không làm gì để tránh vòng lặp re-render
+
+    localStorage.setItem(CURRENT_ROOM_STORAGE_KEY, newJson);
+    if (info && info.so_phong) {
+      try {
+        const raw = localStorage.getItem("ktx_student_account");
+        if (raw) {
+          const acc = JSON.parse(raw);
+          if (acc && typeof acc === "object") {
+            acc.currentResidence = {
+              ...(acc.currentResidence || {}),
+              isActive: true,
+              building: info.toa || acc.currentResidence?.building || "Tòa A1",
+              roomNumber: String(info.so_phong || "203"),
+              floor: info.tang || (String(info.so_phong)[0] || "2"),
+              bed: info.giuong || info.so_giuong || "G01",
+              roomType: info.loai_phong || info.roomType || "Phòng dịch vụ",
+              loai_phong: info.loai_phong || info.roomType || "Phòng dịch vụ",
+              contractStatus: "ACTIVE",
+              startDate: info.ngay_bat_dau || "19/10/2026",
+              endDate: info.ngay_ket_thuc || "",
+            };
+            localStorage.setItem("ktx_student_account", JSON.stringify(acc));
+          }
+        }
+      } catch (_) {}
+    }
   } catch (e) {
     console.error("Failed to save current room info:", e);
   }
@@ -570,9 +642,31 @@ export const occupancyService = {
     // 1. Đưa đơn từ API vào trước
     apiRequests.forEach((req) => {
       const key = req.id || req.ma_yeu_cau || req.msv;
+      const upperId = String(req.id || req.ma_yeu_cau || "").toUpperCase();
+      const isTransfer =
+        upperId.startsWith("YC") ||
+        upperId.startsWith("CP") ||
+        String(req.loai_don || "").toUpperCase().includes("CHUYEN") ||
+        String(req.loai_yeu_cau || "").toLowerCase().includes("chuyển");
+      const isCheckout =
+        upperId.startsWith("TP") ||
+        String(req.loai_don || "").toUpperCase().includes("TRA") ||
+        String(req.loai_yeu_cau || "").toLowerCase().includes("trả");
+
+      const defaultLoaiDon = isCheckout
+        ? "TRA_PHONG"
+        : isTransfer
+          ? "CHUYEN_PHONG"
+          : "DANG_KY";
+      const defaultLoaiYeuCau = isCheckout
+        ? "Trả phòng"
+        : isTransfer
+          ? "Chuyển phòng"
+          : "Đăng ký phòng";
+
       combinedMap.set(key, {
-        loai_don: "DANG_KY",
-        loai_yeu_cau: "Đăng ký phòng",
+        loai_don: req.loai_don || defaultLoaiDon,
+        loai_yeu_cau: req.loai_yeu_cau || defaultLoaiYeuCau,
         ...req,
       });
     });
@@ -672,7 +766,135 @@ export const occupancyService = {
       );
     }
 
-    return [];
+    return [
+      {
+        ma_toa: "TOA_A1",
+        ten_toa: "Tòa A1",
+        gioi_tinh: "Nam & Nữ",
+        rooms: [
+          {
+            ma_phong: "P101_A1",
+            so_phong: "101",
+            loai_phong: "Phòng tiêu chuẩn",
+            so_tang: 1,
+            suc_chua: 4,
+            gioi_tinh: "Nam & Nữ",
+            thanh_vien_hien_tai: 2,
+            gia_tien_nam: 4800000,
+            label: "Phòng 101 (2 chỗ trống)",
+            beds: [
+              { ma_giuong: "P101_A1_G03", label: "Giường G03" },
+              { ma_giuong: "P101_A1_G04", label: "Giường G04" },
+            ],
+          },
+          {
+            ma_phong: "A1_P201",
+            so_phong: "201",
+            loai_phong: "Phòng tiêu chuẩn",
+            so_tang: 2,
+            suc_chua: 4,
+            gioi_tinh: "Nam & Nữ",
+            thanh_vien_hien_tai: 1,
+            gia_tien_nam: 4800000,
+            label: "Phòng 201 (3 chỗ trống)",
+            beds: [
+              { ma_giuong: "A1_P201_G02", label: "Giường G02" },
+              { ma_giuong: "A1_P201_G03", label: "Giường G03" },
+              { ma_giuong: "A1_P201_G04", label: "Giường G04" },
+            ],
+          },
+          {
+            ma_phong: "A203",
+            so_phong: "203",
+            loai_phong: "Phòng dịch vụ",
+            so_tang: 2,
+            suc_chua: 4,
+            gioi_tinh: "Nam & Nữ",
+            thanh_vien_hien_tai: 1,
+            gia_tien_nam: 8200000,
+            label: "Phòng 203 (3 chỗ trống)",
+            beds: [
+              { ma_giuong: "A203_G01", label: "Giường G01" },
+              { ma_giuong: "A203_G02", label: "Giường G02" },
+              { ma_giuong: "A203_G03", label: "Giường G03" },
+            ],
+          },
+          {
+            ma_phong: "A1_P501",
+            so_phong: "501",
+            loai_phong: "Phòng dịch vụ",
+            so_tang: 5,
+            suc_chua: 4,
+            gioi_tinh: "Nam & Nữ",
+            thanh_vien_hien_tai: 0,
+            gia_tien_nam: 8200000,
+            label: "Phòng 501 (4 chỗ trống)",
+            beds: [
+              { ma_giuong: "A1_P501_G01", label: "Giường G01" },
+              { ma_giuong: "A1_P501_G02", label: "Giường G02" },
+              { ma_giuong: "A1_P501_G03", label: "Giường G03" },
+              { ma_giuong: "A1_P501_G04", label: "Giường G04" },
+            ],
+          },
+        ],
+      },
+      {
+        ma_toa: "B",
+        ten_toa: "Tòa B",
+        gioi_tinh: "Nữ",
+        rooms: [
+          {
+            ma_phong: "B101",
+            so_phong: "101",
+            loai_phong: "Phòng tiêu chuẩn",
+            so_tang: 1,
+            suc_chua: 4,
+            gioi_tinh: "Nữ",
+            thanh_vien_hien_tai: 1,
+            gia_tien_nam: 4800000,
+            label: "Phòng 101 (3 chỗ trống)",
+            beds: [
+              { ma_giuong: "B101_G02", label: "Giường G02" },
+              { ma_giuong: "B101_G03", label: "Giường G03" },
+              { ma_giuong: "B101_G04", label: "Giường G04" },
+            ],
+          },
+          {
+            ma_phong: "B202",
+            so_phong: "202",
+            loai_phong: "Phòng dịch vụ",
+            so_tang: 2,
+            suc_chua: 4,
+            gioi_tinh: "Nữ",
+            thanh_vien_hien_tai: 0,
+            gia_tien_nam: 8200000,
+            label: "Phòng 202 (4 chỗ trống)",
+            beds: [
+              { ma_giuong: "B202_G01", label: "Giường G01" },
+              { ma_giuong: "B202_G02", label: "Giường G02" },
+              { ma_giuong: "B202_G03", label: "Giường G03" },
+              { ma_giuong: "B202_G04", label: "Giường G04" },
+            ],
+          },
+          {
+            ma_phong: "B501",
+            so_phong: "501",
+            loai_phong: "Phòng dịch vụ",
+            so_tang: 5,
+            suc_chua: 4,
+            gioi_tinh: "Nữ",
+            thanh_vien_hien_tai: 0,
+            gia_tien_nam: 8200000,
+            label: "Phòng 501 (4 chỗ trống)",
+            beds: [
+              { ma_giuong: "B501_G01", label: "Giường G01" },
+              { ma_giuong: "B501_G02", label: "Giường G02" },
+              { ma_giuong: "B501_G03", label: "Giường G03" },
+            ],
+          },
+        ],
+      },
+    ];
   },
 
   /**
@@ -894,10 +1116,9 @@ export const occupancyService = {
       studentMsv ||
       localStorage.getItem("ktx_username") ||
       localStorage.getItem("ktx_email")?.split("@")[0] ||
-      "dtc245180051"
+      ""
     ).trim().toUpperCase();
 
-    // 1. Thử gọi backend API nếu có mã sinh viên để lấy dữ liệu thực tế từ CSDL MySQL
     if (currentCode) {
       try {
         const res = await api.get("/student/requests/my-contracts", {
@@ -911,26 +1132,26 @@ export const occupancyService = {
       }
     }
 
-    // 2. Tích hợp từ chuẩn hóa studentAccountService
+    // Tích hợp từ chuẩn hóa studentAccountService nếu có
     const account = getStudentAccount(currentCode);
     const accResidenceHistory = Array.isArray(account.residenceHistory) ? account.residenceHistory : [];
 
     if (accResidenceHistory.length > 0) {
       return accResidenceHistory.map((item, idx) => {
         const isActive = item.status === "ACTIVE" && !item.endDate;
-        const roomNum = String(item.roomNumber || "501").replace(/^P/i, "");
-        const buildingStr = item.building || "Tòa A4";
-        const floorStr = roomNum.startsWith("5") ? "5" : (roomNum[0] || "5");
-        const sDate = item.startDate || "02/10/2026";
-        const eDate = item.endDate || "02/10/2027";
-        const sucChua = item.suc_chua || (item.roomType?.includes("dịch vụ") ? "4 người" : "8 người");
-        const shortBed = (item.bed || item.ma_giuong || "G01").split("_").pop() || "G01";
+        const roomNum = String(item.roomNumber || "").replace(/^P/i, "");
+        const buildingStr = item.building || "";
+        const floorStr = item.floor || (roomNum.startsWith("5") ? "5" : (roomNum[0] || "1"));
+        const sDate = item.startDate || "";
+        const eDate = item.endDate || "";
+        const sucChua = item.suc_chua || "4 người";
+        const shortBed = (item.bed || item.ma_giuong || "").split("_").pop() || "";
 
         return {
           id: item.id || `RES-${String(idx + 1).padStart(2, "0")}`,
-          ma_hop_dong: `HD26-${buildingStr.replace(/[^A-Za-z0-9]/g, "")}${roomNum}-${shortBed}`,
-          msv: (account.studentId || "dtc245180051").toUpperCase(),
-          phong: `P${roomNum}`,
+          ma_hop_dong: item.ma_hop_dong || `HD26-${buildingStr.replace(/[^A-Za-z0-9]/g, "")}${roomNum}-${shortBed}`,
+          msv: (account.studentId || currentCode).toUpperCase(),
+          phong: roomNum ? `P${roomNum}` : "",
           so_phong: roomNum,
           roomNumber: roomNum,
           toa: buildingStr,
@@ -946,7 +1167,7 @@ export const occupancyService = {
           ngay_bat_dau: sDate,
           ngay_duyet: sDate,
           ngay_ket_thuc: eDate,
-          thoi_han_hop_dong: `${sDate} - ${eDate}`,
+          thoi_han_hop_dong: sDate && eDate ? `${sDate} - ${eDate}` : "",
           thoi_gian_o: "2026-2027",
           nam_hoc: "2026-2027",
           trang_thai: isActive ? "DANG_O" : "DA_TRA_PHONG",
@@ -958,37 +1179,148 @@ export const occupancyService = {
       });
     }
 
-    // 3. Fallback sang LocalStorage (chỉ lấy hợp đồng thuộc về mã sinh viên hiện tại)
-    const local = getLocalStayContracts();
-    return local.filter((c) => {
-      const cMsv = (c.msv || "").trim().toUpperCase();
-      return !currentCode || (cMsv && cMsv === currentCode);
-    });
+    return [];
   },
 
   getCurrentRoomInfo: async (studentMsv) => {
-    const msv = studentMsv || localStorage.getItem("ktx_username") || "DTC245180051";
+    const msv = (studentMsv || localStorage.getItem("ktx_username") || "").trim();
+    if (!msv) return null;
     try {
       const res = await api.get('/student/requests/current-room', {
-        params: msv ? { msv } : {},
+        params: { msv },
       });
       const data = res.data?.data || null;
       if (data && data.so_phong) {
         saveLocalCurrentRoomInfo(data);
         return data;
       }
-      return getLocalCurrentRoomInfo();
+      localStorage.removeItem(CURRENT_ROOM_STORAGE_KEY);
+      return null;
     } catch (err) {
       console.warn('GET /student/requests/current-room failed, trying local cache:', err);
       return getLocalCurrentRoomInfo();
     }
   },
 
-  getStudentProfile: async () => {
+  getStudentProfile: async (studentMsv) => {
+    const msv = (
+      studentMsv ||
+      localStorage.getItem("ktx_username") ||
+      ""
+    ).trim();
+
+    if (msv) {
+      try {
+        const res = await api.get(`/students/${encodeURIComponent(msv)}`);
+        if (res.data) {
+          const sv = res.data;
+          const u = sv.nguoi_dung || {};
+          const profile = {
+            ho_ten: sv.ho_ten || u.ho_ten || localStorage.getItem("ktx_fullname") || "",
+            vai_tro: "Sinh viên",
+            msv: sv.msv || msv,
+            lop: sv.lop || "",
+            so_dien_thoai: sv.so_dien_thoai || u.so_dien_thoai || "",
+            email: sv.email || u.email || localStorage.getItem("ktx_email") || "",
+            ngay_sinh: sv.ngay_sinh || "",
+            gioi_tinh: sv.gioi_tinh || "",
+            dan_toc: sv.dan_toc || "Kinh",
+            que_quan: sv.que_quan || sv.dia_chi || "",
+            dia_chi: sv.dia_chi || sv.que_quan || "",
+            khoa: sv.khoa || "",
+            cccd: sv.cccd || "",
+            doi_tuong_uu_tien: sv.doi_tuong_uu_tien || "",
+            nguoi_giam_ho: sv.nguoi_giam_ho || "",
+            moi_quan_he: sv.moi_quan_he || "",
+            sdt_nguoi_giam_ho: sv.sdt_nguoi_giam_ho || "",
+            avatar_url: sv.anh_dai_dien || localStorage.getItem("ktx_student_avatar") || "/avatar.png",
+          };
+          saveLocalStudentProfile(profile);
+          return profile;
+        }
+      } catch (err) {
+        console.warn(`GET /students/${msv} failed, falling back to local profile:`, err);
+      }
+    }
     return getLocalStudentProfile();
   },
 
+  uploadStudentAvatar: async (msv, file) => {
+    const cleanMsv = (
+      msv ||
+      localStorage.getItem("ktx_username") ||
+      localStorage.getItem("ktx_email")?.split("@")[0] ||
+      ""
+    ).trim();
+
+    if (!cleanMsv || !file) {
+      throw new Error("Thiếu mã sinh viên hoặc tệp ảnh hợp lệ.");
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await api.post(
+      `/students/${encodeURIComponent(cleanMsv)}/avatar`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    );
+
+    const sv = res.data;
+    const avatarUrl = sv.anh_dai_dien;
+    if (avatarUrl) {
+      localStorage.setItem("ktx_student_avatar", avatarUrl);
+      const current = getLocalStudentProfile();
+      saveLocalStudentProfile({ ...current, avatar_url: avatarUrl });
+      window.dispatchEvent(
+        new CustomEvent("student-avatar-updated", {
+          detail: { avatarUrl },
+        }),
+      );
+    }
+    return sv;
+  },
+
   updateStudentProfile: async (updatedData) => {
+    const msv = (
+      updatedData.msv ||
+      localStorage.getItem("ktx_username") ||
+      ""
+    ).trim();
+
+    if (msv) {
+      try {
+        const payload = {
+          lop: updatedData.lop,
+          gioi_tinh: updatedData.gioi_tinh,
+          khoa: updatedData.khoa,
+          dia_chi: updatedData.dia_chi || updatedData.que_quan,
+          cccd: updatedData.cccd,
+          ngay_sinh: updatedData.ngay_sinh,
+          doi_tuong_uu_tien: updatedData.doi_tuong_uu_tien,
+          nguoi_giam_ho: updatedData.nguoi_giam_ho,
+          moi_quan_he: updatedData.moi_quan_he,
+          sdt_nguoi_giam_ho: updatedData.sdt_nguoi_giam_ho,
+          ho_ten: updatedData.ho_ten,
+          email: updatedData.email,
+          so_dien_thoai: updatedData.so_dien_thoai,
+        };
+        if (
+          updatedData.avatar_url &&
+          !updatedData.avatar_url.startsWith("data:")
+        ) {
+          payload.anh_dai_dien = updatedData.avatar_url;
+        }
+        await api.put(`/students/${encodeURIComponent(msv)}`, payload);
+      } catch (err) {
+        console.warn(`PUT /students/${msv} failed:`, err);
+      }
+    }
+
     const current = getLocalStudentProfile();
     const merged = { ...current, ...updatedData };
     saveLocalStudentProfile(merged);
@@ -1078,6 +1410,24 @@ export const occupancyService = {
 
     // Bắn sự kiện cập nhật thời gian thực
     window.dispatchEvent(new Event("occupancy-updated"));
+    try {
+      const targetReq = all.find(
+        (r) =>
+          r.id?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.replace("#", "").toLowerCase() === cleanId.replace("#", "").toLowerCase()
+      );
+      const targetMsv = targetReq?.msv || targetReq?.ma_sinh_vien || payload.msv || "DTC245180037";
+      studentNotificationService.notifyFromManagement({
+        id: `transfer-approved-${cleanId.replace("#", "")}`,
+        title: "Thông báo duyệt chuyển phòng",
+        content: `Kết quả xét duyệt chuyển phòng (${cleanId}) đã có: Yêu cầu chuyển phòng của bạn đã được Ban quản lý phê duyệt. Bạn được chuyển sang Phòng ${phongLabel} - ${toaLabel} (Giường ${giuongClean}). Vui lòng kiểm tra thông tin phòng tại mục Lịch sử phòng.`,
+        type: "transfer",
+        actionUrl: "/student/history",
+        actionLabel: "Kiểm tra lịch sử phòng",
+        msv: targetMsv,
+      });
+    } catch (_) {}
 
     // Gửi lên backend nếu online
     try {
@@ -1129,6 +1479,24 @@ export const occupancyService = {
     saveLocalTransferCheckoutRequests(updated);
 
     window.dispatchEvent(new Event("occupancy-updated"));
+    try {
+      const targetReq = all.find(
+        (r) =>
+          r.id?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.replace("#", "").toLowerCase() === cleanId.replace("#", "").toLowerCase()
+      );
+      const targetMsv = targetReq?.msv || targetReq?.ma_sinh_vien || payload.msv || "DTC245180037";
+      studentNotificationService.notifyFromManagement({
+        id: `transfer-rejected-${cleanId.replace("#", "")}`,
+        title: "Thông báo từ chối chuyển phòng",
+        content: `Yêu cầu chuyển phòng (${cleanId}) của bạn đã bị từ chối. Lý do: ${payload.ly_do_tu_choi || "Không đáp ứng điều kiện chuyển phòng."}`,
+        type: "transfer",
+        actionUrl: "/student/history",
+        actionLabel: "Xem lịch sử yêu cầu",
+        msv: targetMsv,
+      });
+    } catch (_) {}
 
     try {
       await api.put(
@@ -1198,6 +1566,24 @@ export const occupancyService = {
     saveLocalStayContracts(updatedContracts);
 
     window.dispatchEvent(new Event("occupancy-updated"));
+    try {
+      const targetReq = all.find(
+        (r) =>
+          r.id?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.replace("#", "").toLowerCase() === cleanId.replace("#", "").toLowerCase()
+      );
+      const targetMsv = targetReq?.msv || targetReq?.ma_sinh_vien || payload.msv || "DTC245180037";
+      studentNotificationService.notifyFromManagement({
+        id: `checkout-approved-${cleanId.replace("#", "")}`,
+        title: "Thông báo kết quả trả phòng",
+        content: `Yêu cầu trả phòng (${cleanId}) của bạn đã được Ban quản lý phê duyệt hoàn tất. Thủ tục bàn giao tài sản và kết thúc lưu trú đã xong.`,
+        type: "inspection",
+        actionUrl: "/student/history",
+        actionLabel: "Kiểm tra lịch sử",
+        msv: targetMsv,
+      });
+    } catch (_) {}
 
     try {
       await api.put(
@@ -1244,6 +1630,24 @@ export const occupancyService = {
     saveLocalTransferCheckoutRequests(updated);
 
     window.dispatchEvent(new Event("occupancy-updated"));
+    try {
+      const targetReq = all.find(
+        (r) =>
+          r.id?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.toLowerCase() === cleanId.toLowerCase() ||
+          r.ma_yeu_cau?.replace("#", "").toLowerCase() === cleanId.replace("#", "").toLowerCase()
+      );
+      const targetMsv = targetReq?.msv || targetReq?.ma_sinh_vien || payload.msv || "DTC245180037";
+      studentNotificationService.notifyFromManagement({
+        id: `checkout-rejected-${cleanId.replace("#", "")}`,
+        title: "Thông báo từ chối trả phòng",
+        content: `Yêu cầu trả phòng (${cleanId}) của bạn đã bị từ chối. Lý do: ${payload.ly_do_tu_choi || "Chưa hoàn tất công nợ hoặc thủ tục bàn giao tài sản."}`,
+        type: "inspection",
+        actionUrl: "/student/history",
+        actionLabel: "Kiểm tra lịch sử",
+        msv: targetMsv,
+      });
+    } catch (_) {}
 
     try {
       await api.put(

@@ -529,7 +529,7 @@ export default function RoomManagement({ searchTerm = "" }) {
 
               // Giá tiền / năm
               const roomPrice =
-                Number(room.gia_tien_nam) || (isService ? 9600000 : 4800000);
+                Number(room.gia_tien_nam) || (isService ? 8200000 : 4800000);
 
               return (
                 <div

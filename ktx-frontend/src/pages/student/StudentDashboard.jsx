@@ -3,6 +3,7 @@ import "./StudentDashboard.css";
 import campusBanner from "../../assets/image.png";
 import occupancyService from "../../services/occupancyService";
 import feedbackService from "../../services/feedbackService";
+import studentNotificationService from "../../services/studentNotificationService";
 
 // Dữ liệu tĩnh cho danh sách chức năng (không phải dữ liệu người dùng)
 const SERVICE_LIST = [
@@ -58,46 +59,56 @@ const STATIC_NOTIFICATIONS = [
 ];
 
 export default function StudentDashboard({ user, onNavigate }) {
-  const DEFAULT_ROOM = {
-    so_phong: "101",
-    toa: "Tòa A1",
-    tang: "1",
-    giuong: "G04",
-    so_thanh_vien: 4,
-    suc_chua: "4 người",
-    thanh_vien: "4/4 người",
-  };
-  const DEFAULT_BILLING = {
-    amount: "400.000 đ",
-    period: "/tháng",
-    status: "Đã thanh toán",
-  };
-
   const [activeModal, setActiveModal] = useState(null);
-  const [currentRoomInfo, setCurrentRoomInfo] = useState(DEFAULT_ROOM);
-  const [billing, setBilling] = useState(DEFAULT_BILLING);
+  const [currentRoomInfo, setCurrentRoomInfo] = useState(null);
+  const [billing, setBilling] = useState(null);
   const [complaints, setComplaints] = useState({ total: 0, processing: 0, resolved: 0 });
   const [registrationStatus, setRegistrationStatus] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+
+  const loadNotifications = async () => {
+    try {
+      const initial = studentNotificationService.getNotifications();
+      if (notifications.length === 0) {
+        setNotifications(initial.slice(0, 3));
+      }
+      await studentNotificationService.syncViolations();
+      await studentNotificationService.syncFromBackend();
+      const updated = studentNotificationService.getNotifications();
+      setNotifications(updated.slice(0, 3));
+    } catch (_) {}
+  };
 
   const loadRoomInfo = async () => {
     try {
-      const msv = user?.msv || user?.nguoi_dung?.sinh_vien?.msv || localStorage.getItem("ktx_username") || "DTC245180051";
+      const msv = user?.msv || user?.nguoi_dung?.sinh_vien?.msv || localStorage.getItem("ktx_username") || "";
+      if (!msv) {
+        setCurrentRoomInfo(null);
+        setBilling(null);
+        return;
+      }
       const info = await occupancyService.getCurrentRoomInfo(msv);
       if (info && info.so_phong) {
-        setCurrentRoomInfo(info);
-        if (info.billing) {
-          setBilling(info.billing);
-        } else {
-          setBilling(DEFAULT_BILLING);
-        }
+        const memberCount = (Array.isArray(info.danh_sach_thanh_vien) && info.danh_sach_thanh_vien.length > 0)
+          ? (info.danh_sach_thanh_vien.filter((m) => !m.is_empty && m.msv).length || 1)
+          : (info.so_thanh_vien === 3 ? 1 : (info.so_thanh_vien || 1));
+        const maxCap = String(info.suc_chua || "4").match(/\d+/)?.[0] || "4";
+        const normalized = {
+          ...info,
+          so_thanh_vien: memberCount,
+          suc_chua: `${maxCap} người`,
+          thanh_vien: `${memberCount}/${maxCap} người`,
+        };
+        setCurrentRoomInfo(normalized);
+        setBilling(normalized.billing || null);
       } else {
-        setCurrentRoomInfo(DEFAULT_ROOM);
-        setBilling(DEFAULT_BILLING);
+        setCurrentRoomInfo(null);
+        setBilling(null);
       }
     } catch (e) {
       console.error("Error loading room info in StudentDashboard:", e);
-      setCurrentRoomInfo(DEFAULT_ROOM);
-      setBilling(DEFAULT_BILLING);
+      setCurrentRoomInfo(null);
+      setBilling(null);
     }
   };
 
@@ -114,19 +125,23 @@ export default function StudentDashboard({ user, onNavigate }) {
     }
   };
 
-  const loadRegistrationStatus = () => {
+  const loadRegistrationStatus = async () => {
     try {
+      const msv = user?.msv || user?.nguoi_dung?.sinh_vien?.msv || localStorage.getItem("ktx_username") || "";
+      if (msv) {
+        const reqs = await occupancyService.getMyRequests(msv);
+        if (Array.isArray(reqs) && reqs.length > 0) {
+          setRegistrationStatus(reqs[0]);
+          return;
+        }
+      }
       const raw = localStorage.getItem("dorm_registration_requests");
       if (raw) {
         const list = JSON.parse(raw);
         const real = list.find(
           (r) => r.msv && !r.msv.includes("xxxxxxxx") && !r.msv.includes("XXXXXX")
         );
-        if (real) {
-          setRegistrationStatus(real);
-        } else {
-          setRegistrationStatus(null);
-        }
+        setRegistrationStatus(real || null);
       } else {
         setRegistrationStatus(null);
       }
@@ -141,7 +156,12 @@ export default function StudentDashboard({ user, onNavigate }) {
     if (cachedRoom) {
       try {
         const parsed = JSON.parse(cachedRoom);
-        if (parsed?.so_phong === "36" || parsed?.phong_hien_tai?.includes("P36")) {
+        if (
+          parsed?.so_phong === "36" ||
+          parsed?.phong_hien_tai?.includes("P36") ||
+          parsed?.so_thanh_vien === 3 ||
+          parsed?.thanh_vien === "3/4 người"
+        ) {
           localStorage.removeItem("dorm_current_room_info");
         }
       } catch (_) {
@@ -153,20 +173,35 @@ export default function StudentDashboard({ user, onNavigate }) {
     loadRegistrationStatus();
     loadComplaints();
 
+    let updateTimer = null;
     const handleUpdate = () => {
-      loadRoomInfo();
-      loadRegistrationStatus();
-      loadComplaints();
+      if (updateTimer) clearTimeout(updateTimer);
+      updateTimer = setTimeout(() => {
+        loadRoomInfo();
+        loadRegistrationStatus();
+        loadComplaints();
+      }, 150);
     };
 
     window.addEventListener("occupancy-updated", handleUpdate);
     window.addEventListener("student-account-updated", handleUpdate);
-    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("student-incidents-updated", handleUpdate);
+
+    loadNotifications();
+    const intervalNotifs = setInterval(loadNotifications, 3000);
+    window.addEventListener("focus", loadNotifications);
+    window.addEventListener("ktx-notifications-updated", loadNotifications);
+    window.addEventListener("storage", loadNotifications);
 
     return () => {
+      if (updateTimer) clearTimeout(updateTimer);
+      clearInterval(intervalNotifs);
+      window.removeEventListener("focus", loadNotifications);
+      window.removeEventListener("ktx-notifications-updated", loadNotifications);
+      window.removeEventListener("storage", loadNotifications);
       window.removeEventListener("occupancy-updated", handleUpdate);
       window.removeEventListener("student-account-updated", handleUpdate);
-      window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener("student-incidents-updated", handleUpdate);
     };
   }, []);
 
@@ -306,17 +341,44 @@ export default function StudentDashboard({ user, onNavigate }) {
         {/* Thẻ 2: Số thành viên */}
         <div
           className="student-stat-card"
-          onClick={() =>
+          onClick={() => {
+            const rawRoom = currentRoomInfo?.so_phong || "203";
+            const cleanRoom = String(rawRoom).replace(/^P/i, "");
+            const rawToa = currentRoomInfo?.toa || "Tòa A1";
+            const roomTitle = `P${cleanRoom} - ${rawToa.startsWith("Tòa") ? rawToa : `Tòa ${rawToa}`}`;
+            
+            const currentMsv = (user?.msv || user?.nguoi_dung?.sinh_vien?.msv || localStorage.getItem("ktx_username") || "").trim();
+            const currentName = (user?.nguoi_dung?.ho_ten || user?.ho_ten || localStorage.getItem("ktx_fullname") || "Sinh viên").trim();
+
+            const memberList = (currentRoomInfo?.danh_sach_thanh_vien && currentRoomInfo.danh_sach_thanh_vien.length > 0)
+              ? currentRoomInfo.danh_sach_thanh_vien
+              : [
+                  {
+                    msv: currentMsv,
+                    ho_ten: currentName,
+                    giuong: currentRoomInfo?.giuong || "G01",
+                    so_giuong: currentRoomInfo?.giuong || "G01",
+                    lop: user?.lop || localStorage.getItem("ktx_lop") || "",
+                    khoa: user?.khoa || localStorage.getItem("ktx_khoa") || "",
+                    so_dien_thoai: user?.so_dien_thoai || localStorage.getItem("ktx_phone") || "",
+                    vai_tro: "Bạn (Trưởng phòng)",
+                    ngay_vao: currentRoomInfo?.ngay_bat_dau || "01/10/2026",
+                    trang_thai: "DANG_O",
+                    trang_thai_label: "Đang ở",
+                    is_current_user: true,
+                  },
+                ];
+
             setActiveModal({
+              type: "room_members",
               title: "Danh sách thành viên phòng",
-              desc: currentRoomInfo?.thanh_vien
-                ? `Hiện có ${currentRoomInfo.thanh_vien} sinh viên`
-                : "Chưa có thông tin phòng",
-              detail: currentRoomInfo
-                ? "Phòng đang còn chỗ trống cho đợt tiếp nhận kỳ mới."
-                : "Bạn chưa được xếp phòng.",
-            })
-          }
+              roomTitle,
+              tang: currentRoomInfo?.tang || "2",
+              members: memberList,
+              so_thanh_vien: memberList.filter(m => !m.is_empty && m.msv).length || 1,
+              suc_chua: currentRoomInfo?.suc_chua || "4 người",
+            });
+          }}
         >
           <div className="student-stat-left">
             <div className="student-stat-icon-box cyan">
@@ -340,12 +402,18 @@ export default function StudentDashboard({ user, onNavigate }) {
               <span className="student-stat-label">Số thành viên</span>
               <span className="student-stat-value">
                 {currentRoomInfo
-                  ? (currentRoomInfo.so_thanh_vien !== undefined && currentRoomInfo.suc_chua
-                      ? `${currentRoomInfo.so_thanh_vien}/${String(currentRoomInfo.suc_chua).match(/\d+/)?.[0] || 4}`
-                      : (currentRoomInfo.thanh_vien?.replace(/người/i, '').trim() || "4/4"))
-                  : "4/4"}
+                  ? (() => {
+                      const count = (Array.isArray(currentRoomInfo.danh_sach_thanh_vien) && currentRoomInfo.danh_sach_thanh_vien.length > 0)
+                        ? (currentRoomInfo.danh_sach_thanh_vien.filter(m => !m.is_empty && m.msv).length || 1)
+                        : (currentRoomInfo.so_thanh_vien === 3 ? 1 : (currentRoomInfo.so_thanh_vien || 1));
+                      const cap = String(currentRoomInfo.suc_chua || "4").match(/\d+/)?.[0] || 4;
+                      return `${count}/${cap}`;
+                    })()
+                  : "—"}
               </span>
-              <span className="student-stat-subtext">Hiện tại / sức chứa</span>
+              <span className="student-stat-subtext">
+                {currentRoomInfo ? "Hiện tại / sức chứa" : "Chưa xếp phòng"}
+              </span>
             </div>
           </div>
           <span className="student-stat-arrow">›</span>
@@ -354,7 +422,7 @@ export default function StudentDashboard({ user, onNavigate }) {
         {/* Thẻ 3: Phí KTX */}
         <div
           className="student-stat-card"
-          onClick={() =>
+          onClick={() => {
             setActiveModal({
               title: "Tình trạng phí Ký túc xá",
               desc: billing ? `Số tiền: ${billing.amount}` : "Chưa có thông tin phí",
@@ -363,8 +431,10 @@ export default function StudentDashboard({ user, onNavigate }) {
                   ? "Bạn đã hoàn tất nộp phí lưu trú. Không có công nợ tồn đọng."
                   : "Bạn có khoản phí ký túc xá cần thanh toán.")
                 : "Bạn chưa có hợp đồng lưu trú hoặc công nợ phí. Vui lòng kiểm tra lại sau khi được xếp phòng.",
-            })
-          }
+              actionText: billing?.status !== "Đã thanh toán" ? "Thanh toán ngay" : null,
+              actionPath: billing?.status !== "Đã thanh toán" ? "/student/payment" : null,
+            });
+          }}
         >
           <div className="student-stat-left">
             <div className="student-stat-icon-box amber">
@@ -396,17 +466,23 @@ export default function StudentDashboard({ user, onNavigate }) {
                         color: "#64748B",
                       }}
                     >
-                      {billing.period || "/tháng"}
+                      {billing.period?.replace("/tháng", "/năm") || "/năm"}
                     </span>
                   </>
                 ) : (
-                  "400.000 đ /tháng"
+                  "0 đ"
                 )}
               </span>
               {billing ? (
-                <span className="student-stat-badge">{billing.status}</span>
+                <span
+                  className={`student-stat-badge ${
+                    billing.status === "Đã thanh toán" ? "paid" : "unpaid"
+                  }`}
+                >
+                  {billing.status}
+                </span>
               ) : (
-                <span className="student-stat-badge">Đã thanh toán</span>
+                <span className="student-stat-subtext">Chưa phát sinh</span>
               )}
             </div>
           </div>
@@ -448,7 +524,9 @@ export default function StudentDashboard({ user, onNavigate }) {
               <span className="student-stat-label">Phản ánh</span>
               <span className="student-stat-value">{complaints.total}</span>
               <span className="student-stat-subtext">
-                Đang xử lý: {complaints.processing} | Đã xử lý: {complaints.resolved}
+                {complaints.total === 0
+                  ? "Chưa có phản ánh"
+                  : `Đang xử lý: ${complaints.processing} | Đã xử lý: ${complaints.resolved}`}
               </span>
             </div>
           </div>
@@ -773,7 +851,7 @@ export default function StudentDashboard({ user, onNavigate }) {
                                 : "#94A3B8",
                       }}
                     />
-                    <span>
+                    <span className="student-notif-text">
                       {!registrationStatus && "Đăng ký chỗ ở KTX"}
                       {registrationStatus?.trang_thai === "CHO_DUYET" &&
                         "Đơn đăng ký — Đang chờ duyệt"}
@@ -809,38 +887,409 @@ export default function StudentDashboard({ user, onNavigate }) {
                 </div>
               )}
 
+              {/* Danh sách thông báo thực tế (Vi phạm nội quy, Hội đồng, Kết quả, Hóa đơn...) - Giới hạn tối đa 3 thông báo mới nhất */}
+              {notifications && notifications.length > 0 ? (
+                notifications.slice(0, 3).map((item) => (
+                  <div
+                    key={item.id}
+                    className="student-notif-item"
+                    onClick={() =>
+                      onNavigate &&
+                      onNavigate(item.actionUrl || "/student/notifications")
+                    }
+                    style={{ cursor: "pointer" }}
+                  >
+                    <div className="student-notif-title-wrap">
+                      <span
+                        className="student-notif-dot"
+                        style={{
+                          backgroundColor:
+                            item.type === "violation_warning"
+                              ? "#F59E0B"
+                              : item.type === "violation_summon"
+                                ? "#EF4444"
+                                : item.type === "violation_resolved"
+                                  ? "#10B981"
+                                  : item.source === "ACCOUNTANT"
+                                    ? "#8B5CF6"
+                                    : "#0284C7",
+                        }}
+                      />
+                      <span
+                        className="student-notif-text"
+                        style={{ fontWeight: !item.isRead ? 700 : 500 }}
+                        title={item.title}
+                      >
+                        {item.title}
+                      </span>
+                    </div>
+                    <span className="student-notif-date">
+                      {item.date || "Hôm nay"}
+                    </span>
+                  </div>
+                ))
+              ) : currentRoomInfo ? (
+                <div
+                  style={{
+                    padding: "16px 12px",
+                    textAlign: "center",
+                    color: "#94A3B8",
+                    fontSize: "13px",
+                  }}
+                >
+                  Chưa có thông báo mới nào
+                </div>
+              ) : null}
 
+              {/* Nút xem toàn bộ trang thông báo */}
+              <div
+                style={{
+                  paddingTop: "8px",
+                  borderTop: "1px solid #F1F5F9",
+                  textAlign: "right",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    onNavigate && onNavigate("/student/notifications")
+                  }
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#0284C7",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    padding: "4px 8px",
+                  }}
+                >
+                  Xem tất cả thông báo →
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ================= MODAL XEM CHI TIẾT TÍNH NĂNG ================= */}
+      {/* ================= MODAL XEM CHI TIẾT TÍNH NĂNG / THÀNH VIÊN ================= */}
       {activeModal && (
         <div className="student-modal-backdrop" onClick={closeModal}>
           <div
-            className="student-modal-card"
+            className={`student-modal-card ${activeModal.type === "room_members" ? "student-modal-card-lg" : ""}`}
             onClick={(e) => e.stopPropagation()}
+            style={activeModal.type === "room_members" ? { maxWidth: "600px", maxHeight: "90vh" } : {}}
           >
             <div className="student-modal-header">
-              <h4 className="student-modal-title">{activeModal.title}</h4>
-              <button className="student-modal-close-btn" onClick={closeModal}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {activeModal.type === "room_members" && (
+                  <div style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "10px",
+                    backgroundColor: "#EFF6FF",
+                    color: "#2563EB",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  </div>
+                )}
+                <div>
+                  <h4 className="student-modal-title">{activeModal.title}</h4>
+                  {activeModal.roomTitle && (
+                    <div style={{ fontSize: "12px", color: "#64748B", fontWeight: 500, marginTop: "2px" }}>
+                      Phòng <strong>{activeModal.roomTitle}</strong> • Tầng {activeModal.tang || "2"}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button className="student-modal-close-btn" onClick={closeModal} title="Đóng">
                 ✕
               </button>
             </div>
-            <div className="student-modal-body">
-              <p style={{ fontWeight: 600, color: "#1D68FE", marginBottom: 6 }}>
-                {activeModal.desc}
-              </p>
-              <p>{activeModal.detail}</p>
-            </div>
+
+            {activeModal.type === "room_members" ? (
+              <div className="student-modal-body" style={{ padding: "16px 20px", maxHeight: "calc(90vh - 140px)", overflowY: "auto" }}>
+                {/* Thanh trạng thái phòng */}
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  backgroundColor: "#F8FAFC",
+                  padding: "10px 14px",
+                  borderRadius: "10px",
+                  border: "1px solid #E2E8F0",
+                  marginBottom: "14px"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{
+                      backgroundColor: "#ECFDF5",
+                      color: "#059669",
+                      padding: "3px 10px",
+                      borderRadius: "12px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      border: "1px solid #A7F3D0",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "5px"
+                    }}>
+                      <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#059669" }}></span>
+                      {activeModal.members.filter(m => !m.is_empty).length} đang ở
+                    </span>
+                    <span style={{
+                      backgroundColor: "#FFFBEB",
+                      color: "#D97706",
+                      padding: "3px 10px",
+                      borderRadius: "12px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      border: "1px solid #FDE68A"
+                    }}>
+                      {activeModal.members.filter(m => m.is_empty).length} chỗ trống
+                    </span>
+                  </div>
+                  <span style={{ fontSize: "12.5px", color: "#475569", fontWeight: 500 }}>
+                    Sức chứa: <strong>{activeModal.suc_chua || "4 người"}</strong>
+                  </span>
+                </div>
+
+                {/* Danh sách thành viên / giường */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {activeModal.members.map((mem, idx) => (
+                    mem.is_empty ? (
+                      <div
+                        key={idx}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "12px 14px",
+                          borderRadius: "10px",
+                          border: "1.5px dashed #CBD5E1",
+                          backgroundColor: "#F8FAFC",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <div style={{
+                            width: "40px",
+                            height: "40px",
+                            borderRadius: "50%",
+                            border: "1.5px dashed #94A3B8",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#94A3B8",
+                            backgroundColor: "#FFFFFF",
+                            flexShrink: 0
+                          }}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                              <circle cx="12" cy="7" r="4" />
+                            </svg>
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600, color: "#64748B", fontSize: "13.5px" }}>
+                              {mem.giuong ? `Giường ${mem.giuong}` : `Vị trí #${idx + 1}`} — {mem.ho_ten || "Chưa có người ở"}
+                            </div>
+                            <div style={{ fontSize: "12px", color: "#94A3B8", marginTop: "1px" }}>
+                              Chỗ trống sẵn sàng tiếp nhận sinh viên mới trong đợt tiếp theo
+                            </div>
+                          </div>
+                        </div>
+                        <span style={{
+                          fontSize: "11px",
+                          fontWeight: 600,
+                          color: "#64748B",
+                          backgroundColor: "#E2E8F0",
+                          padding: "4px 9px",
+                          borderRadius: "6px",
+                          whiteSpace: "nowrap"
+                        }}>
+                          Còn trống
+                        </span>
+                      </div>
+                    ) : (
+                      <div
+                        key={idx}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "12px 14px",
+                          borderRadius: "10px",
+                          border: mem.is_current_user ? "1.5px solid #93C5FD" : "1px solid #E2E8F0",
+                          backgroundColor: mem.is_current_user ? "#F0F7FF" : "#FFFFFF",
+                          boxShadow: mem.is_current_user ? "0 2px 8px rgba(37, 99, 235, 0.08)" : "0 1px 3px rgba(0,0,0,0.02)"
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
+                          {/* Avatar Circle */}
+                          <div style={{
+                            width: "42px",
+                            height: "42px",
+                            borderRadius: "50%",
+                            background: mem.is_current_user
+                              ? "linear-gradient(135deg, #2563EB, #1D4ED8)"
+                              : idx === 1
+                                ? "linear-gradient(135deg, #0D9488, #059669)"
+                                : "linear-gradient(135deg, #7C3AED, #6D28D9)",
+                            color: "#FFFFFF",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: 700,
+                            fontSize: "13.5px",
+                            flexShrink: 0,
+                            boxShadow: "0 2px 5px rgba(0,0,0,0.1)"
+                          }}>
+                            {mem.ho_ten ? mem.ho_ten.split(" ").slice(-2).map(n => n[0]).join("") : "SV"}
+                          </div>
+
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                              <span style={{ fontWeight: 700, color: "#0F172A", fontSize: "14px" }}>
+                                {mem.ho_ten}
+                              </span>
+                              {mem.is_current_user ? (
+                                <span style={{
+                                  fontSize: "10.5px",
+                                  fontWeight: 600,
+                                  backgroundColor: "#DBEAFE",
+                                  color: "#1D4ED8",
+                                  padding: "1px 7px",
+                                  borderRadius: "4px"
+                                }}>
+                                  {mem.vai_tro || "Bạn"}
+                                </span>
+                              ) : (
+                                mem.vai_tro && mem.vai_tro !== "Thành viên" && (
+                                  <span style={{
+                                    fontSize: "10.5px",
+                                    fontWeight: 600,
+                                    backgroundColor: "#F1F5F9",
+                                    color: "#475569",
+                                    padding: "1px 6px",
+                                    borderRadius: "4px"
+                                  }}>
+                                    {mem.vai_tro}
+                                  </span>
+                                )
+                              )}
+                            </div>
+
+                            <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                              <span>MSV: <strong style={{ color: "#334155" }}>{mem.msv}</strong></span>
+                              {mem.lop && <span>• Lớp: {mem.lop}</span>}
+                              {mem.khoa && <span>• {mem.khoa}</span>}
+                            </div>
+
+                            {mem.so_dien_thoai && (
+                              <div style={{ fontSize: "11.5px", color: "#2563EB", marginTop: "3px", display: "flex", alignItems: "center", gap: "5px" }}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                                </svg>
+                                <span>{mem.so_dien_thoai}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "5px", flexShrink: 0, marginLeft: "10px" }}>
+                          <span style={{
+                            fontSize: "11.5px",
+                            fontWeight: 700,
+                            color: "#1E293B",
+                            backgroundColor: "#F1F5F9",
+                            padding: "3px 9px",
+                            borderRadius: "6px",
+                            border: "1px solid #E2E8F0"
+                          }}>
+                            {mem.giuong ? `Giường ${mem.giuong}` : `G${idx + 1}`}
+                          </span>
+                          <span style={{
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            color: "#059669",
+                            backgroundColor: "#ECFDF5",
+                            padding: "2px 7px",
+                            borderRadius: "4px"
+                          }}>
+                            {mem.trang_thai_label || "Đang ở"}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  ))}
+                </div>
+
+                <div style={{
+                  fontSize: "11.5px",
+                  color: "#94A3B8",
+                  marginTop: "14px",
+                  paddingTop: "10px",
+                  borderTop: "1px dashed #E2E8F0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between"
+                }}>
+                  <span>* Dữ liệu sinh viên nội trú được xác thực từ KTX</span>
+                  <span>Ngày vào: {currentRoomInfo?.ngay_bat_dau || "19/10/2026"}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="student-modal-body">
+                <p style={{ fontWeight: 600, color: "#1D68FE", marginBottom: 6 }}>
+                  {activeModal.desc}
+                </p>
+                <p>{activeModal.detail}</p>
+              </div>
+            )}
+
             <div className="student-modal-footer">
-              <button
-                className="student-modal-primary-btn"
-                onClick={closeModal}
-              >
-                Đã hiểu
-              </button>
+              {activeModal.actionPath && onNavigate ? (
+                <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", width: "100%" }}>
+                  <button
+                    className="student-modal-secondary-btn"
+                    onClick={closeModal}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      border: "1px solid #CBD5E1",
+                      backgroundColor: "#fff",
+                      color: "#475569",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    className="student-modal-primary-btn"
+                    onClick={() => {
+                      closeModal();
+                      onNavigate(activeModal.actionPath);
+                    }}
+                  >
+                    {activeModal.actionText || "Đến trang thanh toán"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="student-modal-primary-btn"
+                  onClick={closeModal}
+                >
+                  Đã hiểu
+                </button>
+              )}
             </div>
           </div>
         </div>

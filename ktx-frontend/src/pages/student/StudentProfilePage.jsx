@@ -56,11 +56,11 @@ export default function StudentProfilePage({ onSelectTab }) {
 
   // 2. Dữ liệu phòng ở (đồng bộ với occupancyService)
   const [roomInfo, setRoomInfo] = useState({
-    toa: "Tòa A1",
-    so_phong: "101",
-    tang: "1",
-    giuong: "G04",
-    ngay_nhan_phong: "01/09/2026",
+    toa: "",
+    so_phong: "",
+    tang: "",
+    giuong: "",
+    ngay_nhan_phong: "",
   });
 
   // 3. State modal chỉnh sửa & Toast
@@ -128,12 +128,25 @@ export default function StudentProfilePage({ onSelectTab }) {
       }
 
       // 1. Tải hồ sơ sinh viên
+      const currentStudentMsv =
+        accountProfile.msv ||
+        localStorage.getItem("ktx_username") ||
+        "";
+
       if (occupancyService.getStudentProfile) {
-        const student = await occupancyService.getStudentProfile();
+        const student = await occupancyService.getStudentProfile(currentStudentMsv);
         if (student) {
           const savedAvatar = localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY);
           const profileEmail = accountProfile.email || student.email || "";
           const msvFromEmail = profileEmail.split("@")[0].trim();
+          
+          let effectiveAvatar = "/avatar.png";
+          if (student.avatar_url && student.avatar_url !== "/avatar.png") {
+            effectiveAvatar = student.avatar_url;
+          } else if (savedAvatar && savedAvatar !== "/avatar.png") {
+            effectiveAvatar = savedAvatar;
+          }
+
           const studentProfile = {
             ...student,
             ...Object.fromEntries(
@@ -141,21 +154,21 @@ export default function StudentProfilePage({ onSelectTab }) {
             ),
             msv: msvFromEmail || accountProfile.msv || student.msv,
             email: profileEmail || student.email,
-            avatar_url: savedAvatar || student.avatar_url || "/avatar.png",
+            avatar_url: effectiveAvatar,
           };
           setProfile(studentProfile);
           setEditFormData({
             ...studentProfile,
             ngay_sinh: toDateInputValue(studentProfile.ngay_sinh),
           });
-          if (studentProfile.avatar_url) {
+          if (effectiveAvatar) {
             localStorage.setItem(
               STUDENT_AVATAR_STORAGE_KEY,
-              studentProfile.avatar_url,
+              effectiveAvatar,
             );
             window.dispatchEvent(
               new CustomEvent("student-avatar-updated", {
-                detail: { avatarUrl: studentProfile.avatar_url },
+                detail: { avatarUrl: effectiveAvatar },
               }),
             );
           }
@@ -164,11 +177,7 @@ export default function StudentProfilePage({ onSelectTab }) {
 
       // 2. Tải thông tin phòng ở hiện tại
       if (occupancyService.getCurrentRoomInfo) {
-        const studentMsv =
-          accountProfile.msv ||
-          localStorage.getItem("ktx_username") ||
-          "DTC245180051";
-        const currentRoom = await occupancyService.getCurrentRoomInfo(studentMsv);
+        const currentRoom = await occupancyService.getCurrentRoomInfo(currentStudentMsv);
         if (currentRoom && currentRoom.so_phong) {
           const rawToa = currentRoom.toa || "";
           const cleanToa = rawToa.replace(/^Tòa\s*/i, "").trim();
@@ -177,22 +186,22 @@ export default function StudentProfilePage({ onSelectTab }) {
           const rawGiuong = currentRoom.giuong || currentRoom.so_giuong || currentRoom.ma_giuong?.split("_")?.pop() || "";
           const cleanGiuong = rawGiuong.match(/G?\d+/i)?.[0]
             ? `G${rawGiuong.match(/\d+/)?.[0]?.padStart(2, "0")}`
-            : (rawGiuong || "G04");
+            : (rawGiuong || "");
 
           setRoomInfo({
-            toa: cleanToa ? `Tòa ${cleanToa}` : (currentRoom.toa || "Tòa A1"),
-            so_phong: cleanPhong || "101",
-            tang: currentRoom.tang || currentRoom.so_tang || "1",
-            giuong: cleanGiuong || "G04",
-            ngay_nhan_phong: formatDateForDisplay(currentRoom.ngay_duyet || currentRoom.ngay_nhan_phong || currentRoom.ngay_bat_dau || currentRoom.thoi_gian_luu_tru || "01/09/2026"),
+            toa: cleanToa ? `Tòa ${cleanToa}` : (currentRoom.toa || ""),
+            so_phong: cleanPhong || "",
+            tang: currentRoom.tang || currentRoom.so_tang || "",
+            giuong: cleanGiuong || "",
+            ngay_nhan_phong: formatDateForDisplay(currentRoom.ngay_duyet || currentRoom.ngay_nhan_phong || currentRoom.ngay_bat_dau || currentRoom.thoi_gian_luu_tru || ""),
           });
         } else {
           setRoomInfo({
-            toa: "Tòa A1",
-            so_phong: "101",
-            tang: "1",
-            giuong: "G04",
-            ngay_nhan_phong: "01/09/2026",
+            toa: "",
+            so_phong: "",
+            tang: "",
+            giuong: "",
+            ngay_nhan_phong: "",
           });
         }
       }
@@ -201,32 +210,51 @@ export default function StudentProfilePage({ onSelectTab }) {
     }
   };
 
-  // Xử lý upload ảnh đại diện
-  const handleAvatarUpload = (e) => {
+  // Xử lý upload ảnh đại diện (Lưu bền vững cả vào CSDL Backend và LocalStorage)
+  const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const newAvatarUrl = event.target?.result;
-      if (newAvatarUrl) {
-        const updated = { ...profile, avatar_url: newAvatarUrl };
-        setProfile(updated);
-        setEditFormData((prev) => ({ ...prev, avatar_url: newAvatarUrl }));
-        localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, newAvatarUrl);
-        window.dispatchEvent(
-          new CustomEvent("student-avatar-updated", {
-            detail: { avatarUrl: newAvatarUrl },
-          }),
-        );
+    // Xem trước tức thì
+    const previewUrl = URL.createObjectURL(file);
+    setProfile((prev) => ({ ...prev, avatar_url: previewUrl }));
+    setEditFormData((prev) => ({ ...prev, avatar_url: previewUrl }));
 
-        if (occupancyService.updateStudentProfile) {
-          await occupancyService.updateStudentProfile(updated);
-        }
-        showToast("Cập nhật ảnh đại diện thành công!");
+    try {
+      const studentMsv =
+        profile.msv ||
+        localStorage.getItem("ktx_username") ||
+        "DTC245180137";
+
+      if (occupancyService.uploadStudentAvatar) {
+        const res = await occupancyService.uploadStudentAvatar(studentMsv, file);
+        const serverAvatarUrl = res.anh_dai_dien || previewUrl;
+        setProfile((prev) => ({ ...prev, avatar_url: serverAvatarUrl }));
+        setEditFormData((prev) => ({ ...prev, avatar_url: serverAvatarUrl }));
+        localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, serverAvatarUrl);
       }
-    };
-    reader.readAsDataURL(file);
+      showToast("Cập nhật ảnh đại diện thành công!");
+    } catch (err) {
+      console.warn("Upload avatar to server failed, falling back to local storage:", err);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result;
+        if (dataUrl) {
+          setProfile((prev) => ({ ...prev, avatar_url: dataUrl }));
+          setEditFormData((prev) => ({ ...prev, avatar_url: dataUrl }));
+          try {
+            localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, dataUrl);
+          } catch (_) {}
+          window.dispatchEvent(
+            new CustomEvent("student-avatar-updated", {
+              detail: { avatarUrl: dataUrl },
+            }),
+          );
+        }
+      };
+      reader.readAsDataURL(file);
+      showToast("Đã cập nhật ảnh đại diện!");
+    }
   };
 
   // Mở modal chỉnh sửa
@@ -544,61 +572,96 @@ export default function StudentProfilePage({ onSelectTab }) {
         {/* 4. KHỐI THÔNG TIN PHÒNG Ở (ROOM INFORMATION)                               */}
         {/* ========================================================================= */}
         <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-7 shadow-xs">
-          <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-5 tracking-tight">
-            Thông tin phòng ở
-          </h3>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 text-left">
-            {/* Tòa KTX */}
-            <div>
-              <span className="text-xs text-slate-400 block mb-1.5 font-medium">
-                Tòa KTX
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+              Thông tin phòng ở
+            </h3>
+            {!roomInfo.so_phong && (
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200/70 select-none">
+                Chưa xếp phòng
               </span>
-              <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
-                {roomInfo.toa}
-              </span>
-            </div>
-
-            {/* Phòng */}
-            <div>
-              <span className="text-xs text-slate-400 block mb-1.5 font-medium">
-                Phòng
-              </span>
-              <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
-                {roomInfo.so_phong}
-              </span>
-            </div>
-
-            {/* Tầng */}
-            <div>
-              <span className="text-xs text-slate-400 block mb-1.5 font-medium">
-                Tầng
-              </span>
-              <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
-                {roomInfo.tang}
-              </span>
-            </div>
-
-            {/* Giường */}
-            <div>
-              <span className="text-xs text-slate-400 block mb-1.5 font-medium">
-                Giường
-              </span>
-              <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
-                {roomInfo.giuong}
-              </span>
-            </div>
-
-            {/* Ngày nhận phòng */}
-            <div>
-              <span className="text-xs text-slate-400 block mb-1.5 font-medium">
-                Ngày nhận phòng
-              </span>
-              <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
-                {roomInfo.ngay_nhan_phong}
-              </span>
-            </div>
+            )}
           </div>
+
+          {roomInfo.so_phong ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 text-left">
+              {/* Tòa KTX */}
+              <div>
+                <span className="text-xs text-slate-400 block mb-1.5 font-medium">
+                  Tòa KTX
+                </span>
+                <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
+                  {roomInfo.toa}
+                </span>
+              </div>
+
+              {/* Phòng */}
+              <div>
+                <span className="text-xs text-slate-400 block mb-1.5 font-medium">
+                  Phòng
+                </span>
+                <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
+                  {roomInfo.so_phong}
+                </span>
+              </div>
+
+              {/* Tầng */}
+              <div>
+                <span className="text-xs text-slate-400 block mb-1.5 font-medium">
+                  Tầng
+                </span>
+                <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
+                  {roomInfo.tang}
+                </span>
+              </div>
+
+              {/* Giường */}
+              <div>
+                <span className="text-xs text-slate-400 block mb-1.5 font-medium">
+                  Giường
+                </span>
+                <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
+                  {roomInfo.giuong}
+                </span>
+              </div>
+
+              {/* Ngày nhận phòng */}
+              <div>
+                <span className="text-xs text-slate-400 block mb-1.5 font-medium">
+                  Ngày nhận phòng
+                </span>
+                <span className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
+                  {roomInfo.ngay_nhan_phong}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="py-6 flex flex-col items-center justify-center text-center">
+              <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 mb-3 shadow-2xs">
+                <Home className="w-6 h-6 stroke-[1.8]" />
+              </div>
+              <p className="text-sm font-semibold text-slate-700 mb-1">
+                Hiện tại bạn chưa lưu trú tại phòng nào trong KTX
+              </p>
+              <p className="text-xs text-slate-500 max-w-sm mb-4 leading-relaxed">
+                Thông tin phòng, giường và tòa nhà sẽ hiển thị tự động tại đây ngay sau khi đơn đăng ký phòng của bạn được Ban Quản lý phê duyệt.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onSelectTab) {
+                    onSelectTab("register");
+                  } else {
+                    window.history.pushState({}, "", "/student/register");
+                    window.dispatchEvent(new PopStateEvent("popstate"));
+                  }
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition shadow-xs cursor-pointer"
+              >
+                Đăng ký phòng ngay
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -655,19 +718,29 @@ export default function StudentProfilePage({ onSelectTab }) {
                   <input
                     type="file"
                     ref={modalAvatarInputRef}
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        if (event.target?.result) {
-                          setEditFormData((prev) => ({
-                            ...prev,
-                            avatar_url: event.target.result,
-                          }));
+                      const previewUrl = URL.createObjectURL(file);
+                      setEditFormData((prev) => ({
+                        ...prev,
+                        avatar_url: previewUrl,
+                      }));
+                      try {
+                        const studentMsv =
+                          profile.msv ||
+                          localStorage.getItem("ktx_username") ||
+                          "DTC245180137";
+                        if (occupancyService.uploadStudentAvatar) {
+                          const res = await occupancyService.uploadStudentAvatar(studentMsv, file);
+                          const serverAvatarUrl = res.anh_dai_dien || previewUrl;
+                          setProfile((prev) => ({ ...prev, avatar_url: serverAvatarUrl }));
+                          setEditFormData((prev) => ({ ...prev, avatar_url: serverAvatarUrl }));
+                          localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, serverAvatarUrl);
                         }
-                      };
-                      reader.readAsDataURL(file);
+                      } catch (err) {
+                        console.warn("Upload avatar from modal failed, fallback to local:", err);
+                      }
                     }}
                     accept="image/*"
                     className="hidden"

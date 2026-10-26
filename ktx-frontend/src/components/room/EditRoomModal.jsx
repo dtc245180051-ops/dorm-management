@@ -2,26 +2,30 @@ import React, { useState, useRef } from 'react';
 import { X, UploadCloud, CheckCircle2, Trash2, Loader2, AlertCircle, Edit3 } from 'lucide-react';
 import { dormService } from '../../services/api';
 
-const STANDARD_MAX_PRICE = 6000000;
-const SERVICE_MIN_PRICE = 7000000;
+const STANDARD_PRICE = 4800000; // 4.8 triệu/năm cho phòng tiêu chuẩn
+const SERVICE_PRICE = 8200000;  // 8.2 triệu/năm cho phòng dịch vụ
 
 const PRICE_CHIPS = [
-  { label: '3.6 tr', value: 3600000, category: 'Phòng tiêu chuẩn' },
   { label: '4.8 tr (Tiêu chuẩn)', value: 4800000, category: 'Phòng tiêu chuẩn' },
-  { label: '6.0 tr', value: 6000000, category: 'Phòng tiêu chuẩn' },
-  { label: '7.2 tr', value: 7200000, category: 'Phòng dịch vụ' },
-  { label: '9.6 tr (Dịch vụ)', value: 9600000, category: 'Phòng dịch vụ' },
-  { label: '12 tr', value: 12000000, category: 'Phòng dịch vụ' },
+  { label: '8.2 tr (Dịch vụ)', value: 8200000, category: 'Phòng dịch vụ' },
 ];
 
 export default function EditRoomModal({ isOpen, room, onClose, onUpdated }) {
   if (!isOpen || !room) return null;
 
+  const roomType = room.loai_phong || 'Phòng tiêu chuẩn';
+  const isTypeService = roomType === 'Phòng dịch vụ';
+  // Chuẩn hóa giá: nếu chưa đúng 4.8tr hay 8.2tr (như 300.000 cũ), tự động gán giá chuẩn
+  let initialPrice = Number(room.gia_tien_nam);
+  if (!initialPrice || (isTypeService && initialPrice !== SERVICE_PRICE) || (!isTypeService && initialPrice !== STANDARD_PRICE)) {
+    initialPrice = isTypeService ? SERVICE_PRICE : STANDARD_PRICE;
+  }
+
   const [formData, setFormData] = useState({
     so_phong: room.so_phong || '',
     suc_chua: Number(room.suc_chua) || 4,
-    loai_phong: room.loai_phong || 'Phòng tiêu chuẩn',
-    gia_tien_nam: Number(room.gia_tien_nam) || 4800000,
+    loai_phong: roomType,
+    gia_tien_nam: initialPrice,
     hinh_anh: room.hinh_anh || '',
   });
 
@@ -42,32 +46,29 @@ export default function EditRoomModal({ isOpen, room, onClose, onUpdated }) {
   const isService = formData.loai_phong === 'Phòng dịch vụ';
   const currentPrice = Number(formData.gia_tien_nam) || 0;
 
-  // Lỗi xác thực giá
+  // Lỗi xác thực giá nếu không thuộc 2 mức chuẩn
   let priceValidationError = '';
-  if (!isService && currentPrice > STANDARD_MAX_PRICE) {
-    priceValidationError = `Phòng tiêu chuẩn không được nhập giá cao hơn phòng dịch vụ (tối đa ${STANDARD_MAX_PRICE.toLocaleString('vi-VN')} đ/năm).`;
-  } else if (isService && currentPrice < SERVICE_MIN_PRICE && currentPrice > 0) {
-    priceValidationError = `Phòng dịch vụ không được nhập giá thấp hơn phòng tiêu chuẩn (tối thiểu ${SERVICE_MIN_PRICE.toLocaleString('vi-VN')} đ/năm).`;
+  if (!isService && currentPrice !== STANDARD_PRICE && currentPrice > 0) {
+    priceValidationError = `Phòng tiêu chuẩn có giá quy định là 4.800.000 VNĐ/năm (~${Math.round(STANDARD_PRICE / 11).toLocaleString('vi-VN')} đ/tháng x 11 tháng).`;
+  } else if (isService && currentPrice !== SERVICE_PRICE && currentPrice > 0) {
+    priceValidationError = `Phòng dịch vụ có giá quy định là 8.200.000 VNĐ/năm (~${Math.round(SERVICE_PRICE / 11).toLocaleString('vi-VN')} đ/tháng x 11 tháng).`;
   }
 
   const handleRoomTypeChange = (newType) => {
-    setFormData((prev) => {
-      let suggestedPrice = prev.gia_tien_nam;
-      if (newType === 'Phòng dịch vụ') {
-        if (!suggestedPrice || Number(suggestedPrice) < SERVICE_MIN_PRICE) {
-          suggestedPrice = 9600000;
-        }
-      } else {
-        if (!suggestedPrice || Number(suggestedPrice) > STANDARD_MAX_PRICE) {
-          suggestedPrice = 4800000;
-        }
-      }
-      return {
-        ...prev,
-        loai_phong: newType,
-        gia_tien_nam: suggestedPrice,
-      };
-    });
+    const newPrice = newType === 'Phòng dịch vụ' ? SERVICE_PRICE : STANDARD_PRICE;
+    setFormData((prev) => ({
+      ...prev,
+      loai_phong: newType,
+      gia_tien_nam: newPrice,
+    }));
+  };
+
+  const handleSelectChip = (chip) => {
+    setFormData((prev) => ({
+      ...prev,
+      loai_phong: chip.category,
+      gia_tien_nam: chip.value,
+    }));
   };
 
   const handleFileChange = async (e) => {
@@ -123,12 +124,12 @@ export default function EditRoomModal({ isOpen, room, onClose, onUpdated }) {
       return;
     }
 
-    if (!isService && Number(formData.gia_tien_nam) > STANDARD_MAX_PRICE) {
-      setErrorMsg(`Phòng tiêu chuẩn tối đa ${STANDARD_MAX_PRICE.toLocaleString('vi-VN')} đ/năm.`);
+    if (!isService && Number(formData.gia_tien_nam) !== STANDARD_PRICE) {
+      setErrorMsg(`Phòng tiêu chuẩn có giá cố định là ${STANDARD_PRICE.toLocaleString('vi-VN')} đ/năm (~${Math.round(STANDARD_PRICE / 11).toLocaleString('vi-VN')} đ/tháng x 11 tháng).`);
       return;
     }
-    if (isService && Number(formData.gia_tien_nam) < SERVICE_MIN_PRICE) {
-      setErrorMsg(`Phòng dịch vụ tối thiểu ${SERVICE_MIN_PRICE.toLocaleString('vi-VN')} đ/năm.`);
+    if (isService && Number(formData.gia_tien_nam) !== SERVICE_PRICE) {
+      setErrorMsg(`Phòng dịch vụ có giá cố định là ${SERVICE_PRICE.toLocaleString('vi-VN')} đ/năm (~${Math.round(SERVICE_PRICE / 11).toLocaleString('vi-VN')} đ/tháng x 11 tháng).`);
       return;
     }
 
@@ -265,17 +266,10 @@ export default function EditRoomModal({ isOpen, room, onClose, onUpdated }) {
               <label className="text-xs font-semibold text-slate-700">
                 Giá phòng / năm (VNĐ)
               </label>
-              {currentPrice > 0 && (
-                <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200/60 px-2 py-0.5 rounded-md">
-                  ~{Math.round(currentPrice / 12).toLocaleString('vi-VN')} đ/tháng
-                </span>
-              )}
             </div>
             <div className="relative">
               <input
                 type="number"
-                min={isService ? SERVICE_MIN_PRICE : 1000000}
-                max={!isService ? STANDARD_MAX_PRICE : 30000000}
                 step="100000"
                 value={formData.gia_tien_nam}
                 onChange={(e) =>
@@ -302,29 +296,20 @@ export default function EditRoomModal({ isOpen, room, onClose, onUpdated }) {
               </p>
             )}
 
-            {/* Chips */}
-            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+            {/* Chips chọn nhanh chỉ 2 mức giá */}
+            <div className="flex items-center gap-2 mt-2">
               {PRICE_CHIPS.map((chip) => {
-                const isMatching = chip.category === formData.loai_phong;
-                const isSelected = Number(formData.gia_tien_nam) === chip.value;
-                if (!isMatching) {
-                  return (
-                    <span
-                      key={chip.value}
-                      className="text-[11px] px-2 py-0.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 opacity-40 cursor-not-allowed line-through"
-                    >
-                      {chip.label}
-                    </span>
-                  );
-                }
+                const isSelected =
+                  Number(formData.gia_tien_nam) === chip.value &&
+                  formData.loai_phong === chip.category;
                 return (
                   <button
                     key={chip.value}
                     type="button"
-                    onClick={() => setFormData({ ...formData, gia_tien_nam: chip.value })}
-                    className={`text-[11px] px-2.5 py-0.5 rounded-lg border transition font-medium cursor-pointer ${
+                    onClick={() => handleSelectChip(chip)}
+                    className={`text-xs px-3 py-1.5 rounded-xl border transition font-semibold cursor-pointer ${
                       isSelected
-                        ? 'bg-blue-600 border-blue-600 text-white font-semibold'
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-2xs'
                         : 'bg-white hover:bg-blue-50 text-slate-700 border-slate-300'
                     }`}
                   >

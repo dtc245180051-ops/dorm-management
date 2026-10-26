@@ -7,15 +7,15 @@ import {
   Scale,
   FileText,
   LogOut,
+  Bell,
 } from "lucide-react";
 
 const menuItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutGrid },
-  { id: "rooms", label: "Quản lý phòng ở", icon: Building2, active: true },
+  { id: "rooms", label: "Quản lý phòng ở", icon: Building2 },
   { id: "students", label: "Hồ sơ sinh viên", icon: Users },
   { id: "incidents", label: "Phản ánh sự cố", icon: AlertCircle },
   { id: "violations", label: "Quản lý vi phạm", icon: Scale },
-  // { id: 'reports', label: 'Báo cáo', icon: FileText },
 ];
 
 export default function Sidebar({ activeTab = "rooms", onSelectTab }) {

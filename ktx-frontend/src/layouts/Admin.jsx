@@ -22,6 +22,7 @@ export default function AdminLayout({
           searchTerm={searchTerm}
           onSearchChange={onSearchChange}
           userName={userName}
+          onSelectTab={onSelectTab}
         />
 
         {/* Khối 3: Khung nội dung chính (Bo tròn, nền xám) */}

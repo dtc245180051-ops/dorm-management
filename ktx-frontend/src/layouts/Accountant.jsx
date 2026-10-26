@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './Accountant.css';
 import { authService } from '../services/authService';
+import NotificationPopover from '../components/NotificationPopover';
+import accountantNotificationService from '../services/accountantNotificationService';
 
 /**
  * Layout cho phân hệ Kế toán (Chuẩn 100% theo bản thiết kế Figma iDORM)
@@ -31,6 +33,104 @@ export default function AccountantLayout({
     if (onMenuChange) {
       onMenuChange(menuKey);
     }
+  };
+
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [notifications, setNotifications] = useState(() =>
+    accountantNotificationService.getNotifications()
+  );
+  const [unreadCount, setUnreadCount] = useState(() =>
+    accountantNotificationService.getUnreadCount()
+  );
+  const [actionRequiredCount, setActionRequiredCount] = useState(() =>
+    accountantNotificationService.getActionRequiredCount()
+  );
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setNotifications(accountantNotificationService.getNotifications());
+      setUnreadCount(accountantNotificationService.getUnreadCount());
+      setActionRequiredCount(accountantNotificationService.getActionRequiredCount());
+    };
+
+    // Khởi tạo ban đầu
+    handleUpdate();
+    accountantNotificationService.syncFromSystem().then(handleUpdate);
+
+    // Lắng nghe cập nhật (CHỈ đọc lại từ service, KHÔNG gọi syncFromSystem để tránh lặp vô tận)
+    window.addEventListener("accountant-notifications-updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+
+    const handleExternalSync = () => {
+      accountantNotificationService.syncFromSystem().then(handleUpdate);
+    };
+    window.addEventListener("occupancy-updated", handleExternalSync);
+
+    // Polling định kỳ 30s
+    const intervalId = setInterval(handleExternalSync, 30000);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("accountant-notifications-updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener("occupancy-updated", handleExternalSync);
+    };
+  }, []);
+
+  const handleMarkAllAsRead = () => {
+    accountantNotificationService.markAllAsRead();
+    setNotifications(accountantNotificationService.getNotifications());
+    setUnreadCount(0);
+  };
+
+  const handleNotificationClick = (item) => {
+    accountantNotificationService.markAsRead(item.id);
+    setNotifications(accountantNotificationService.getNotifications());
+    setUnreadCount(accountantNotificationService.getUnreadCount());
+
+    setIsPopoverOpen(false);
+    if (item.deepLink?.targetUrl) {
+      const url = item.deepLink.targetUrl;
+      if (url.includes("reconciliation")) {
+        handleSelectMenu("reconciliation");
+      } else if (url.includes("billing") || url.includes("invoices")) {
+        handleSelectMenu("billing");
+      } else if (url.includes("debt")) {
+        handleSelectMenu("debt-book");
+      } else if (url.includes("report")) {
+        handleSelectMenu("reports");
+      } else {
+        window.history.pushState({}, "", url);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      }
+    }
+  };
+
+  const handleQuickAction = async (actionKey, item) => {
+    if (actionKey === "MATCH_AND_CLEAR") {
+      const invId = item.metadata?.invoiceId || item.id.replace("NOTIF_INV_", "");
+      await accountantNotificationService.matchAndClearInvoice(invId);
+    } else {
+      accountantNotificationService.resolveNotification(item.id);
+    }
+
+    setNotifications(accountantNotificationService.getNotifications());
+    setUnreadCount(accountantNotificationService.getUnreadCount());
+    setActionRequiredCount(accountantNotificationService.getActionRequiredCount());
+
+    setIsPopoverOpen(false);
+    if (item.deepLink?.targetUrl && actionKey !== "MATCH_AND_CLEAR") {
+      window.history.pushState({}, "", item.deepLink.targetUrl);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      window.dispatchEvent(
+        new CustomEvent("student-navigate", { detail: { path: item.deepLink.targetUrl } })
+      );
+    }
+  };
+
+  const handleViewAll = () => {
+    setIsPopoverOpen(false);
+    handleSelectMenu('notifications');
   };
 
   const handleLogoutClick = () => {
@@ -189,20 +289,73 @@ export default function AccountantLayout({
             />
           </div>
 
-          {/* Actions: Thông báo & Profile Pill */}
+          {/* Actions: Thông báo Popover & Profile Pill */}
           <div className="acc-header-right">
-            <button
-              type="button"
-              className="acc-notify-btn"
-              title="Thông báo hệ thống"
-              onClick={() => alert('Chức năng Thông báo: Hiện tại chưa có thông báo mới.')}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-              <span>Thông báo</span>
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                className={`acc-notify-btn ${isPopoverOpen ? 'active' : ''}`}
+                style={{ position: 'relative' }}
+                title="Trung tâm thông báo tài chính & đối soát"
+                onClick={() => setIsPopoverOpen((prev) => !prev)}
+              >
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                  </svg>
+                  {unreadCount > 0 && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: '-8px',
+                        right: '-8px',
+                        backgroundColor: '#ef4444',
+                        color: '#fff',
+                        fontSize: '10px',
+                        fontWeight: '800',
+                        borderRadius: '9999px',
+                        minWidth: '16px',
+                        height: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '0 3px',
+                        border: '2px solid #fff',
+                        lineHeight: 1,
+                      }}
+                    >
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </div>
+                <span>Thông báo</span>
+                {actionRequiredCount > 0 && (
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '9999px',
+                      backgroundColor: '#f59e0b',
+                    }}
+                    title={`${actionRequiredCount} việc cần xử lý`}
+                  />
+                )}
+              </button>
+
+              <NotificationPopover
+                isOpen={isPopoverOpen}
+                onClose={() => setIsPopoverOpen(false)}
+                role="accountant"
+                notifications={notifications}
+                unreadCount={unreadCount}
+                actionRequiredCount={actionRequiredCount}
+                onMarkAllAsRead={handleMarkAllAsRead}
+                onNotificationClick={handleNotificationClick}
+                onQuickAction={handleQuickAction}
+                onViewAll={handleViewAll}
+              />
+            </div>
 
             <div className="acc-profile-pill" title={`Tài khoản: ${displayName} (Vai trò: Kế toán)`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">

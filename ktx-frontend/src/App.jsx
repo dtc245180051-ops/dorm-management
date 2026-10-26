@@ -28,6 +28,9 @@ import StudentProfilePage from "./pages/student/StudentProfilePage";
 import RoomSearchPage from "./pages/student/RoomSearchPage";
 import PaymentPage from "./pages/student/PaymentPage";
 import PaymentHistoryPage from "./pages/student/PaymentHistoryPage";
+import StudentNotificationsPage from "./pages/student/StudentNotificationsPage";
+import AdminNotificationsPage from "./pages/admin/AdminNotificationsPage";
+import AccountantNotificationsPage from "./pages/accountant/AccountantNotificationsPage";
 import Dashboard from "./pages/admin/Dashboard";
 import {
   Clock,
@@ -50,7 +53,7 @@ export default function App() {
   const [adminSearchTerm, setAdminSearchTerm] = useState("");
 
   const [accountantActiveMenu, setAccountantActiveMenu] =
-    useState("reconciliation");
+    useState("dashboard");
   const [accountantSearchTerm, setAccountantSearchTerm] = useState("");
 
   const [requestsList, setRequestsList] = useState([]);
@@ -77,8 +80,9 @@ export default function App() {
   const loadRoomInfo = useCallback(async () => {
     try {
       if (occupancyService?.getCurrentRoomInfo) {
-        const info = await occupancyService.getCurrentRoomInfo();
-        if (info) setCurrentRoomInfo(info);
+        const studentMsv = localStorage.getItem("ktx_username") || "";
+        const info = await occupancyService.getCurrentRoomInfo(studentMsv);
+        setCurrentRoomInfo(info || null);
       }
     } catch (e) {
       console.error("Error loading current room info:", e);
@@ -112,6 +116,20 @@ export default function App() {
 
   // Phân quyền bảo vệ đường dẫn (Role-Based Access Control - RBAC)
   useEffect(() => {
+    const isPublicAuthRoute =
+      currentPath === "/" ||
+      currentPath === "/home" ||
+      currentPath === "/landing" ||
+      currentPath === "/login" ||
+      currentPath === "/register" ||
+      currentPath === "/signup" ||
+      currentPath === "/auth";
+
+    // Cho phép truy cập trang chủ công khai hoặc màn hình đăng nhập/đăng ký tự do
+    if (isPublicAuthRoute) {
+      return;
+    }
+
     const token = localStorage.getItem("ktx_token");
     const roleStr = (localStorage.getItem("ktx_user_role") || "").toUpperCase();
 
@@ -178,26 +196,58 @@ export default function App() {
   // Tự động dọn dẹp dữ liệu mẫu / test cũ nếu còn lưu trong LocalStorage
   useEffect(() => {
     try {
-      if (localStorage.getItem("ktx_test_data_cleaned_v3") !== "true") {
+      if (localStorage.getItem("ktx_test_data_cleaned_v5") !== "true") {
         const studentAcc = localStorage.getItem("ktx_student_account");
         if (studentAcc && (studentAcc.includes("REG-01") || studentAcc.includes("RES-01") || studentAcc.includes("BILL-10-2026"))) {
           localStorage.removeItem("ktx_student_account");
         }
-        const transferReqs = localStorage.getItem("dorm_transfer_checkout_requests");
-        if (transferReqs && (transferReqs.includes("YC-0231") || transferReqs.includes("YC-0232"))) {
-          localStorage.removeItem("dorm_transfer_checkout_requests");
-        }
+
         const incidents = localStorage.getItem("dorm_student_incidents");
-        if (incidents && (incidents.includes("PA-001") || incidents.includes("PA-002"))) {
+        if (incidents && (incidents.includes("PA-001") || incidents.includes("PA-002") || incidents.includes("PA-8291A4") || incidents.includes("PA-7193F2"))) {
           localStorage.removeItem("dorm_student_incidents");
         }
         const cachedRoom = localStorage.getItem("dorm_current_room_info");
         if (cachedRoom && (cachedRoom.includes("P36") || cachedRoom.includes('"so_phong":"36"'))) {
           localStorage.removeItem("dorm_current_room_info");
         }
-        localStorage.setItem("ktx_test_data_cleaned_v3", "true");
+
+        const notifs = localStorage.getItem("ktx_student_notifications");
+        if (notifs && (notifs.includes("noti-default-") || notifs.includes("transfer-approved-YC-0231") || notifs.includes("YC-0231"))) {
+          localStorage.removeItem("ktx_student_notifications");
+        }
+
+        localStorage.setItem("ktx_test_data_cleaned_v5", "true");
         window.dispatchEvent(new Event("student-account-updated"));
         window.dispatchEvent(new Event("occupancy-updated"));
+        window.dispatchEvent(new Event("student-incidents-updated"));
+        window.dispatchEvent(new CustomEvent("ktx-notifications-updated", { detail: [] }));
+      }
+
+      if (localStorage.getItem("ktx_fix_notifications_v8") !== "true") {
+        localStorage.removeItem("dorm_student_incidents");
+        const notifsRaw = localStorage.getItem("ktx_student_notifications");
+        if (notifsRaw) {
+          try {
+            const notifs = JSON.parse(notifsRaw);
+            if (Array.isArray(notifs)) {
+              const cleaned = notifs.filter((n) => {
+                const title = n.title || "";
+                const content = n.content || "";
+                if (title.includes("Ban quản lý KTX đang xử lý phản ánh")) return false;
+                if (content.includes("Báo hỏng vòi nước")) return false;
+                if (title.includes("hóa đơn điện nước Năm học")) return false;
+                if (title.includes("hóa đơn điện nước Tháng 10/2026")) return false;
+                if (n.time === "07:00") return false;
+                return true;
+              });
+              localStorage.setItem("ktx_student_notifications", JSON.stringify(cleaned));
+            }
+          } catch (_) {
+            localStorage.removeItem("ktx_student_notifications");
+          }
+        }
+        localStorage.setItem("ktx_fix_notifications_v8", "true");
+        window.dispatchEvent(new CustomEvent("ktx-notifications-updated", { detail: [] }));
       }
     } catch (_) {}
   }, []);
@@ -239,6 +289,10 @@ export default function App() {
       case "chuyen-phong":
         navigateTo("/student/transfer-room");
         break;
+      case "checkout":
+      case "tra-phong":
+        navigateTo("/student/transfer-room?tab=checkout");
+        break;
       case "lookup":
       case "tra-cuu":
       case "search-rooms":
@@ -263,6 +317,10 @@ export default function App() {
       case "thong-tin-ca-nhan":
         navigateTo("/student/profile");
         break;
+      case "notifications":
+      case "thong-bao":
+        navigateTo("/student/notifications");
+        break;
       default:
         break;
     }
@@ -280,6 +338,8 @@ export default function App() {
       navigateTo("/accountant/debt");
     } else if (menuKey === "reports" || menuKey === "report") {
       navigateTo("/accountant/reports");
+    } else if (menuKey === "notifications" || menuKey === "thong-bao") {
+      navigateTo("/accountant/notifications");
     }
   };
 
@@ -299,11 +359,9 @@ export default function App() {
         <Login
           initialTab="login"
           onTabChange={(tab) => {
-            window.history.replaceState(
-              {},
-              "",
-              tab === "register" ? "/register" : "/login",
-            );
+            const nextPath = tab === "register" ? "/register" : "/login";
+            window.history.replaceState({}, "", nextPath);
+            setCurrentPath(nextPath);
           }}
           onLoginSuccess={(role) => {
             const r = String(role || "").toUpperCase();
@@ -331,11 +389,9 @@ export default function App() {
         <Login
           initialTab="register"
           onTabChange={(tab) => {
-            window.history.replaceState(
-              {},
-              "",
-              tab === "register" ? "/register" : "/login",
-            );
+            const nextPath = tab === "register" ? "/register" : "/login";
+            window.history.replaceState({}, "", nextPath);
+            setCurrentPath(nextPath);
           }}
           onLoginSuccess={(role) => {
             const r = String(role || "").toUpperCase();
@@ -499,6 +555,33 @@ export default function App() {
     );
   }
 
+  if (
+    currentPath === "/accountant/notifications" ||
+    currentPath === "/thong-bao-ke-toan"
+  ) {
+    return (
+      <div className="relative">
+        <AccountantLayout
+          user={{
+            username: localStorage.getItem('ktx_fullname') || localStorage.getItem('ktx_username') || 'Phòng Kế Toán',
+            role: 'KeToan'
+          }}
+          onLogout={() => {
+            localStorage.clear();
+            navigateTo("/");
+          }}
+          activeMenu="notifications"
+          onMenuChange={handleAccountantMenuChange}
+          searchTerm={accountantSearchTerm}
+          onSearchChange={setAccountantSearchTerm}
+        >
+          <AccountantNotificationsPage onNavigate={navigateTo} />
+        </AccountantLayout>
+        <RoleSwitcher currentRole="accountant" onSwitchRole={navigateTo} />
+      </div>
+    );
+  }
+
   // =========================================================================
   // PHÂN HỆ ADMIN: XỬ LÝ CHI TIẾT ĐƠN YÊU CẦU
   // =========================================================================
@@ -507,6 +590,66 @@ export default function App() {
   if (currentPath.startsWith("/admin/requests/registration")) {
     const match = currentPath.match(/\/admin\/requests\/registration\/?(.*)/);
     const requestId = match && match[1] ? match[1] : "DK-001";
+    const upperReqId = requestId.toUpperCase();
+
+    const foundReq = (requestsList || []).find(
+      (r) =>
+        String(r.id || r.ma_yeu_cau || "").replace(/^#/, "").toUpperCase() ===
+        upperReqId,
+    );
+    const reqType = (
+      foundReq?.loai_don ||
+      foundReq?.loai_yeu_cau ||
+      ""
+    ).toLowerCase();
+
+    // Nếu ID là đơn trả phòng -> Tự động chuyển hướng xử lý đúng sang ProcessCheckoutPage
+    if (
+      upperReqId.startsWith("TP") ||
+      reqType.includes("trả") ||
+      reqType.includes("tra") ||
+      reqType.includes("checkout")
+    ) {
+      return (
+        <div className="relative">
+          <ProcessCheckoutPage
+            requestId={requestId}
+            onBack={() => {
+              loadRequests();
+              navigateTo("/admin");
+            }}
+            onProcessed={() => {
+              loadRequests();
+              navigateTo("/admin");
+            }}
+          />
+        </div>
+      );
+    }
+
+    // Nếu ID là đơn chuyển phòng (YC hoặc CP) -> Tự động chuyển hướng xử lý đúng sang ProcessTransferPage
+    if (
+      upperReqId.startsWith("YC") ||
+      upperReqId.startsWith("CP") ||
+      reqType.includes("chuy") ||
+      reqType.includes("transfer")
+    ) {
+      return (
+        <div className="relative">
+          <ProcessTransferPage
+            requestId={requestId}
+            onBack={() => {
+              loadRequests();
+              navigateTo("/admin");
+            }}
+            onProcessed={() => {
+              loadRequests();
+              navigateTo("/admin");
+            }}
+          />
+        </div>
+      );
+    }
 
     return (
       <div className="relative">
@@ -541,6 +684,53 @@ export default function App() {
   if (currentPath.startsWith("/admin/requests/transfer")) {
     const match = currentPath.match(/\/admin\/requests\/transfer\/?(.*)/);
     const requestId = match && match[1] ? match[1] : "";
+    const upperReqId = requestId.toUpperCase();
+    const foundReq = (requestsList || []).find(
+      (r) =>
+        String(r.id || r.ma_yeu_cau || "").replace(/^#/, "").toUpperCase() ===
+        upperReqId,
+    );
+    const reqType = (
+      foundReq?.loai_don ||
+      foundReq?.loai_yeu_cau ||
+      ""
+    ).toLowerCase();
+
+    // Nếu đơn thực chất là đơn trả phòng -> Chuyển sang ProcessCheckoutPage
+    if (
+      upperReqId.startsWith("TP") ||
+      reqType.includes("trả") ||
+      reqType.includes("tra") ||
+      reqType.includes("checkout")
+    ) {
+      return (
+        <div className="relative">
+          <ProcessCheckoutPage
+            requestId={requestId}
+            onBack={() => {
+              loadRequests();
+              navigateTo("/admin");
+            }}
+            onProcessed={() => {
+              loadRequests();
+              navigateTo("/admin");
+            }}
+          />
+          <RoleSwitcher
+            currentRole="admin"
+            onSwitchRole={(r) =>
+              navigateTo(
+                r === "admin"
+                  ? "/admin"
+                  : r === "student"
+                    ? "/student/dashboard"
+                    : "/accountant/dashboard",
+              )
+            }
+          />
+        </div>
+      );
+    }
 
     return (
       <div className="relative">
@@ -696,7 +886,9 @@ export default function App() {
   // 3. Chuyển / Trả phòng
   if (
     currentPath === "/student/transfer-room" ||
-    currentPath === "/student/transfer"
+    currentPath === "/student/transfer" ||
+    currentPath === "/student/checkout" ||
+    currentPath === "/student/tra-phong"
   ) {
     return (
       <div className="relative">
@@ -791,7 +983,11 @@ export default function App() {
           onSelectTab={handleStudentTabSelect}
           onNavigate={navigateTo}
           onLogout={() => {
+            const savedAvatar = localStorage.getItem("ktx_student_avatar");
             localStorage.clear();
+            if (savedAvatar) {
+              localStorage.setItem("ktx_student_avatar", savedAvatar);
+            }
             navigateTo("/");
           }}
         />
@@ -881,6 +1077,34 @@ export default function App() {
     );
   }
 
+  // 7. Thông báo sinh viên (Nhận thông tin từ Quản lý KTX và Kế toán)
+  if (
+    currentPath === "/student/notifications" ||
+    currentPath === "/student/thong-bao"
+  ) {
+    return (
+      <div className="relative">
+        <StudentNotificationsPage
+          onSelectTab={handleStudentTabSelect}
+          onNavigate={navigateTo}
+        />
+        <RoleSwitcher
+          currentRole="student"
+          onSwitchRole={(r) => {
+            loadRequests();
+            navigateTo(
+              r === "admin"
+                ? "/admin"
+                : r === "student"
+                  ? "/student/dashboard"
+                  : "/accountant/dashboard",
+            );
+          }}
+        />
+      </div>
+    );
+  }
+
   // =========================================================================
   // PHÂN HỆ BAN QUẢN LÝ (Admin)
   // =========================================================================
@@ -940,11 +1164,16 @@ export default function App() {
           <ViolationManagement searchTerm={adminSearchTerm} />
         )}
 
+        {adminActiveTab === 'notifications' && (
+          <AdminNotificationsPage onNavigate={navigateTo} />
+        )}
+
         {adminActiveTab !== 'dashboard' &&
           adminActiveTab !== 'rooms' &&
           adminActiveTab !== 'students' &&
           adminActiveTab !== 'incidents' &&
-          adminActiveTab !== 'violations' && (
+          adminActiveTab !== 'violations' &&
+          adminActiveTab !== 'notifications' && (
             <div className="p-8 text-center text-slate-400 mt-20">
               <h2 className="text-xl font-bold text-slate-600 mb-2">
                 Trang đang được xây dựng

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import AdminLayout from '../../layouts/Admin';
 import occupancyService from '../../services/occupancyService';
+import ProcessCheckoutPage from './ProcessCheckoutPage';
 
 export default function ProcessTransferPage({
   requestId = 'YC-0231',
@@ -51,65 +52,75 @@ export default function ProcessTransferPage({
 
         setRequestData(detail);
 
-        const tree = bedsData || [
-          {
-            ma_toa: 'A',
-            ten_toa: 'Tòa A',
-            rooms: [
-              {
-                ma_phong: 'A203',
-                so_phong: '203',
-                label: 'Phòng A203',
-                beds: [
-                  { ma_giuong: 'G01', label: 'Giường G01' },
-                  { ma_giuong: 'G02', label: 'Giường G02' },
-                  { ma_giuong: 'G04', label: 'Giường G04' },
-                ],
-              },
-              {
-                ma_phong: 'A204',
-                so_phong: '204',
-                label: 'Phòng A204',
-                beds: [
-                  { ma_giuong: 'G01', label: 'Giường G01' },
-                  { ma_giuong: 'G03', label: 'Giường G03' },
-                ],
-              },
-            ],
-          },
-          {
-            ma_toa: 'B',
-            ten_toa: 'Tòa B',
-            rooms: [
-              {
-                ma_phong: 'B101',
-                so_phong: '101',
-                label: 'Phòng B101',
-                beds: [{ ma_giuong: 'G01', label: 'Giường G01' }],
-              },
-            ],
-          },
-        ];
+        const tree = Array.isArray(bedsData) && bedsData.length > 0 ? bedsData : [];
         setBuildingTree(tree);
 
-        // Khớp Tòa - Phòng - Giường theo gợi ý hoặc chuẩn Figma (Tòa A, Phòng A203, Giường G04)
+        // Khớp Tòa - Phòng - Giường theo đúng nguyện vọng chuyển của sinh viên
         if (tree.length > 0) {
-          const targetBuilding =
-            tree.find((b) => b.ma_toa === 'A' || b.ma_toa.includes('A')) || tree[0];
-          setSelectedBuilding(targetBuilding.ma_toa);
+          const extractRoomDigits = (str = "") => {
+            const m = String(str).match(/\d+/);
+            return m ? m[0] : "";
+          };
 
-          const rooms = targetBuilding.rooms || [];
-          if (rooms.length > 0) {
-            const targetRoom =
-              rooms.find((r) => r.ma_phong === 'A203' || r.so_phong === '203') || rooms[0];
-            setSelectedRoom(targetRoom.ma_phong);
+          const rawTarget =
+            detail?.phong_dich ||
+            detail?.phong_mong_muon ||
+            (detail?.phong_lien_quan && detail.phong_lien_quan.includes("→")
+              ? detail.phong_lien_quan.split("→")[1]
+              : "") ||
+            "";
 
-            const beds = targetRoom.beds || [];
-            if (beds.length > 0) {
-              const targetBed =
-                beds.find((b) => b.ma_giuong === 'G04') || beds[0];
-              setSelectedBed(targetBed.ma_giuong);
+          const targetDigits = extractRoomDigits(rawTarget);
+
+          // Trích xuất gợi ý tòa từ vị trí hiện tại hoặc nguyện vọng
+          const viTri = detail?.vi_tri_hien_tai || "";
+          const toaMatch = viTri.match(/Tòa\s+([A-Za-z0-9]+)/i);
+          const currentBuildingCode = toaMatch ? toaMatch[1].toUpperCase() : "";
+
+          let matchedBuilding = null;
+          let matchedRoom = null;
+
+          if (targetDigits) {
+            for (const bld of tree) {
+              const bldCode = String(bld.ma_toa || "").toUpperCase();
+              const rm = (bld.rooms || []).find((r) => {
+                const rDigits = extractRoomDigits(r.so_phong || r.ma_phong);
+                return rDigits === targetDigits;
+              });
+              if (rm) {
+                if (!matchedBuilding || (currentBuildingCode && bldCode.includes(currentBuildingCode))) {
+                  matchedBuilding = bld;
+                  matchedRoom = rm;
+                  if (currentBuildingCode && bldCode.includes(currentBuildingCode)) {
+                    break;
+                  }
+                }
+              }
             }
+          }
+
+          if (!matchedBuilding) {
+            matchedBuilding =
+              tree.find((b) => currentBuildingCode && String(b.ma_toa).toUpperCase().includes(currentBuildingCode)) ||
+              tree[0];
+          }
+
+          setSelectedBuilding(matchedBuilding.ma_toa);
+
+          const rooms = matchedBuilding.rooms || [];
+          if (rooms.length > 0) {
+            const finalRoom = matchedRoom || rooms[0];
+            setSelectedRoom(finalRoom.ma_phong);
+
+            const beds = finalRoom.beds || [];
+            if (beds.length > 0) {
+              setSelectedBed(beds[0].ma_giuong);
+            } else {
+              setSelectedBed("");
+            }
+          } else {
+            setSelectedRoom("");
+            setSelectedBed("");
           }
         }
       } catch (err) {
@@ -165,9 +176,10 @@ export default function ProcessTransferPage({
     setSubmitting(true);
     try {
       const payload = {
-        ma_toa: selectedBuilding || 'A',
-        phong_id: selectedRoom || 'A203',
-        giuong_id: selectedBed || 'G04',
+        ma_toa: selectedBuilding,
+        phong_id: selectedRoom,
+        giuong_id: selectedBed,
+        msv: requestData?.msv || requestData?.ma_sinh_vien || "",
       };
 
       const result = await occupancyService.approveTransferRequest(requestId, payload);
@@ -197,7 +209,10 @@ export default function ProcessTransferPage({
 
     setSubmitting(true);
     try {
-      const payload = { ly_do_tu_choi: rejectReason.trim() };
+      const payload = {
+        ly_do_tu_choi: rejectReason.trim(),
+        msv: requestData?.msv || requestData?.ma_sinh_vien || "DTC245180037",
+      };
       await occupancyService.rejectTransferRequest(requestId, payload);
 
       setIsRejectModalOpen(false);
@@ -217,6 +232,24 @@ export default function ProcessTransferPage({
       setSubmitting(false);
     }
   };
+
+  const reqType = String(
+    requestData?.loai_don || requestData?.loai_yeu_cau || "",
+  ).toLowerCase();
+  if (
+    requestData &&
+    (reqType.includes("trả") ||
+      reqType.includes("tra") ||
+      reqType.includes("checkout"))
+  ) {
+    return (
+      <ProcessCheckoutPage
+        requestId={requestId}
+        onBack={onBack}
+        onProcessed={onProcessed}
+      />
+    );
+  }
 
   return (
     <AdminLayout activeTab="dashboard" userName="QL_Minh">
@@ -274,13 +307,13 @@ export default function ProcessTransferPage({
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
                     <span className="text-slate-600 font-medium">Họ và tên</span>
                     <span className="font-bold text-slate-900">
-                      {requestData?.ho_ten || 'Nguyễn Quốc Huy'}
+                      {requestData?.ho_ten || '—'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
                     <span className="text-slate-600 font-medium">Giới tính</span>
                     <span className="text-slate-900 font-medium">
-                      {requestData?.gioi_tinh || 'Nam'}
+                      {requestData?.gioi_tinh || '—'}
                     </span>
                   </div>
                 </div>
@@ -290,14 +323,30 @@ export default function ProcessTransferPage({
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
                     <span className="text-slate-600 font-medium">Vị trí hiện tại</span>
                     <span className="font-semibold text-slate-900">
-                      {requestData?.vi_tri_hien_tai || 'Phòng A102 - Giường G01'}
+                      {requestData?.vi_tri_hien_tai || (requestData?.phong_hien_tai ? `Phòng ${requestData.phong_hien_tai}` : 'Chưa xếp phòng')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
+                    <span className="text-slate-600 font-medium">Nguyện vọng chuyển tới</span>
+                    <span className="font-bold text-blue-600">
+                      {requestData?.phong_dich ? `Phòng ${requestData.phong_dich.replace(/^P/i, '')}` : (requestData?.phong_lien_quan || '—')}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2.5 border-b border-slate-100 text-sm">
                     <span className="text-slate-600 font-medium">Công nợ</span>
-                    <span className="font-bold text-emerald-600">
-                      {requestData?.cong_no || 'Đã hoàn thành toàn bộ phí'}
-                    </span>
+                    {requestData?.cong_no &&
+                    (requestData.cong_no.toLowerCase().includes('nợ') ||
+                      requestData.cong_no.toLowerCase().includes('chưa') ||
+                      requestData.cong_no.toLowerCase().includes('thiếu')) &&
+                    !requestData.cong_no.toLowerCase().includes('không có') ? (
+                      <span className="font-bold text-rose-600">
+                        {requestData.cong_no}
+                      </span>
+                    ) : (
+                      <span className="font-bold text-emerald-600">
+                        {requestData?.cong_no || 'Chưa thanh toán (Chưa phát hành hóa đơn)'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -309,7 +358,7 @@ export default function ProcessTransferPage({
                 Lý do xin chuyển
               </h3>
               <div className="border border-slate-200 rounded-lg p-4 text-sm text-slate-800 bg-white shadow-2xs leading-relaxed">
-                "{requestData?.mo_ta || requestData?.ly_do || 'Em muốn chuyển sang phòng A305 để cùng phòng với các bạn cùng nhóm đồ án môn học...'}"
+                "{requestData?.mo_ta || requestData?.ly_do || 'Không có mô tả chi tiết'}"
               </div>
             </div>
 

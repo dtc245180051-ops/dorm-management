@@ -41,20 +41,61 @@ const requestRoute = (request) => {
   const id = String(
     request?.id || request?.ma_yeu_cau || request?.msv || "",
   ).replace(/^#/, "");
+  const upperId = id.toUpperCase();
   const type = normalize(request?.loai_don || request?.loai_yeu_cau);
-  if (type.includes("chuy") || type.includes("transfer"))
-    return `/admin/requests/transfer/${id}`;
-  if (type.includes("trả") || type.includes("tra") || type.includes("checkout"))
+
+  // 1. Ưu tiên kiểm tra đơn Trả phòng
+  if (
+    type.includes("trả") ||
+    type.includes("tra") ||
+    type.includes("checkout") ||
+    upperId.startsWith("TP")
+  ) {
     return `/admin/requests/checkout/${id}`;
+  }
+
+  // 2. Kiểm tra đơn Chuyển phòng
+  if (
+    type.includes("chuy") ||
+    type.includes("transfer") ||
+    type.includes("đổi") ||
+    upperId.startsWith("CP") ||
+    upperId.startsWith("YC")
+  ) {
+    return `/admin/requests/transfer/${id}`;
+  }
+
   return `/admin/requests/registration/${id}`;
 };
 
 const getRequestTypeLabel = (request) => {
+  const id = String(
+    request?.id || request?.ma_yeu_cau || request?.msv || "",
+  ).replace(/^#/, "");
+  const upperId = id.toUpperCase();
   const type = normalize(request?.loai_don || request?.loai_yeu_cau);
-  if (type.includes("chuy") || type.includes("transfer"))
+
+  // 1. Ưu tiên kiểm tra đơn Trả phòng
+  if (
+    type.includes("trả") ||
+    type.includes("tra") ||
+    type.includes("checkout") ||
+    upperId.startsWith("TP")
+  ) {
+    return "Đăng ký trả phòng";
+  }
+
+  // 2. Kiểm tra đơn Chuyển phòng
+  if (
+    type.includes("chuy") ||
+    type.includes("transfer") ||
+    type.includes("đổi") ||
+    upperId.startsWith("CP") ||
+    upperId.startsWith("YC")
+  ) {
     return "Đăng ký chuyển phòng";
-  if (type.includes("trả") || type.includes("tra") || type.includes("checkout"))
-    return "Trả phòng";
+  }
+
   return "Đăng ký ở";
 };
 
@@ -65,6 +106,7 @@ const formatRequestSubmittedAt = (value) => {
   const localizedDate = dateText.match(
     /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/,
   );
+  const hasTime = Boolean(localizedDate && localizedDate[4]);
   const date = localizedDate
     ? new Date(
         Number(localizedDate[3]),
@@ -77,18 +119,26 @@ const formatRequestSubmittedAt = (value) => {
 
   if (Number.isNaN(date.getTime())) return `Gửi lúc ${dateText}`;
 
-  const time = date.toLocaleTimeString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const time = hasTime
+    ? date.toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
   const today = new Date();
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const submittedDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const daysAgo = Math.round((todayStart - submittedDay) / 86400000);
 
-  if (daysAgo === 0) return `Gửi lúc ${time} hôm nay`;
-  if (daysAgo === 1) return `Gửi lúc ${time} hôm qua`;
-  return `Gửi lúc ${time} ${date.toLocaleDateString("vi-VN")}`;
+  if (daysAgo === 0) {
+    return time ? `Gửi lúc ${time} hôm nay` : "Gửi hôm nay";
+  }
+  if (daysAgo === 1) {
+    return time ? `Gửi lúc ${time} hôm qua` : "Gửi hôm qua";
+  }
+  return time
+    ? `Gửi lúc ${time} ${date.toLocaleDateString("vi-VN")}`
+    : `Gửi ngày ${date.toLocaleDateString("vi-VN")}`;
 };
 
 const getTodayIncidents = (incidents) => {

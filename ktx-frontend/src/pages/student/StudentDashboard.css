@@ -541,6 +541,18 @@
   width: fit-content;
 }
 
+.student-stat-badge.unpaid {
+  background-color: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+}
+
+.student-stat-badge.paid {
+  background-color: #E8F8EE;
+  color: #16A34A;
+  border: 1px solid #BBF7D0;
+}
+
 .student-stat-arrow {
   color: #CBD5E1;
   font-size: 18px;
@@ -963,6 +975,9 @@
   border-bottom: 1px solid #F1F5F9;
   cursor: pointer;
   transition: opacity 0.15s ease;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
 }
 
 .student-notif-item:last-child {
@@ -980,9 +995,19 @@
   gap: 8px;
   color: var(--text-body);
   font-weight: 500;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.student-notif-title-wrap span:not(.student-notif-dot),
+.student-notif-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+  display: block;
 }
 
 .student-notif-dot {
@@ -997,7 +1022,8 @@
   color: var(--text-secondary);
   font-size: 11px;
   white-space: nowrap;
-  margin-left: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* --------------------------------------------------------------------------
@@ -1028,6 +1054,10 @@
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--border);
+}
+
+.student-modal-card.student-modal-card-lg {
+  max-width: 620px;
 }
 
 .student-modal-header {

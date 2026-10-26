@@ -92,7 +92,7 @@ export default function RoomDetailModal({
                 Sức chứa: {capacity} người
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                {(Number(room.gia_tien_nam) || (isService ? 9600000 : 4800000)).toLocaleString('vi-VN')} đ/năm
+                {(Number(room.gia_tien_nam) || (isService ? 8200000 : 4800000)).toLocaleString('vi-VN')} đ/năm
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-1">
