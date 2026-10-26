@@ -1,5 +1,23 @@
 [
   {
+    "id": "PA-127623",
+    "ma_phan_anh": "PA-127623",
+    "msv": "dtc245180045",
+    "ho_ten": "bún đậu mắm tôm",
+    "phong": "P202",
+    "loai_phan_anh": "Điện nước",
+    "phan_loai": "Điện nước",
+    "tieu_de": "Mất điện",
+    "mo_ta": "phòng em bị mất điện",
+    "hinh_anh": null,
+    "muc_do_uu_tien": "Thường",
+    "ngay_gui": "2026-10-26T19:45:54.104681",
+    "ngay_tao": "2026-10-26T19:45:54.104689",
+    "trang_thai": "DA_XU_LY",
+    "trang_thai_label": "Đã xử lý",
+    "ghi_chu_xu_ly": "xử lí xong"
+  },
+  {
     "id": "PA-41AE96",
     "ma_phan_anh": "PA-41AE96",
     "msv": "DTC245180037",

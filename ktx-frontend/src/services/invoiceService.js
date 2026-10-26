@@ -243,4 +243,51 @@ export const invoiceService = {
       return [];
     }
   },
+
+  /**
+   * Sinh viên báo đã chuyển khoản thành công cho hóa đơn
+   */
+  async confirmTransfer(invoiceId, msv) {
+    try {
+      const headers = await this.getAuthHeaders();
+      const params = new URLSearchParams();
+      if (msv) params.append('msv', msv);
+
+      const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/confirm-transfer?${params.toString()}`, {
+        method: 'POST',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Lỗi confirmTransfer: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.warn('Lỗi confirmTransfer:', error);
+      return { success: false };
+    }
+  },
+
+  /**
+   * Kế toán gạch nợ trực tiếp cho hóa đơn
+   */
+  async markInvoicePaid(invoiceId) {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/mark-paid`, {
+        method: 'POST',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Lỗi markInvoicePaid: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.warn('Lỗi markInvoicePaid:', error);
+      return null;
+    }
+  },
 };

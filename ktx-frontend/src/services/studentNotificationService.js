@@ -164,7 +164,11 @@ class StudentNotificationService {
         n.id === "transfer-approved-YC-0231" ||
         n.id?.includes("YC-0231") ||
         n.title === "Đã tiếp nhận phản ánh sự cố" ||
-        (n.content && n.content.includes("Ban quản lý KTX đã tiếp nhận phản ánh của bạn tại"))
+        n.title === "Đã gửi phản ánh sự cố" ||
+        n.title?.toLowerCase().includes("đã gửi phản ánh") ||
+        (n.title === "Ban quản lý KTX đã tiếp nhận phản ánh" && n.content?.includes("Mất điện")) ||
+        (n.content && n.content.includes("Ban quản lý KTX đã tiếp nhận phản ánh của bạn tại")) ||
+        (n.content && n.content.includes("đang chờ Ban quản lý KTX tiếp nhận"))
       ) {
         return false;
       }
@@ -542,22 +546,12 @@ class StudentNotificationService {
             const dt = safeParseDate(item.ngay_cap_nhat || item.ngay_tao || item.ngay_gui);
             const formatted = formatTimeAndDate(item.ngay_cap_nhat || item.ngay_tao || dt);
 
-            let title = "Cập nhật phản ánh sự cố";
-            let content = `Phản ánh sự cố "${item.tieu_de || item.mo_ta || "Báo hỏng"}" của bạn đang được cập nhật xử lý.`;
-
-            if (st === "HOAN_THANH" || st === "DA_GIAI_QUYET" || st === "DA_XU_LY") {
-              title = "Phản ánh sự cố đã được xử lý hoàn tất";
-              content = `Phản ánh sự cố "${item.tieu_de || item.mo_ta || "Báo hỏng"}" đã được Ban quản lý KTX giải quyết thành công.${item.ghi_chu_xu_ly ? ` Ghi chú: ${item.ghi_chu_xu_ly}` : ""}`;
-            } else if (st === "DANG_XU_LY") {
-              title = "Ban quản lý KTX đang xử lý phản ánh";
-              content = `Phản ánh sự cố "${item.tieu_de || item.mo_ta || "Báo hỏng"}" của bạn đang được kỹ thuật viên KTX tiến hành xử lý/khắc phục.${item.ghi_chu_xu_ly ? ` Ghi chú: ${item.ghi_chu_xu_ly}` : ""}`;
-            } else if (st === "TU_CHOI") {
-              title = "Ban quản lý KTX từ chối xử lý phản ánh";
-              content = `Phản ánh sự cố "${item.tieu_de || item.mo_ta || "Báo hỏng"}" của bạn đã bị từ chối tiếp nhận/xử lý. Lý do: ${item.ghi_chu_xu_ly || "Không thuộc phạm vi hỗ trợ."}`;
-            } else if (st === "CHO_XU_LY") {
-              title = "Ban quản lý KTX đã tiếp nhận phản ánh";
-              content = `Phản ánh sự cố "${item.tieu_de || item.mo_ta || "Báo hỏng"}" của bạn đã được ghi nhận vào hệ thống và đang phân công kỹ thuật viên kiểm tra.`;
-            }
+            const isHandledByAdmin =
+              st === "HOAN_THANH" ||
+              st === "DA_GIAI_QUYET" ||
+              st === "DA_XU_LY" ||
+              st === "DANG_XU_LY" ||
+              st === "TU_CHOI";
 
             const notifId = `incident-api-status-${incId}`;
             const existingIdx = savedList.findIndex(
@@ -566,6 +560,31 @@ class StudentNotificationService {
                 n.id === `incident-api-resolved-${incId}` ||
                 n.id?.startsWith(`incident-status-${incId}`)
             );
+
+            // Sinh viên chỉ nhận thông báo khi Ban quản lý ĐÃ THỰC SỰ XỬ LÝ
+            // Khi đơn còn ở trạng thái Chờ tiếp nhận (CHO_XU_LY) thì KHÔNG thông báo cho sinh viên!
+            if (!isHandledByAdmin) {
+              if (existingIdx >= 0) {
+                savedList.splice(existingIdx, 1);
+                hasChange = true;
+              }
+              return;
+            }
+
+            let title = "Cập nhật phản ánh sự cố";
+            let content = `Phản ánh sự cố "${item.tieu_de || item.mo_ta || "Báo hỏng"}" của bạn đang được cập nhật xử lý.`;
+
+            if (st === "HOAN_THANH" || st === "DA_GIAI_QUYET" || st === "DA_XU_LY") {
+              title = "Phản ánh sự cố đã được xử lý hoàn tất";
+              content = `Phản ánh sự cố "${item.tieu_de || item.mo_ta || "Báo hỏng"}" đã được Ban quản lý KTX giải quyết thành công.${item.ghi_chu_xu_ly ? ` Ghi chú: ${item.ghi_chu_xu_ly}` : ""}`;
+            } else if (st === "DANG_XU_LY") {
+              title = "Ban quản lý KTX đã tiếp nhận phản ánh";
+              content = `Phản ánh sự cố "${item.tieu_de || item.mo_ta || "Báo hỏng"}" của bạn đã được Ban quản lý KTX tiếp nhận và đang tiến hành xử lý/khắc phục.${item.ghi_chu_xu_ly ? ` Ghi chú: ${item.ghi_chu_xu_ly}` : ""}`;
+            } else if (st === "TU_CHOI") {
+              title = "Ban quản lý KTX từ chối xử lý phản ánh";
+              content = `Phản ánh sự cố "${item.tieu_de || item.mo_ta || "Báo hỏng"}" của bạn đã bị từ chối tiếp nhận/xử lý. Lý do: ${item.ghi_chu_xu_ly || "Không thuộc phạm vi hỗ trợ."}`;
+            }
+
             if (existingIdx >= 0) {
               if (savedList[existingIdx].content !== content || savedList[existingIdx].title !== title) {
                 savedList[existingIdx].title = title;
@@ -1531,6 +1550,32 @@ class StudentNotificationService {
                   const dt = item.ngay_cap_nhat || item.ngay_tao ? new Date(item.ngay_cap_nhat || item.ngay_tao) : new Date();
                   const formatted = formatTimeAndDate(dt);
 
+                  const isHandledByAdmin =
+                    st === "HOAN_THANH" ||
+                    st === "DA_GIAI_QUYET" ||
+                    st === "DA_XU_LY" ||
+                    st === "DANG_XU_LY" ||
+                    st === "TU_CHOI";
+
+                  const existingIdx = list.findIndex(
+                    (n) =>
+                      n.id === notifId ||
+                      n.id === `incident-api-resolved-${incId}` ||
+                      n.id?.startsWith(`incident-status-${incId}`) ||
+                      n.id === `notif-incident-${incId}` ||
+                      n.id === `incident-${incId}`
+                  );
+
+                  // Chỉ thông báo khi bên quản lý ấn tiếp nhận (DANG_XU_LY), xử lý xong (HOAN_THANH / DA_XU_LY) hoặc từ chối (TU_CHOI).
+                  // Không thông báo khi sinh viên vừa gửi (CHO_XU_LY).
+                  if (!isHandledByAdmin) {
+                    if (existingIdx >= 0) {
+                      list.splice(existingIdx, 1);
+                      hasNew = true;
+                    }
+                    return;
+                  }
+
                   let title = "Cập nhật phản ánh sự cố";
                   let content = `Phản ánh sự cố "${item.tieu_de || item.mo_ta || "Báo hỏng"}" của bạn đang được cập nhật xử lý.`;
                   
@@ -1538,22 +1583,12 @@ class StudentNotificationService {
                     title = "Phản ánh sự cố đã được xử lý hoàn tất";
                     content = `Phản ánh sự cố "${item.tieu_de || item.mo_ta || "Báo hỏng"}" đã được Ban quản lý KTX giải quyết thành công.${item.ghi_chu_xu_ly ? ` Ghi chú kết quả: ${item.ghi_chu_xu_ly}` : ""}`;
                   } else if (st === "DANG_XU_LY") {
-                    title = "Ban quản lý KTX đang xử lý phản ánh";
-                    content = `Phản ánh sự cố "${item.tieu_de || item.mo_ta || "Báo hỏng"}" của bạn đang được kỹ thuật viên KTX tiến hành xử lý/khắc phục.${item.ghi_chu_xu_ly ? ` Ghi chú: ${item.ghi_chu_xu_ly}` : ""}`;
+                    title = "Ban quản lý KTX đã tiếp nhận phản ánh";
+                    content = `Phản ánh sự cố "${item.tieu_de || item.mo_ta || "Báo hỏng"}" của bạn đã được Ban quản lý KTX tiếp nhận và đang tiến hành xử lý/khắc phục.${item.ghi_chu_xu_ly ? ` Ghi chú: ${item.ghi_chu_xu_ly}` : ""}`;
                   } else if (st === "TU_CHOI") {
                     title = "Ban quản lý KTX từ chối xử lý phản ánh";
                     content = `Phản ánh sự cố "${item.tieu_de || item.mo_ta || "Báo hỏng"}" của bạn đã bị từ chối tiếp nhận/xử lý. Lý do: ${item.ghi_chu_xu_ly || "Không thuộc phạm vi hỗ trợ."}`;
-                  } else if (st === "CHO_XU_LY") {
-                    title = "Ban quản lý KTX đã tiếp nhận phản ánh";
-                    content = `Phản ánh sự cố "${item.tieu_de || item.mo_ta || "Báo hỏng"}" của bạn đã được ghi nhận vào hệ thống và đang phân công kỹ thuật viên kiểm tra.`;
                   }
-
-                  const existingIdx = list.findIndex(
-                    (n) =>
-                      n.id === notifId ||
-                      n.id === `incident-api-resolved-${incId}` ||
-                      n.id?.startsWith(`incident-status-${incId}`)
-                  );
                   if (existingIdx >= 0) {
                     if (list[existingIdx].content !== content || list[existingIdx].title !== title) {
                       list[existingIdx].title = title;

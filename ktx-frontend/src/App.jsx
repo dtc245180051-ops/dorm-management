@@ -29,6 +29,8 @@ import RoomSearchPage from "./pages/student/RoomSearchPage";
 import PaymentPage from "./pages/student/PaymentPage";
 import PaymentHistoryPage from "./pages/student/PaymentHistoryPage";
 import StudentNotificationsPage from "./pages/student/StudentNotificationsPage";
+import AdminNotificationsPage from "./pages/admin/AdminNotificationsPage";
+import AccountantNotificationsPage from "./pages/accountant/AccountantNotificationsPage";
 import Dashboard from "./pages/admin/Dashboard";
 import {
   Clock,
@@ -336,6 +338,8 @@ export default function App() {
       navigateTo("/accountant/debt");
     } else if (menuKey === "reports" || menuKey === "report") {
       navigateTo("/accountant/reports");
+    } else if (menuKey === "notifications" || menuKey === "thong-bao") {
+      navigateTo("/accountant/notifications");
     }
   };
 
@@ -545,6 +549,33 @@ export default function App() {
           onSearchChange={setAccountantSearchTerm}
         >
           <PeriodicReports searchTerm={accountantSearchTerm} />
+        </AccountantLayout>
+        <RoleSwitcher currentRole="accountant" onSwitchRole={navigateTo} />
+      </div>
+    );
+  }
+
+  if (
+    currentPath === "/accountant/notifications" ||
+    currentPath === "/thong-bao-ke-toan"
+  ) {
+    return (
+      <div className="relative">
+        <AccountantLayout
+          user={{
+            username: localStorage.getItem('ktx_fullname') || localStorage.getItem('ktx_username') || 'Phòng Kế Toán',
+            role: 'KeToan'
+          }}
+          onLogout={() => {
+            localStorage.clear();
+            navigateTo("/");
+          }}
+          activeMenu="notifications"
+          onMenuChange={handleAccountantMenuChange}
+          searchTerm={accountantSearchTerm}
+          onSearchChange={setAccountantSearchTerm}
+        >
+          <AccountantNotificationsPage onNavigate={navigateTo} />
         </AccountantLayout>
         <RoleSwitcher currentRole="accountant" onSwitchRole={navigateTo} />
       </div>
@@ -1133,11 +1164,16 @@ export default function App() {
           <ViolationManagement searchTerm={adminSearchTerm} />
         )}
 
+        {adminActiveTab === 'notifications' && (
+          <AdminNotificationsPage onNavigate={navigateTo} />
+        )}
+
         {adminActiveTab !== 'dashboard' &&
           adminActiveTab !== 'rooms' &&
           adminActiveTab !== 'students' &&
           adminActiveTab !== 'incidents' &&
-          adminActiveTab !== 'violations' && (
+          adminActiveTab !== 'violations' &&
+          adminActiveTab !== 'notifications' && (
             <div className="p-8 text-center text-slate-400 mt-20">
               <h2 className="text-xl font-bold text-slate-600 mb-2">
                 Trang đang được xây dựng

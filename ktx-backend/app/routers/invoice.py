@@ -352,3 +352,108 @@ def get_invoice_detail(
             detail=f"Không tìm thấy hóa đơn với mã '{ma_hoa_don}'",
         )
     return invoice
+
+
+@router.post(
+    "/{ma_hoa_don}/confirm-transfer",
+    summary="[Sinh viên] Báo đã chuyển khoản thành công cho hóa đơn",
+)
+def confirm_invoice_transfer(
+    ma_hoa_don: str,
+    msv: Optional[str] = Query(None),
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    """
+    Sinh viên xác nhận đã chuyển khoản qua QR/ngân hàng.
+    Tự động ghi nhận giao dịch chờ đối soát vào hệ thống để Kế toán nhận thông báo.
+    """
+    import datetime
+    from app.models.invoice import HoaDon
+    from app.models.reconciliation import GiaoDichNganHang, TrangThaiDoiSoat
+
+    inv = db.query(HoaDon).filter(HoaDon.ma_hoa_don == ma_hoa_don).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy hóa đơn '{ma_hoa_don}'")
+
+    student_code = msv or inv.msv or "SINHVIEN"
+    tx_code = f"FT2629{datetime.datetime.now().strftime('%H%M%S')}"
+
+    # Kiểm tra xem đã có giao dịch chờ xử lý tương tự chưa
+    existing_tx = db.query(GiaoDichNganHang).filter(
+        GiaoDichNganHang.noi_dung_chuyen_khoan.contains(student_code),
+        GiaoDichNganHang.so_tien == inv.so_tien,
+    ).first()
+
+    if not existing_tx:
+        content = f"TP {student_code}" if inv.loai_hoa_don == "TIEN_PHONG" else f"DN {inv.ma_phong or 'KTX'} {student_code}"
+        new_tx = GiaoDichNganHang(
+            ma_giao_dich_ngan_hang=tx_code,
+            so_tien=float(inv.so_tien),
+            noi_dung_chuyen_khoan=content,
+            ten_ngan_hang="MB Bank",
+            so_tai_khoan="20020813520",
+            trang_thai=TrangThaiDoiSoat.MANUAL_REQUIRED.value,
+            ngay_giao_dich=datetime.datetime.now(),
+            msv=student_code,
+        )
+        db.add(new_tx)
+        db.commit()
+
+    return {"success": True, "message": "Đã ghi nhận giao dịch chờ đối soát", "invoice_id": ma_hoa_don}
+
+
+@router.post(
+    "/{ma_hoa_don}/mark-paid",
+    response_model=HoaDonResponse,
+    summary="[Kế toán] Xác nhận gạch nợ thanh toán cho hóa đơn",
+)
+def mark_invoice_paid(
+    ma_hoa_don: str,
+    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    """
+    Dành riêng cho Kế toán gạch nợ trực tiếp cho hóa đơn.
+    """
+    import datetime
+    from app.models.debt import SoCongNo
+    from app.models.invoice import HoaDon, TrangThaiHoaDon
+    from app.models.reconciliation import GiaoDichNganHang, TrangThaiDoiSoat
+
+    inv = db.query(HoaDon).filter(HoaDon.ma_hoa_don == ma_hoa_don).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy hóa đơn '{ma_hoa_don}'")
+
+    inv.trang_thai = TrangThaiHoaDon.DA_THANH_TOAN.value
+
+    # Cập nhật sổ công nợ
+    cong_no = db.query(SoCongNo).filter(SoCongNo.ma_hoa_don == ma_hoa_don).first()
+    if cong_no:
+        cong_no.da_tra = float(inv.so_tien)
+        cong_no.con_thieu = 0.0
+        cong_no.trang_thai = "DA_THANH_TOAN"
+        cong_no.ngay_cap_nhat = datetime.datetime.now()
+
+    # Cập nhật giao dịch ngân hàng liên quan nếu có
+    if inv.msv:
+        tx = (
+            db.query(GiaoDichNganHang)
+            .filter(
+                GiaoDichNganHang.noi_dung_chuyen_khoan.contains(inv.msv),
+                GiaoDichNganHang.trang_thai.in_([
+                    TrangThaiDoiSoat.MANUAL_REQUIRED.value,
+                    TrangThaiDoiSoat.INVALID_SYNTAX.value,
+                ]),
+            )
+            .first()
+        )
+        if tx:
+            tx.trang_thai = TrangThaiDoiSoat.MATCHED_MANUALLY.value
+            tx.ma_hoa_don = inv.ma_hoa_don
+            tx.nguoi_xu_ly = current_user.ten_dang_nhap if current_user else "KeToan"
+            tx.ngay_cap_nhat = datetime.datetime.now()
+
+    db.commit()
+    db.refresh(inv)
+    return inv

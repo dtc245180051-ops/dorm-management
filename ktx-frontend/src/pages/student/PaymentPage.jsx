@@ -561,6 +561,9 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
     setPendingInvoiceIds(newPending);
     localStorage.setItem("ktx_pending_invoices", JSON.stringify(newPending));
 
+    // Gọi backend ghi nhận giao dịch chờ đối soát
+    invoiceService.confirmTransfer(invId, maSV).catch(() => {});
+
     payStudentBill(maSV, invId);
 
     const now = new Date();
@@ -570,6 +573,8 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
     localStorage.setItem(PAYMENT_DATE_STORAGE_KEY, paymentDate);
 
     window.dispatchEvent(new CustomEvent("ktx-payment-updated"));
+    window.dispatchEvent(new CustomEvent("accountant-notifications-updated"));
+    window.dispatchEvent(new CustomEvent("occupancy-updated"));
     setToastMessage(
       `Đã ghi nhận giao dịch cho ${selectedInvoice.name}! Kế toán sẽ đối soát và gạch nợ tự động trong 1-3 phút.`,
     );
