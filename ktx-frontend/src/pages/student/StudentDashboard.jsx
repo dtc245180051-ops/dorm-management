@@ -79,9 +79,26 @@ export default function StudentDashboard({ user, onNavigate }) {
     } catch (_) {}
   };
 
+  const getSafeStudentCode = () => {
+    return (
+      user?.code ||
+      user?.student_id ||
+      user?.studentId ||
+      user?.msv ||
+      user?.username ||
+      user?.nguoi_dung?.sinh_vien?.msv ||
+      user?.email?.split?.("@")?.[0] ||
+      localStorage.getItem("ktx_msv") ||
+      localStorage.getItem("ktx_student_msv") ||
+      localStorage.getItem("ktx_username") ||
+      localStorage.getItem("ktx_email")?.split?.("@")?.[0] ||
+      ""
+    ).trim();
+  };
+
   const loadRoomInfo = async () => {
     try {
-      const msv = user?.msv || user?.nguoi_dung?.sinh_vien?.msv || localStorage.getItem("ktx_username") || "";
+      const msv = getSafeStudentCode();
       if (!msv) {
         setCurrentRoomInfo(null);
         setBilling(null);
@@ -114,7 +131,7 @@ export default function StudentDashboard({ user, onNavigate }) {
 
   const loadComplaints = async () => {
     try {
-      const msv = user?.msv || user?.nguoi_dung?.sinh_vien?.msv || localStorage.getItem("ktx_username") || "";
+      const msv = getSafeStudentCode();
       const list = await feedbackService.getStudentIncidents(msv);
       const processing = list.filter((f) => ["Chờ tiếp nhận", "Đang xử lý", "CHO_TIEP_NHAN", "CHO_XU_LY", "DANG_XU_LY"].includes(f.trang_thai || f.status)).length;
       const resolved = list.filter((f) => ["Đã giải quyết", "DA_GIAI_QUYET", "DA_XU_LY"].includes(f.trang_thai || f.status)).length;
@@ -127,7 +144,7 @@ export default function StudentDashboard({ user, onNavigate }) {
 
   const loadRegistrationStatus = async () => {
     try {
-      const msv = user?.msv || user?.nguoi_dung?.sinh_vien?.msv || localStorage.getItem("ktx_username") || "";
+      const msv = getSafeStudentCode();
       if (msv) {
         const reqs = await occupancyService.getMyRequests(msv);
         if (Array.isArray(reqs) && reqs.length > 0) {
@@ -207,11 +224,13 @@ export default function StudentDashboard({ user, onNavigate }) {
 
   const displayName =
     user?.ho_ten ||
+    user?.fullName ||
+    user?.name ||
     user?.nguoi_dung?.ho_ten ||
     localStorage.getItem("ktx_fullname") ||
     user?.username ||
     localStorage.getItem("ktx_username") ||
-    "Nguyễn Văn A";
+    "Sinh viên";
 
   const handleCardClick = (service) => {
     if (onNavigate) {
@@ -347,8 +366,8 @@ export default function StudentDashboard({ user, onNavigate }) {
             const rawToa = currentRoomInfo?.toa || "Tòa A1";
             const roomTitle = `P${cleanRoom} - ${rawToa.startsWith("Tòa") ? rawToa : `Tòa ${rawToa}`}`;
             
-            const currentMsv = (user?.msv || user?.nguoi_dung?.sinh_vien?.msv || localStorage.getItem("ktx_username") || "").trim();
-            const currentName = (user?.nguoi_dung?.ho_ten || user?.ho_ten || localStorage.getItem("ktx_fullname") || "Sinh viên").trim();
+            const currentMsv = getSafeStudentCode();
+            const currentName = (user?.nguoi_dung?.ho_ten || user?.ho_ten || user?.fullName || localStorage.getItem("ktx_fullname") || "Sinh viên").trim();
 
             const memberList = (currentRoomInfo?.danh_sach_thanh_vien && currentRoomInfo.danh_sach_thanh_vien.length > 0)
               ? currentRoomInfo.danh_sach_thanh_vien

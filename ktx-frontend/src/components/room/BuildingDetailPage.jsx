@@ -241,7 +241,10 @@ export default function BuildingDetailPage({
     const tangMap = new Map();
 
     (building.tangs || []).forEach((t) => {
-      tangMap.set(t.so_tang, t);
+      // Ưu tiên tầng có phòng hoặc có mã chuẩn theo format {ma_toa}_T{so_tang}
+      if (!tangMap.has(t.so_tang) || (t.phongs && t.phongs.length > 0)) {
+        tangMap.set(t.so_tang, t);
+      }
     });
 
     const list = [];

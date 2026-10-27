@@ -300,11 +300,10 @@ export default function FeedbackPage({
                 <button
                   type="button"
                   onClick={() => setActiveTab('create')}
-                  className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
-                    activeTab === 'create'
-                      ? 'bg-white text-blue-600 shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${activeTab === 'create'
+                    ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   Gửi phản ánh mới
                 </button>
@@ -314,11 +313,10 @@ export default function FeedbackPage({
                     setActiveTab('history');
                     loadHistory();
                   }}
-                  className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === 'history'
-                      ? 'bg-white text-blue-600 shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${activeTab === 'history'
+                    ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   <span>Lịch sử phản ánh</span>
                   {myIncidents.length > 0 && (
@@ -354,9 +352,7 @@ export default function FeedbackPage({
                     <div>
                       <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
                         <span>Phòng lưu trú</span>
-                        <span className="text-[11px] font-normal text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
-                          Tự động điền theo phòng đang ở
-                        </span>
+
                       </label>
                       <input
                         type="text"
@@ -371,10 +367,7 @@ export default function FeedbackPage({
                     <div>
                       <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
                         <span>Mô tả chi tiết sự cố</span>
-                        <span className="text-[11px] text-blue-600 font-medium flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-blue-500" />
-                          AI tự động tóm tắt & phân loại
-                        </span>
+
                       </label>
                       <textarea
                         rows={5}
@@ -571,10 +564,10 @@ export default function FeedbackPage({
                               <td className="py-3.5 px-4 text-xs text-slate-500">
                                 {pa.ngay_gui
                                   ? (typeof pa.ngay_gui === 'string' && pa.ngay_gui.includes('/')
-                                      ? pa.ngay_gui
-                                      : (!isNaN(new Date(pa.ngay_gui).getTime())
-                                          ? new Date(pa.ngay_gui).toLocaleDateString('vi-VN')
-                                          : String(pa.ngay_gui)))
+                                    ? pa.ngay_gui
+                                    : (!isNaN(new Date(pa.ngay_gui).getTime())
+                                      ? new Date(pa.ngay_gui).toLocaleDateString('vi-VN')
+                                      : String(pa.ngay_gui)))
                                   : 'Hôm nay'}
                               </td>
                               <td className="py-3.5 px-4">

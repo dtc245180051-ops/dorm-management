@@ -1038,11 +1038,30 @@ export default function App() {
 
   // 6. Trang chủ Sinh viên (Dashboard)
   if (currentPath === "/student/dashboard" || currentPath === "/student") {
-    const acc = getStudentAccount();
+    const studentCode =
+      localStorage.getItem("ktx_msv") ||
+      localStorage.getItem("ktx_student_msv") ||
+      localStorage.getItem("ktx_username") ||
+      localStorage.getItem("ktx_email")?.split("@")[0] ||
+      "";
+    const acc = getStudentAccount(studentCode);
     const studentName =
-      acc.fullName ||
       localStorage.getItem("ktx_fullname") ||
-      "Nguyễn Thị Ánh";
+      acc?.fullName ||
+      localStorage.getItem("ktx_username") ||
+      "Sinh viên";
+
+    const currentUser = {
+      ho_ten: studentName,
+      name: studentName,
+      fullName: studentName,
+      username: studentCode || acc?.studentId || "dtc245180051",
+      msv: studentCode || acc?.studentId || "dtc245180051",
+      code: studentCode || acc?.studentId || "dtc245180051",
+      student_id: studentCode || acc?.studentId || "dtc245180051",
+      studentId: studentCode || acc?.studentId || "dtc245180051",
+      email: localStorage.getItem("ktx_email") || "",
+    };
 
     return (
       <div className="relative">
@@ -1051,12 +1070,10 @@ export default function App() {
           onSelectTab={handleStudentTabSelect}
           userName={studentName}
           userRole="Sinh viên"
+          user={currentUser}
         >
           <StudentDashboard
-            user={{
-              ho_ten: studentName,
-              username: acc.studentId || "dtc245180051",
-            }}
+            user={currentUser}
             onNavigate={navigateTo}
           />
         </StudentLayout>

@@ -132,6 +132,57 @@ export const authService = {
   },
 
   /**
+   * Đăng nhập Google OAuth 2.0 (Gửi Google ID Token JWT về backend xác thực)
+   * @param {string} credential - Google ID Token JWT từ @react-oauth/google
+   */
+  async googleLogin(credential) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/google-login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          credential,
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || "",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Đăng nhập Google thất bại");
+      }
+
+      // Lưu trữ phiên đăng nhập chuẩn iDORM
+      if (data.access_token) {
+        localStorage.setItem("token", data.access_token);
+        localStorage.setItem("access_token", data.access_token);
+        localStorage.setItem("ktx_token", data.access_token);
+        localStorage.setItem("ktx_user_role", data.role);
+        localStorage.setItem("user_role", data.role);
+        localStorage.setItem("ktx_username", data.username);
+        localStorage.setItem("user_name", data.username);
+        if (data.full_name) {
+          localStorage.setItem("ktx_fullname", data.full_name);
+        }
+        if (data.msv) {
+          localStorage.setItem("ktx_msv", data.msv);
+          localStorage.setItem("ktx_student_msv", data.msv);
+        }
+      }
+
+      return { success: true, data };
+    } catch (error) {
+      console.error("Lỗi Google Login:", error);
+      return {
+        success: false,
+        message: error.message || "Không thể kết nối đến máy chủ xác thực",
+      };
+    }
+  },
+
+  /**
    * Đăng nhập hoặc Đăng ký bằng Google (Chỉ chấp nhận email @ictu.edu.vn)
    * @param {Object} googleUser - { email, fullName, avatarUrl, googleId }
    */

@@ -350,8 +350,11 @@ def approve_request(
     raw_phong = payload.phong_id.strip()
     digits = re.findall(r"\d", raw_phong)
     floor_num = int(digits[0]) if digits else 1
-    tang_code = f"TANG_{floor_num}_{toa.ma_toa}"[:20]
-    tang = db.query(Tang).filter(Tang.ma_tang == tang_code).first()
+    tang_code = f"{toa.ma_toa}_T{floor_num}"[:20]
+    tang = (
+        db.query(Tang).filter(Tang.ma_tang == tang_code).first()
+        or db.query(Tang).filter((Tang.ma_toa == toa.ma_toa) & (Tang.so_tang == floor_num)).first()
+    )
     if not tang:
         tang = Tang(
             ma_tang=tang_code,
@@ -362,10 +365,14 @@ def approve_request(
         db.flush()
 
     # Phòng
-    phong_code = raw_phong[:20]
-    phong = db.query(Phong).filter(Phong.ma_phong == phong_code).first()
+    so_p = "".join(digits) if digits else raw_phong.replace("Phòng ", "").replace("P", "").strip()
+    phong = (
+        db.query(Phong).filter(Phong.ma_phong == raw_phong).first()
+        or db.query(Phong).filter((Phong.ma_tang == tang.ma_tang) & (Phong.so_phong == so_p)).first()
+        or db.query(Phong).filter(Phong.ma_phong.endswith(f"P{so_p}")).first()
+    )
     if not phong:
-        so_p = "".join(digits) if digits else raw_phong.replace("Phòng ", "").replace("P", "")
+        phong_code = raw_phong[:20]
         phong = Phong(
             ma_phong=phong_code,
             so_phong=so_p[:20],

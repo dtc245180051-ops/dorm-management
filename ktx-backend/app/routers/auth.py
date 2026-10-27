@@ -5,9 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import RoleChecker, get_current_user
+from app.core.config import settings
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.models.user import NguoiDung, TaiKhoan, VaiTro
-from app.schemas.auth import GoogleAuthRequest, Token, UserRegister, UserResponse
+from app.schemas.auth import GoogleAuthRequest, GoogleLoginRequest, Token, UserRegister, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -325,6 +326,145 @@ def google_auth(
         else str(account.vai_tro)
     )
 
+    access_token = create_access_token(
+        data={"sub": account.ten_dang_nhap, "role": role_value}
+    )
+
+    full_name_val = account.nguoi_dung.ho_ten if account.nguoi_dung else account.ten_dang_nhap
+    msv_val = None
+    if account.nguoi_dung and account.nguoi_dung.sinh_vien:
+        msv_val = account.nguoi_dung.sinh_vien.msv
+
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        role=role_value,
+        username=account.ten_dang_nhap,
+        full_name=full_name_val,
+        msv=msv_val,
+    )
+
+
+@router.post(
+    "/google-login",
+    response_model=Token,
+    summary="Đăng nhập Google OAuth 2.0 Identity Services thực tế",
+)
+def google_login(
+    payload: GoogleLoginRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Xác thực Google ID Token JWT gửi từ Google Identity Services (@react-oauth/google):
+    - Xác thực chữ ký token từ Google thông qua id_token.verify_oauth2_token
+    - Ràng buộc email trường: Nếu đuôi email không phải @ictu.edu.vn, trả về HTTP 403 Forbidden
+    - Tự động tra cứu hoặc tạo mới người dùng với username/MSV trích xuất từ phần tiền tố email
+    - Ký và trả về mã JWT Token nội bộ của hệ thống iDORM
+    """
+    from google.oauth2 import id_token
+    from google.auth.transport import requests as google_requests
+
+    # 1. Xác thực chữ ký token từ Google
+    try:
+        # Nếu có client_id thì kiểm tra audience, nếu không thì chỉ kiểm tra chữ ký & hạn dùng của Google certs
+        expected_audience = payload.client_id or getattr(settings, "GOOGLE_CLIENT_ID", None)
+        id_info = id_token.verify_oauth2_token(
+            payload.credential,
+            google_requests.Request(),
+            audience=expected_audience,
+        )
+    except ValueError as val_err:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Mã Google ID Token không hợp lệ hoặc đã hết hạn: {str(val_err)}",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Xác thực chữ ký Google OAuth thất bại: {str(e)}",
+        )
+
+    email = id_info.get("email", "").strip().lower()
+    full_name = id_info.get("name", "").strip()
+    picture = id_info.get("picture", "")
+
+    # 2. Kiểm tra ràng buộc email trường: Bắt buộc kết thúc bằng @ictu.edu.vn
+    if not email.endswith("@ictu.edu.vn"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Hệ thống chỉ chấp nhận tài khoản Google do trường cấp (@ictu.edu.vn)",
+        )
+
+    # 3. Trích xuất username và MSV từ phần tiền tố email
+    prefix = email.split("@")[0].strip()
+    username = prefix.lower()[:50]
+    msv_val = prefix.upper()[:20]
+
+    # 4. Kiểm tra tài khoản đã tồn tại trong CSDL chưa
+    from app.models.user import SinhVien
+    account = (
+        db.query(TaiKhoan)
+        .outerjoin(NguoiDung, TaiKhoan.ma_tai_khoan == NguoiDung.ma_tai_khoan)
+        .outerjoin(SinhVien, NguoiDung.ma_nguoi_dung == SinhVien.ma_nguoi_dung)
+        .filter(
+            or_(
+                NguoiDung.email == email,
+                NguoiDung.email.ilike(email),
+                TaiKhoan.ten_dang_nhap == username,
+                TaiKhoan.ten_dang_nhap.ilike(username),
+                SinhVien.msv == msv_val,
+                SinhVien.msv.ilike(msv_val),
+            )
+        )
+        .first()
+    )
+
+    # 5. Nếu chưa có, tự động tạo mới người dùng
+    if not account:
+        default_pwd = get_password_hash(f"IctuGoogleAuth@{username}")
+        full_name_val = full_name or username.upper()
+
+        account = TaiKhoan(
+            ten_dang_nhap=username,
+            mat_khau=default_pwd,
+            vai_tro=VaiTro.SINH_VIEN,
+        )
+        db.add(account)
+        db.flush()
+
+        new_user = NguoiDung(
+            ma_tai_khoan=account.ma_tai_khoan,
+            ho_ten=full_name_val,
+            email=email,
+        )
+        db.add(new_user)
+        db.flush()
+
+        existing_sv = db.query(SinhVien).filter(SinhVien.msv == msv_val).first()
+        if not existing_sv:
+            sv = SinhVien(
+                msv=msv_val,
+                ma_nguoi_dung=new_user.ma_nguoi_dung,
+                lop="",
+                gioi_tinh="Nam",
+                anh_dai_dien=picture if picture else None,
+            )
+            db.add(sv)
+        elif not existing_sv.ma_nguoi_dung:
+            existing_sv.ma_nguoi_dung = new_user.ma_nguoi_dung
+            if picture and hasattr(existing_sv, "anh_dai_dien"):
+                existing_sv.anh_dai_dien = picture
+
+        db.commit()
+        db.refresh(account)
+
+    role_value = (
+        account.vai_tro.value
+        if hasattr(account.vai_tro, "value")
+        else str(account.vai_tro)
+    )
+
+    # 6. Ký và trả về mã JWT Token nội bộ của hệ thống iDORM
     access_token = create_access_token(
         data={"sub": account.ten_dang_nhap, "role": role_value}
     )

@@ -55,3 +55,8 @@ class GoogleAuthRequest(BaseModel):
     full_name: Optional[str] = Field(default=None, description="Họ và tên")
     avatar_url: Optional[str] = Field(default=None, description="Ảnh đại diện Google")
     google_id: Optional[str] = Field(default=None, description="ID hoặc sub từ Google OAuth")
+
+
+class GoogleLoginRequest(BaseModel):
+    credential: str = Field(..., description="Google ID Token JWT (credential từ @react-oauth/google)")
+    client_id: Optional[str] = Field(default=None, description="Google Client ID")

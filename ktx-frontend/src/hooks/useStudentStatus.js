@@ -10,23 +10,58 @@ import { getStudentAccount } from "../services/studentAccountService";
 // Module-level cache để giữ trạng thái liên tục giữa các lần chuyển trang (không bị giật nhấp nháy lock icon)
 let cachedStudentStatusState = null;
 
+/**
+ * Trích xuất an toàn mã sinh viên từ tham số (chuỗi msv hoặc object user)
+ * Hỗ trợ đăng nhập thông thường lẫn Google OAuth 2.0
+ */
+export function extractStudentCode(studentInput) {
+  let raw = "";
+
+  if (typeof studentInput === "string") {
+    raw = studentInput;
+  } else if (studentInput && typeof studentInput === "object") {
+    raw =
+      studentInput.code ||
+      studentInput.student_id ||
+      studentInput.studentId ||
+      studentInput.msv ||
+      studentInput.username ||
+      studentInput.user_name ||
+      studentInput.email?.split?.("@")?.[0] ||
+      studentInput.nguoi_dung?.sinh_vien?.msv ||
+      studentInput.user?.code ||
+      studentInput.user?.student_id ||
+      studentInput.user?.msv ||
+      "";
+  }
+
+  if (!raw) {
+    try {
+      raw =
+        localStorage.getItem("ktx_msv") ||
+        localStorage.getItem("ktx_student_msv") ||
+        localStorage.getItem("ktx_username") ||
+        localStorage.getItem("user_name") ||
+        localStorage.getItem("ktx_email")?.split?.("@")?.[0] ||
+        "";
+    } catch (_) {
+      raw = "";
+    }
+  }
+
+  return (typeof raw === "string" ? raw : "").trim().toLowerCase();
+}
+
 function getInitialStudentStatus(studentMsv) {
   if (cachedStudentStatusState) {
     return cachedStudentStatusState;
   }
 
-  try {
-    const code = (
-      studentMsv ||
-      localStorage.getItem("ktx_msv") ||
-      localStorage.getItem("ktx_student_msv") ||
-      localStorage.getItem("ktx_username") ||
-      localStorage.getItem("ktx_email")?.split("@")[0] ||
-      ""
-    )
-      .trim()
-      .toLowerCase();
+  // Khắc phục biến code chưa định nghĩa ngoài khối try-catch:
+  // Lấy mã sinh viên an toàn với fallback chuỗi rỗng
+  const code = extractStudentCode(studentMsv) || "";
 
+  try {
     // 1. Kiểm tra sessionStorage
     const sessionCached = sessionStorage.getItem("ktx_cached_student_status");
     if (sessionCached) {
@@ -92,25 +127,16 @@ export function useStudentStatus(studentMsv) {
 
   const checkStatus = useCallback(async () => {
     try {
-      const code = (
-        studentMsv ||
-        localStorage.getItem("ktx_msv") ||
-        localStorage.getItem("ktx_student_msv") ||
-        localStorage.getItem("ktx_username") ||
-        localStorage.getItem("ktx_email")?.split("@")[0] ||
-        ""
-      )
-        .trim()
-        .toLowerCase();
+      const code = extractStudentCode(studentMsv) || "";
 
       const res = await resolveStudentStatus(code);
       const newState = {
-        status: res.status,
-        stage: res.stage || getStudentStage(res.status),
-        studentInfo: res.studentInfo,
-        activeRoom: res.activeRoom,
-        latestRequest: res.latestRequest,
-        account: res.account || getStudentAccount(code),
+        status: res?.status || STUDENT_STATUS.ACTIVE_RESIDENT,
+        stage: res?.stage || getStudentStage(res?.status || STUDENT_STATUS.ACTIVE_RESIDENT),
+        studentInfo: res?.studentInfo || { msv: code, trang_thai_o: "DANG_O" },
+        activeRoom: res?.activeRoom || null,
+        latestRequest: res?.latestRequest || null,
+        account: res?.account || getStudentAccount(code),
         loading: false,
       };
 

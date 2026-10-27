@@ -473,7 +473,23 @@
   font-weight: 500;
 }
 
-/* Nút Google */
+/* Nút Google & Khung bọc Google OAuth */
+.google-login-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 2px;
+  overflow: hidden;
+  border-radius: 9px;
+}
+
+.google-login-wrapper > div {
+  width: 100% !important;
+  display: flex;
+  justify-content: center;
+}
+
 .google-btn {
   width: 100%;
   height: 46px;

@@ -47,13 +47,17 @@ export default function StudentLayout({
   onSearchChange,
   userName,
   userRole = "Sinh viên",
+  user,
 }) {
   const displayUserName =
+    user?.ho_ten ||
+    user?.fullName ||
+    user?.name ||
     userName ||
     localStorage.getItem("ktx_fullname") ||
     localStorage.getItem("ktx_username") ||
     "Sinh viên";
-  const { canAccess } = useStudentStatus();
+  const { canAccess } = useStudentStatus(user);
   const [showChatbotModal, setShowChatbotModal] = useState(false);
   const chatEndRef = useRef(null);
   const [showMobileNav, setShowMobileNav] = useState(false);

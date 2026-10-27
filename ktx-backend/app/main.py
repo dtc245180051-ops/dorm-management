@@ -93,8 +93,9 @@ except Exception as e:
     print(f"Warning on database startup/migration: {e}")
 
 
-# Đăng ký các router với prefix /api/v1
+# Đăng ký các router với prefix /api/v1 và tương thích đường dẫn trực tiếp
 app.include_router(auth_router, prefix=settings.API_V1_STR)
+app.include_router(auth_router, prefix="")
 app.include_router(invoice_router, prefix=settings.API_V1_STR)
 app.include_router(reconciliation_router, prefix=settings.API_V1_STR)
 app.include_router(debt_router, prefix=settings.API_V1_STR)
