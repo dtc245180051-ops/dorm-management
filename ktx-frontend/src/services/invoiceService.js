@@ -261,13 +261,20 @@ export const invoiceService = {
       });
 
       if (!response.ok) {
-        throw new Error(`Lỗi confirmTransfer: ${response.status}`);
+        let detailMsg = `Máy chủ không phản hồi thành công (mã ${response.status})`;
+        try {
+          const errData = await response.json();
+          if (errData?.detail) detailMsg = errData.detail;
+        } catch (_) {}
+        const error = new Error(detailMsg);
+        error.status = response.status;
+        throw error;
       }
 
       return await response.json();
     } catch (error) {
-      console.warn('Lỗi confirmTransfer:', error);
-      return { success: false };
+      console.error('Lỗi confirmTransfer:', error);
+      throw error;
     }
   },
 

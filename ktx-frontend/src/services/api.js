@@ -26,8 +26,64 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(error)
+  (error) => {
+    // Chuẩn hóa thông báo lỗi thân thiện cho người dùng khi gặp lỗi mạng/máy chủ
+    if (!error.response) {
+      if (error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout')) {
+        error.userFriendlyMessage =
+          'Kết nối tới máy chủ bị quá thời gian chờ (timeout). Vui lòng thử lại sau.';
+      } else {
+        error.userFriendlyMessage =
+          'Không thể kết nối tới máy chủ. Vui lòng kiểm tra lại kết nối mạng hoặc thử lại sau.';
+      }
+    } else {
+      const status = error.response.status;
+      if (status >= 500) {
+        error.userFriendlyMessage =
+          error.response.data?.detail ||
+          `Máy chủ đang gặp sự cố xử lý (mã ${status}). Vui lòng thử lại sau.`;
+      } else if (status === 404) {
+        error.userFriendlyMessage =
+          error.response.data?.detail || 'Dữ liệu yêu cầu không tồn tại.';
+      } else if (status === 401) {
+        error.userFriendlyMessage =
+          error.response.data?.detail || 'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.';
+      } else if (status === 403) {
+        error.userFriendlyMessage =
+          error.response.data?.detail || 'Bạn không có quyền thực hiện thao tác này.';
+      } else {
+        error.userFriendlyMessage =
+          error.response.data?.detail || error.message || 'Yêu cầu không hợp lệ.';
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('app-api-error', {
+          detail: {
+            message: error.userFriendlyMessage,
+            status: error.response?.status,
+            url: error.config?.url,
+          },
+        })
+      );
+    }
+
+    return Promise.reject(error);
+  }
 );
+
+/**
+ * Helper lấy thông báo lỗi thân thiện, chuẩn hóa cho UI
+ */
+export function getApiErrorMessage(error, defaultMsg = 'Không thể kết nối tới máy chủ. Vui lòng thử lại sau.') {
+  return (
+    error?.userFriendlyMessage ||
+    error?.response?.data?.detail ||
+    error?.message ||
+    defaultMsg
+  );
+}
 
 // ----------------- AUTH SERVICES -----------------
 export const authService = {

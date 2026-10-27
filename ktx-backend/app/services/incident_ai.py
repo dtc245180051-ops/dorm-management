@@ -19,6 +19,14 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+PROMPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "prompts")
+
+def load_prompt_template(filename: str) -> str:
+    """Đọc nội dung template prompt từ thư mục app/prompts/"""
+    file_path = os.path.join(PROMPTS_DIR, filename)
+    with open(file_path, "r", encoding="utf-8") as f:
+        return f.read()
+
 VALID_CATEGORIES = [
     "Điện nước",
     "Cơ sở vật chất",
@@ -158,17 +166,10 @@ def analyze_incident_with_ai(mo_ta: str, phong: Optional[str] = "") -> Dict[str,
         logger.warning(f"analyze_incident_with_ai fallback: {error_msg}")
         return _heuristic_analyze(clean_mo_ta, phong, error_reason=error_msg)
 
-    prompt = (
-        f"Bạn là chuyên gia tiếp nhận sự cố ký túc xá. Đọc kỹ mô tả sự cố sau của sinh viên:\n"
-        f"Phòng: {phong or 'Không xác định'}\n"
-        f"Mô tả: {clean_mo_ta}\n\n"
-        f"Hãy trích xuất thông tin JSON chuẩn:\n"
-        f"{{\n"
-        f'  "tieu_de": "Tóm tắt cực ngắn gọn dưới 10 từ (VD: Bóng đèn hành lang bị cháy, Rò rỉ nước nhà vệ sinh)",\n'
-        f'  "phan_loai": "Chỉ chọn 1 trong: [\'Điện nước\', \'Cơ sở vật chất\', \'An ninh trật tự\', \'Vệ sinh\', \'Khác\']",\n'
-        f'  "muc_do_uu_tien": "Chỉ chọn \'Khẩn cấp\' (nếu có chập điện, cháy nổ, ngập nước, bục ống nước, đánh nhau, nguy hiểm) hoặc \'Thường\'"\n'
-        f"}}\n"
-        f"Chỉ trả về chuỗi JSON thuần, không giải thích gì thêm."
+    template = load_prompt_template("incident_classify.txt")
+    prompt = template.format(
+        phong=phong or "Không xác định",
+        clean_mo_ta=clean_mo_ta,
     )
 
     headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
@@ -365,17 +366,15 @@ def generate_daily_incident_summary(incidents_today: List[Dict[str, Any]]) -> st
 
         pending_context = "\n".join(pending_lines)
 
-        # 2. Xây dựng Prompt tóm tắt tiến độ công việc trong ngày
-        prompt = (
-            "Bạn là trợ lý AI quản lý Ký túc xá. Dưới đây là thống kê tiến độ sự cố hôm nay:\n"
-            f"- Tổng số sự cố phát sinh: {total_count}\n"
-            f"- Đã xử lý hoàn tất: {resolved_count}\n"
-            f"- Còn lại đang chờ giải quyết: {pending_count}\n\n"
-            f"Danh sách các sự cố CÒN LẠI cần làm:\n{pending_context}\n\n"
-            "Nhiệm vụ: Viết DUY NHẤT 1 đến 2 câu tóm tắt cực kỳ ngắn gọn, trực diện:\n"
-            f"- Nêu rõ: Hôm nay có {total_count} sự cố" + (f" (đã xử lý {resolved_count})" if resolved_count > 0 else "") + f", hiện còn {pending_count} việc cần giải quyết về vấn đề gì tại phòng nào.\n"
-            "- Nếu có sự cố khẩn cấp (như chập cháy, ngập nước, an ninh), chỉ đích danh phòng và lỗi cần ưu tiên xử lý.\n"
-            "- Tuyệt đối không dài dòng, không chào hỏi, không thêm văn phong hành chính chung chung. Trả về đúng 1-2 câu văn bản thuần."
+        # 2. Xây dựng Prompt tóm tắt tiến độ công việc trong ngày từ file template
+        resolved_clause = f" (đã xử lý {resolved_count})" if resolved_count > 0 else ""
+        template = load_prompt_template("daily_summary.txt")
+        prompt = template.format(
+            total_count=total_count,
+            resolved_count=resolved_count,
+            pending_count=pending_count,
+            pending_context=pending_context,
+            resolved_clause=resolved_clause,
         )
 
         # 3. Gửi request đến Gemini API với header xác thực và hỗ trợ các phiên bản model mới

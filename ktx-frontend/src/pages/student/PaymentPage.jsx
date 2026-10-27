@@ -21,6 +21,7 @@ import {
   AlertCircle,
   CircleDollarSign,
   Wallet,
+  Loader2,
 } from "lucide-react";
 
 /**
@@ -242,6 +243,8 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
     }
   });
   const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState("success");
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
   const [timeLeft, setTimeLeft] = useState(900); // 15 phút đếm ngược (900s)
 
@@ -552,32 +555,53 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
     setIsModalOpen(true);
   };
 
-  const handleConfirmPayment = () => {
-    if (!selectedInvoice) return;
-    setIsModalOpen(false);
-
+  const handleConfirmPayment = async () => {
+    if (!selectedInvoice || isConfirmingPayment) return;
     const invId = selectedInvoice.id;
-    const newPending = Array.from(new Set([...pendingInvoiceIds, invId]));
-    setPendingInvoiceIds(newPending);
-    localStorage.setItem("ktx_pending_invoices", JSON.stringify(newPending));
 
-    // Gọi backend ghi nhận giao dịch chờ đối soát
-    invoiceService.confirmTransfer(invId, maSV).catch(() => {});
+    setIsConfirmingPayment(true);
+    try {
+      // 1. Gửi request lên backend và đợi xác nhận phản hồi thành công
+      await invoiceService.confirmTransfer(invId, maSV);
 
-    payStudentBill(maSV, invId);
+      // 2. Chỉ khi backend trả về thành công mới đóng modal và lưu trữ cục bộ
+      setIsModalOpen(false);
 
-    const now = new Date();
-    const paymentDate = `${String(now.getDate()).padStart(2, "0")}/${String(
-      now.getMonth() + 1,
-    ).padStart(2, "0")}/${now.getFullYear()}`;
-    localStorage.setItem(PAYMENT_DATE_STORAGE_KEY, paymentDate);
+      const newPending = Array.from(new Set([...pendingInvoiceIds, invId]));
+      setPendingInvoiceIds(newPending);
+      localStorage.setItem("ktx_pending_invoices", JSON.stringify(newPending));
 
-    window.dispatchEvent(new CustomEvent("ktx-payment-updated"));
-    window.dispatchEvent(new CustomEvent("accountant-notifications-updated"));
-    window.dispatchEvent(new CustomEvent("occupancy-updated"));
-    setToastMessage(
-      `Đã ghi nhận giao dịch cho ${selectedInvoice.name}! Kế toán sẽ đối soát và gạch nợ tự động trong 1-3 phút.`,
-    );
+      payStudentBill(maSV, invId);
+
+      const now = new Date();
+      const paymentDate = `${String(now.getDate()).padStart(2, "0")}/${String(
+        now.getMonth() + 1,
+      ).padStart(2, "0")}/${now.getFullYear()}`;
+      localStorage.setItem(PAYMENT_DATE_STORAGE_KEY, paymentDate);
+
+      window.dispatchEvent(new CustomEvent("ktx-payment-updated"));
+      window.dispatchEvent(new CustomEvent("accountant-notifications-updated"));
+      window.dispatchEvent(new Event("occupancy-updated"));
+      setToastType("success");
+      setToastMessage(
+        `Đã ghi nhận giao dịch cho ${selectedInvoice.name}! Kế toán sẽ đối soát và gạch nợ tự động trong 1-3 phút.`
+      );
+      setTimeout(() => setToastMessage(""), 5000);
+    } catch (err) {
+      console.error("Xác nhận chuyển khoản thất bại:", err);
+      // Giữ nguyên modal để sinh viên có thể kiểm tra và chủ động bấm gửi lại (manual retry)
+      // TUYỆT ĐỐI không tự ý gạch nợ hay ghi pending giả vào localStorage
+      const errorMsg =
+        err.userFriendlyMessage ||
+        err.response?.data?.detail ||
+        err.message ||
+        "Không thể kết nối tới máy chủ. Vui lòng kiểm tra lại mạng và thử lại sau.";
+      setToastType("error");
+      setToastMessage(`Lỗi xác nhận: ${errorMsg}`);
+      setTimeout(() => setToastMessage(""), 5000);
+    } finally {
+      setIsConfirmingPayment(false);
+    }
   };
 
   return (
@@ -1107,9 +1131,17 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
                   <button
                     type="button"
                     onClick={handleConfirmPayment}
-                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold rounded-xl transition shadow-md flex items-center justify-center cursor-pointer active:scale-98 whitespace-nowrap px-4"
+                    disabled={isConfirmingPayment}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold rounded-xl transition shadow-md flex items-center justify-center cursor-pointer active:scale-98 whitespace-nowrap px-4 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    <span>Xác nhận đã chuyển khoản</span>
+                    {isConfirmingPayment ? (
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Đang kết nối tới máy chủ...
+                      </span>
+                    ) : (
+                      <span>Xác nhận đã chuyển khoản</span>
+                    )}
                   </button>
                 </div>
               </div>
@@ -1119,9 +1151,19 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
 
         {/* Toast thông báo */}
         {toastMessage && (
-          <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>{toastMessage}</span>
+          <div
+            className={`fixed bottom-6 right-6 z-50 text-white text-xs px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-2 max-w-md ${
+              toastType === "error"
+                ? "bg-rose-600 border border-rose-700"
+                : "bg-slate-900"
+            }`}
+          >
+            {toastType === "error" ? (
+              <AlertCircle className="w-4 h-4 text-rose-200 shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            )}
+            <span className="leading-relaxed">{toastMessage}</span>
           </div>
         )}
       </div>

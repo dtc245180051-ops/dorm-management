@@ -358,6 +358,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
     } catch (err) {
       console.error("Submit transfer request failed:", err);
       const errorDetail =
+        err.userFriendlyMessage ||
         err.response?.data?.detail ||
         err.message ||
         "Có lỗi xảy ra khi gửi yêu cầu chuyển phòng. Vui lòng kiểm tra kết nối và thử lại!";
@@ -453,6 +454,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
     } catch (err) {
       console.error("Submit checkout request failed:", err);
       const errorDetail =
+        err.userFriendlyMessage ||
         err.response?.data?.detail ||
         err.message ||
         "Có lỗi xảy ra khi gửi yêu cầu trả phòng. Vui lòng kiểm tra kết nối và thử lại!";

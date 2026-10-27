@@ -17,6 +17,7 @@ from app.routers.student_requests import router as student_requests_router
 from app.routers.admin_occupancy import router as admin_occupancy_router
 from app.routers.finance import router as finance_router
 from app.routers.incidents import router as incidents_router
+from app.routers.ai import router as ai_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -113,6 +114,8 @@ app.include_router(student_requests_router, prefix=settings.API_V1_STR)
 app.include_router(admin_occupancy_router, prefix=settings.API_V1_STR)
 app.include_router(finance_router, prefix=settings.API_V1_STR)
 app.include_router(incidents_router, prefix=settings.API_V1_STR)
+app.include_router(ai_router, prefix=f"{settings.API_V1_STR}/ai", tags=["AI Services"])
+app.include_router(ai_router, prefix="/api/ai", tags=["AI Services"])
 
 
 @app.get("/", tags=["Health Check"])

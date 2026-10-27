@@ -979,29 +979,41 @@ export const occupancyService = {
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await api.post(
-      `/students/${encodeURIComponent(cleanMsv)}/avatar`,
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
+    try {
+      const res = await api.post(
+        `/students/${encodeURIComponent(cleanMsv)}/avatar`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
         },
-      },
-    );
-
-    const sv = res.data;
-    const avatarUrl = sv.anh_dai_dien;
-    if (avatarUrl) {
-      localStorage.setItem("ktx_student_avatar", avatarUrl);
-      const current = getLocalStudentProfile();
-      saveLocalStudentProfile({ ...current, avatar_url: avatarUrl });
-      window.dispatchEvent(
-        new CustomEvent("student-avatar-updated", {
-          detail: { avatarUrl },
-        }),
       );
+
+      const sv = res.data;
+      const avatarUrl = sv.anh_dai_dien;
+      if (avatarUrl) {
+        localStorage.setItem("ktx_student_avatar", avatarUrl);
+        const current = getLocalStudentProfile();
+        saveLocalStudentProfile({ ...current, avatar_url: avatarUrl });
+        window.dispatchEvent(
+          new CustomEvent("student-avatar-updated", {
+            detail: { avatarUrl },
+          }),
+        );
+      }
+      return sv;
+    } catch (err) {
+      console.error(`POST /students/${cleanMsv}/avatar failed:`, err);
+      const detail =
+        err.userFriendlyMessage ||
+        err.response?.data?.detail ||
+        err.message ||
+        "Không thể tải lên ảnh đại diện. Vui lòng kiểm tra lại kết nối mạng và thử lại sau.";
+      const errorToThrow = new Error(detail);
+      errorToThrow.response = err.response;
+      throw errorToThrow;
     }
-    return sv;
   },
 
   updateStudentProfile: async (updatedData) => {
@@ -1011,44 +1023,56 @@ export const occupancyService = {
       ""
     ).trim();
 
-    if (msv) {
-      try {
-        const payload = {
-          lop: updatedData.lop,
-          gioi_tinh: updatedData.gioi_tinh,
-          khoa: updatedData.khoa,
-          dia_chi: updatedData.dia_chi || updatedData.que_quan,
-          cccd: updatedData.cccd,
-          ngay_sinh: updatedData.ngay_sinh,
-          doi_tuong_uu_tien: updatedData.doi_tuong_uu_tien,
-          nguoi_giam_ho: updatedData.nguoi_giam_ho,
-          moi_quan_he: updatedData.moi_quan_he,
-          sdt_nguoi_giam_ho: updatedData.sdt_nguoi_giam_ho,
-          ho_ten: updatedData.ho_ten,
-          email: updatedData.email,
-          so_dien_thoai: updatedData.so_dien_thoai,
-        };
-        if (
-          updatedData.avatar_url &&
-          !updatedData.avatar_url.startsWith("data:")
-        ) {
-          payload.anh_dai_dien = updatedData.avatar_url;
-        }
-        await api.put(`/students/${encodeURIComponent(msv)}`, payload);
-      } catch (err) {
-        console.warn(`PUT /students/${msv} failed:`, err);
-      }
+    if (!msv) {
+      throw new Error("Không xác định được mã sinh viên để cập nhật hồ sơ.");
     }
 
-    const current = getLocalStudentProfile();
-    const merged = { ...current, ...updatedData };
-    saveLocalStudentProfile(merged);
-    window.dispatchEvent(new Event("occupancy-updated"));
-    return {
-      status: "success",
-      message: "Cập nhật thông tin thành công!",
-      data: merged,
+    const payload = {
+      lop: updatedData.lop,
+      gioi_tinh: updatedData.gioi_tinh,
+      khoa: updatedData.khoa,
+      dia_chi: updatedData.dia_chi || updatedData.que_quan,
+      cccd: updatedData.cccd,
+      ngay_sinh: updatedData.ngay_sinh,
+      doi_tuong_uu_tien: updatedData.doi_tuong_uu_tien,
+      nguoi_giam_ho: updatedData.nguoi_giam_ho,
+      moi_quan_he: updatedData.moi_quan_he,
+      sdt_nguoi_giam_ho: updatedData.sdt_nguoi_giam_ho,
+      ho_ten: updatedData.ho_ten,
+      email: updatedData.email,
+      so_dien_thoai: updatedData.so_dien_thoai,
     };
+    if (
+      updatedData.avatar_url &&
+      !updatedData.avatar_url.startsWith("data:")
+    ) {
+      payload.anh_dai_dien = updatedData.avatar_url;
+    }
+
+    try {
+      const res = await api.put(`/students/${encodeURIComponent(msv)}`, payload);
+
+      // Chỉ cập nhật bộ nhớ client khi backend đã phản hồi thành công (2xx)
+      const current = getLocalStudentProfile();
+      const merged = { ...current, ...updatedData };
+      saveLocalStudentProfile(merged);
+      window.dispatchEvent(new Event("occupancy-updated"));
+      return {
+        status: "success",
+        message: "Cập nhật thông tin thành công!",
+        data: res.data || merged,
+      };
+    } catch (err) {
+      console.error(`PUT /students/${msv} failed:`, err);
+      const detail =
+        err.userFriendlyMessage ||
+        err.response?.data?.detail ||
+        err.message ||
+        "Không thể kết nối tới máy chủ để lưu thông tin. Vui lòng thử lại sau.";
+      const errorToThrow = new Error(detail);
+      errorToThrow.response = err.response;
+      throw errorToThrow;
+    }
   },
 
   /**

@@ -14,6 +14,8 @@ import {
   X,
   CheckCircle2,
   Lock,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import StudentLayout from "../../layouts/Student";
 import occupancyService from "../../services/occupancyService";
@@ -67,14 +69,18 @@ export default function StudentProfilePage({ onSelectTab }) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({ ...profile });
   const [toastMessage, setToastMessage] = useState(null);
+  const [toastType, setToastType] = useState("success");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const avatarInputRef = useRef(null);
   const modalAvatarInputRef = useRef(null);
 
-  const showToast = (message) => {
+  const showToast = (message, type = "success") => {
     setToastMessage(message);
+    setToastType(type);
     setTimeout(() => {
       setToastMessage(null);
-    }, 3500);
+    }, 4000);
   };
 
   // Tải dữ liệu ban đầu và lắng nghe sự kiện đồng bộ phòng ở
@@ -215,45 +221,47 @@ export default function StudentProfilePage({ onSelectTab }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Xem trước tức thì
+    if (!file.type.startsWith("image/")) {
+      showToast("Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, JPEG).", "error");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("Kích thước ảnh không được vượt quá 5MB.", "error");
+      return;
+    }
+
+    const previousAvatar = profile.avatar_url;
     const previewUrl = URL.createObjectURL(file);
     setProfile((prev) => ({ ...prev, avatar_url: previewUrl }));
     setEditFormData((prev) => ({ ...prev, avatar_url: previewUrl }));
+    setIsUploadingAvatar(true);
 
     try {
       const studentMsv =
         profile.msv ||
         localStorage.getItem("ktx_username") ||
-        "DTC245180137";
+        "";
 
       if (occupancyService.uploadStudentAvatar) {
         const res = await occupancyService.uploadStudentAvatar(studentMsv, file);
         const serverAvatarUrl = res.anh_dai_dien || previewUrl;
         setProfile((prev) => ({ ...prev, avatar_url: serverAvatarUrl }));
         setEditFormData((prev) => ({ ...prev, avatar_url: serverAvatarUrl }));
-        localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, serverAvatarUrl);
       }
-      showToast("Cập nhật ảnh đại diện thành công!");
+      showToast("Cập nhật ảnh đại diện thành công!", "success");
     } catch (err) {
-      console.warn("Upload avatar to server failed, falling back to local storage:", err);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const dataUrl = event.target?.result;
-        if (dataUrl) {
-          setProfile((prev) => ({ ...prev, avatar_url: dataUrl }));
-          setEditFormData((prev) => ({ ...prev, avatar_url: dataUrl }));
-          try {
-            localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, dataUrl);
-          } catch (_) {}
-          window.dispatchEvent(
-            new CustomEvent("student-avatar-updated", {
-              detail: { avatarUrl: dataUrl },
-            }),
-          );
-        }
-      };
-      reader.readAsDataURL(file);
-      showToast("Đã cập nhật ảnh đại diện!");
+      console.error("Upload avatar to server failed:", err);
+      // Khi server lỗi, lập tức phục hồi lại ảnh ban đầu, TUYỆT ĐỐI không lưu tạm ngầm ảnh base64 vào localStorage
+      setProfile((prev) => ({ ...prev, avatar_url: previousAvatar }));
+      setEditFormData((prev) => ({ ...prev, avatar_url: previousAvatar }));
+      const errorDetail =
+        err.userFriendlyMessage ||
+        err.response?.data?.detail ||
+        err.message ||
+        "Không thể kết nối tới máy chủ để tải lên ảnh đại diện. Vui lòng thử lại sau.";
+      showToast(errorDetail, "error");
+    } finally {
+      setIsUploadingAvatar(false);
     }
   };
 
@@ -275,6 +283,7 @@ export default function StudentProfilePage({ onSelectTab }) {
   // Lưu thông tin chỉnh sửa
   const handleSaveProfile = async (e) => {
     e.preventDefault();
+    setIsSaving(true);
     try {
       // Chỉ cập nhật các trường được phép sửa
       const updatedProfile = {
@@ -298,22 +307,20 @@ export default function StudentProfilePage({ onSelectTab }) {
         ...updatedProfile,
         ngay_sinh: toDateInputValue(updatedProfile.ngay_sinh),
       });
-      if (updatedProfile.avatar_url) {
-        localStorage.setItem(
-          STUDENT_AVATAR_STORAGE_KEY,
-          updatedProfile.avatar_url,
-        );
-        window.dispatchEvent(
-          new CustomEvent("student-avatar-updated", {
-            detail: { avatarUrl: updatedProfile.avatar_url },
-          }),
-        );
-      }
 
       setIsEditModalOpen(false);
-      showToast("Cập nhật thông tin cá nhân thành công!");
+      showToast("Cập nhật thông tin cá nhân thành công!", "success");
     } catch (err) {
       console.error("Lỗi lưu thông tin cá nhân:", err);
+      const errorMsg =
+        err.userFriendlyMessage ||
+        err.response?.data?.detail ||
+        err.message ||
+        "Không thể kết nối tới máy chủ. Vui lòng thử lại sau.";
+      showToast(errorMsg, "error");
+      // Giữ nguyên dữ liệu editFormData và không đóng modal để người dùng không mất công nhập lại
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -894,16 +901,25 @@ export default function StudentProfilePage({ onSelectTab }) {
               <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-100 select-none">
                 <button
                   type="button"
+                  disabled={isSaving}
                   onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-100 font-semibold text-xs sm:text-sm rounded-xl transition cursor-pointer"
+                  className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-100 font-semibold text-xs sm:text-sm rounded-xl transition cursor-pointer disabled:opacity-50"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition cursor-pointer"
+                  disabled={isSaving}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  Lưu thay đổi
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Đang lưu...</span>
+                    </>
+                  ) : (
+                    <span>Lưu thay đổi</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -912,12 +928,22 @@ export default function StudentProfilePage({ onSelectTab }) {
       )}
 
       {/* ========================================================================= */}
-      {/* 6. TOAST THÔNG BÁO THÀNH CÔNG                                             */}
+      {/* 6. TOAST THÔNG BÁO                                                        */}
       {/* ========================================================================= */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-8 z-60 flex items-center gap-2.5 px-4 py-3 bg-slate-900 text-white rounded-2xl shadow-2xl text-xs sm:text-sm animate-in fade-in slide-in-from-bottom-5">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span className="font-medium">{toastMessage}</span>
+        <div
+          className={`fixed bottom-6 right-8 z-60 flex items-center gap-2.5 px-4 py-3 text-white rounded-2xl shadow-2xl text-xs sm:text-sm animate-in fade-in slide-in-from-bottom-5 max-w-md ${
+            toastType === "error"
+              ? "bg-rose-600 border border-rose-700"
+              : "bg-slate-900"
+          }`}
+        >
+          {toastType === "error" ? (
+            <AlertCircle className="w-4 h-4 text-rose-200 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          )}
+          <span className="font-medium leading-relaxed">{toastMessage}</span>
         </div>
       )}
     </StudentLayout>

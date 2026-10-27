@@ -24,6 +24,7 @@ import PeriodicReports from './pages/accountant/PeriodicReports';
 import occupancyService from './services/occupancyService';
 import { API_BASE_URL } from './services/authService';
 import { getStudentAccount } from './services/studentAccountService';
+import { cleanupObsoleteStorage } from './utils/storageCleanup';
 import StudentProfilePage from "./pages/student/StudentProfilePage";
 import RoomSearchPage from "./pages/student/RoomSearchPage";
 import PaymentPage from "./pages/student/PaymentPage";
@@ -211,6 +212,7 @@ export default function App() {
   // Tự động dọn dẹp dữ liệu mẫu / test cũ nếu còn lưu trong LocalStorage
   useEffect(() => {
     try {
+      cleanupObsoleteStorage();
       if (localStorage.getItem("ktx_test_data_cleaned_v5") !== "true") {
         const studentAcc = localStorage.getItem("ktx_student_account");
         if (studentAcc && (studentAcc.includes("REG-01") || studentAcc.includes("RES-01") || studentAcc.includes("BILL-10-2026"))) {

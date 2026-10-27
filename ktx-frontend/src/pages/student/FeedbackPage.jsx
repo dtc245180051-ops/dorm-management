@@ -145,7 +145,12 @@ export default function FeedbackPage({
       await loadHistory();
     } catch (err) {
       console.error('Lỗi khi gửi phản ánh:', err);
-      setErrorMessage('Có lỗi xảy ra khi gửi phản ánh. Vui lòng thử lại.');
+      const errorMsg =
+        err.userFriendlyMessage ||
+        err.response?.data?.detail ||
+        err.message ||
+        'Không thể kết nối tới máy chủ. Vui lòng kiểm tra lại kết nối mạng và thử lại sau.';
+      setErrorMessage(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
