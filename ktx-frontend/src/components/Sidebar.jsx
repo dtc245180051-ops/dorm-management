@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   LayoutGrid,
   Building2,
@@ -9,6 +9,8 @@ import {
   LogOut,
   Bell,
 } from "lucide-react";
+import LogoutConfirmModal from "./common/LogoutConfirmModal";
+import { authService } from "../services/authService";
 
 const menuItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutGrid },
@@ -18,86 +20,127 @@ const menuItems = [
   { id: "violations", label: "Quản lý vi phạm", icon: Scale },
 ];
 
-export default function Sidebar({ activeTab = "rooms", onSelectTab }) {
+export default function Sidebar({
+  activeTab = "rooms",
+  onSelectTab,
+  onLogout,
+  userName,
+}) {
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const displayUserName =
+    userName ||
+    localStorage.getItem("ktx_fullname") ||
+    localStorage.getItem("ktx_username") ||
+    "Ban Quản Lý";
+
+  const handleConfirmLogout = () => {
+    setIsLoggingOut(true);
+    try {
+      authService.logout();
+      localStorage.clear();
+      setIsLogoutModalOpen(false);
+      if (onLogout) {
+        onLogout();
+      } else {
+        window.history.pushState({}, "", "/login");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+        window.dispatchEvent(
+          new CustomEvent("student-navigate", { detail: { path: "/login" } })
+        );
+      }
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
-    <aside className="w-64 min-h-[calc(100vh-1.75rem)] bg-[#f4f5f7] rounded-2xl border border-slate-200/60 p-6 select-none shrink-0 flex flex-col">
-      {/* Logo iDORM */}
-      <div className="mb-8 px-2 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-sm shrink-0">
-          <svg
-            className="w-5 h-5 fill-current"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
-          </svg>
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-baseline leading-none tracking-tight">
-            <span className="text-2xl font-black text-blue-600 font-sans">
-              i
-            </span>
-            <span className="text-2xl font-black text-slate-900 tracking-normal">
-              DORM
-            </span>
+    <>
+      <aside className="w-64 min-h-[calc(100vh-1.75rem)] bg-[#f4f5f7] rounded-2xl border border-slate-200/60 p-6 select-none shrink-0 flex flex-col">
+        {/* Logo iDORM */}
+        <div className="mb-8 px-2 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-sm shrink-0">
+            <svg
+              className="w-5 h-5 fill-current"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+            </svg>
           </div>
-          <div className="text-[10px] text-slate-500 font-medium mt-1 whitespace-nowrap">
-            Hệ thống ký túc xá
+          <div className="min-w-0">
+            <div className="flex items-baseline leading-none tracking-tight">
+              <span className="text-2xl font-black text-blue-600 font-sans">
+                i
+              </span>
+              <span className="text-2xl font-black text-slate-900 tracking-normal">
+                DORM
+              </span>
+            </div>
+            <div className="text-[10px] text-slate-500 font-medium mt-1 whitespace-nowrap">
+              Hệ thống ký túc xá
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Menu Section */}
-      <div>
-        <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase mb-3 px-2">
-          MENU
-        </div>
-        <nav className="space-y-1">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onSelectTab && onSelectTab(item.id)}
-                type="button"
-                className={`w-full flex items-center gap-3.5 px-3 py-2.5 rounded-[8px] text-sm transition-all duration-150 text-left cursor-pointer ${
-                  isActive
-                    ? "bg-[#dbeafe] text-blue-600 font-bold"
-                    : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900 font-medium"
-                }`}
-              >
-                <Icon
-                  className={`w-5 h-5 shrink-0 ${
-                    isActive ? "text-blue-600" : "text-slate-500"
+        {/* Menu Section */}
+        <div>
+          <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase mb-3 px-2">
+            MENU
+          </div>
+          <nav className="space-y-1">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onSelectTab && onSelectTab(item.id)}
+                  type="button"
+                  className={`w-full flex items-center gap-3.5 px-3 py-2.5 rounded-[8px] text-sm transition-all duration-150 text-left cursor-pointer ${
+                    isActive
+                      ? "bg-[#dbeafe] text-blue-600 font-bold"
+                      : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900 font-medium"
                   }`}
-                />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
-
-      {/* System Section - Cách phần menu khoảng 50px theo yêu cầu */}
-      <div className="mt-[50px]">
-        <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase mb-3 px-2">
-          HỆ THỐNG
+                >
+                  <Icon
+                    className={`w-5 h-5 shrink-0 ${
+                      isActive ? "text-blue-600" : "text-slate-500"
+                    }`}
+                  />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            if (window.confirm("Bạn có chắc chắn muốn đăng xuất không?")) {
-              localStorage.clear();
-              window.location.href = "/";
-            }
-          }}
-          className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-[8px] text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors text-left cursor-pointer"
-        >
-          <LogOut className="w-5 h-5 text-slate-500 hover:text-red-500" />
-          <span>Đăng xuất</span>
-        </button>
-      </div>
-    </aside>
+
+        {/* System Section - Cách phần menu khoảng 50px theo yêu cầu */}
+        <div className="mt-[50px]">
+          <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase mb-3 px-2">
+            HỆ THỐNG
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsLogoutModalOpen(true)}
+            className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-[8px] text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors text-left cursor-pointer"
+          >
+            <LogOut className="w-5 h-5 text-slate-500 hover:text-red-500" />
+            <span>Đăng xuất</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Modal Xác nhận Đăng xuất Quản lý */}
+      <LogoutConfirmModal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirm={handleConfirmLogout}
+        isLoading={isLoggingOut}
+        userName={displayUserName}
+        userRole="Quản lý KTX"
+      />
+    </>
   );
 }

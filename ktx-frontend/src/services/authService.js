@@ -250,3 +250,6 @@ export const authService = {
     keys.forEach((k) => localStorage.removeItem(k));
   },
 };
+
+export default authService;
+
