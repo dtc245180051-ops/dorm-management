@@ -1,6 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+const apiKey = (import.meta.env.VITE_GEMINI_API_KEY || "").trim();
+if (!apiKey) {
+  console.warn("Cảnh báo cấu hình: VITE_GEMINI_API_KEY chưa được thiết lập trong tệp môi trường. Ứng dụng sẽ tự động chuyển sang chế độ dự phòng ngoại tuyến (Rule-based Fallback).");
+}
 export const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 /**

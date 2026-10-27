@@ -666,92 +666,145 @@
 }
 
 @media print {
-  body * {
-    visibility: hidden;
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
   }
 
-  .acc-shell,
+  /* 1. Ẩn tất cả các thành phần giao diện web tương tác */
   .acc-sidebar,
   .acc-header,
+  .rep-header,
   .rep-toolbar,
-  .rep-actions-group,
+  .rep-kpi-grid,
+  .rep-breakdown-card,
+  .rep-table-card,
   .rep-modal-overlay,
-  .role-switcher-banner {
+  .role-switcher-banner,
+  .acc-profile-pill,
+  button {
     display: none !important;
   }
 
-  .rep-print-container,
-  .rep-print-container * {
-    visibility: visible !important;
+  /* 2. Reset các container cha để luồng in tự nhiên không bị chặn bởi flex/overflow */
+  html,
+  body,
+  #root,
+  .relative,
+  .acc-shell,
+  .acc-main-wrapper,
+  .acc-content,
+  .rep-container {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    float: none !important;
   }
 
+  /* 3. Hiển thị khối văn bản in A4 */
   .rep-print-container {
     display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 20mm 15mm;
-    background: #ffffff;
-    color: #000000;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
     font-family: 'Times New Roman', Times, serif;
-    font-size: 13pt;
+    font-size: 12pt;
     line-height: 1.4;
   }
 
+  .rep-print-container * {
+    visibility: visible !important;
+    color: #000000 !important;
+    box-sizing: border-box !important;
+  }
+
   .print-page-header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 25px;
+    display: flex !important;
+    justify-content: space-between !important;
+    margin-bottom: 20px !important;
   }
 
   .print-left-header,
   .print-right-header {
-    text-align: center;
-    font-size: 12pt;
+    text-align: center !important;
+    font-size: 11pt !important;
+    line-height: 1.35 !important;
   }
 
   .print-title {
-    text-align: center;
-    font-size: 16pt;
-    font-weight: bold;
-    text-transform: uppercase;
-    margin: 20px 0 6px 0;
+    text-align: center !important;
+    font-size: 15pt !important;
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    margin: 18px 0 6px 0 !important;
+    color: #000000 !important;
   }
 
   .print-subtitle {
-    text-align: center;
-    font-style: italic;
-    margin-bottom: 25px;
+    text-align: center !important;
+    font-style: italic !important;
+    margin-bottom: 20px !important;
+    font-size: 11.5pt !important;
   }
 
   .print-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 15px 0;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin: 12px 0 16px 0 !important;
+    page-break-inside: auto !important;
+  }
+
+  .print-table tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
   }
 
   .print-table th,
   .print-table td {
-    border: 1px solid #000000;
-    padding: 6px 8px;
-    font-size: 11pt;
+    border: 1px solid #000000 !important;
+    padding: 6px 8px !important;
+    font-size: 10pt !important;
+    color: #000000 !important;
+    background: transparent !important;
+  }
+
+  .print-table th {
+    background-color: #f2f2f2 !important;
+    font-weight: bold !important;
+    text-align: center !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .print-signatures {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 40px;
-    page-break-inside: avoid;
+    display: flex !important;
+    justify-content: space-between !important;
+    margin-top: 35px !important;
+    page-break-inside: avoid !important;
   }
 
   .print-sig-col {
-    text-align: center;
-    width: 30%;
+    text-align: center !important;
+    width: 32% !important;
+    font-size: 11.5pt !important;
   }
 
   .print-sig-space {
-    height: 70px;
+    height: 70px !important;
   }
 }

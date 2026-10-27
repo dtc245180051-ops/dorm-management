@@ -334,24 +334,16 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
       payload.phong_lien_quan = fullLienQuan;
 
       const res = await occupancyService.submitTransferRequest(payload);
-      const now = new Date();
-      const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-      const fullTimeStr = `${now.toLocaleDateString("vi-VN")} ${timeStr}`;
-      const newReq = res.data || {
-        id: `YC-${Date.now().toString().slice(-4)}`,
-        ma_yeu_cau: `#YC-${Date.now().toString().slice(-4)}`,
-        loai_yeu_cau: "Chuyển phòng",
-        loai_don: "CHUYEN_PHONG",
-        ngay_gui: fullTimeStr,
-        phong_lien_quan: fullLienQuan,
-        trang_thai: "CHO_DUYET",
-        trang_thai_label: "Chờ duyệt",
-      };
+      const newReq = res?.data;
+
+      if (!newReq) {
+        throw new Error("Máy chủ không trả về thông tin yêu cầu vừa tạo.");
+      }
 
       // Đưa ngay lên đầu danh sách lịch sử
       setHistoryList((prev) => [newReq, ...prev]);
 
-      // Reset form về dạng trống hoàn toàn
+      // Reset form về dạng trống hoàn toàn chỉ khi thành công
       setTransferForm({
         ly_do: "",
         ngay_mong_muon: "",
@@ -365,9 +357,13 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
       });
     } catch (err) {
       console.error("Submit transfer request failed:", err);
+      const errorDetail =
+        err.response?.data?.detail ||
+        err.message ||
+        "Có lỗi xảy ra khi gửi yêu cầu chuyển phòng. Vui lòng kiểm tra kết nối và thử lại!";
       setFeedbackMessage({
         type: "error",
-        text: "Có lỗi xảy ra khi gửi yêu cầu chuyển phòng. Vui lòng thử lại!",
+        text: errorDetail,
       });
     } finally {
       setIsSubmitting(false);
@@ -430,24 +426,16 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
       };
 
       const res = await occupancyService.submitCheckoutRequest(payload);
-      const now = new Date();
-      const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-      const fullTimeStr = `${now.toLocaleDateString("vi-VN")} ${timeStr}`;
-      const newReq = res.data || {
-        id: `YC-${Date.now().toString().slice(-4)}`,
-        ma_yeu_cau: `#YC-${Date.now().toString().slice(-4)}`,
-        loai_yeu_cau: "Trả phòng",
-        loai_don: "TRA_PHONG",
-        ngay_gui: fullTimeStr,
-        phong_lien_quan: currentRoomInfo.so_phong || "",
-        trang_thai: "CHO_DUYET",
-        trang_thai_label: "Chờ duyệt",
-      };
+      const newReq = res?.data;
+
+      if (!newReq) {
+        throw new Error("Máy chủ không trả về thông tin yêu cầu trả phòng vừa tạo.");
+      }
 
       // Đưa ngay lên đầu danh sách lịch sử
       setHistoryList((prev) => [newReq, ...prev]);
 
-      // Reset form về dạng trống hoàn toàn
+      // Reset form về dạng trống hoàn toàn chỉ khi thành công
       setCheckoutProvince("");
       setCheckoutDistrict("");
       setCheckoutStreet("");
@@ -464,9 +452,13 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
       });
     } catch (err) {
       console.error("Submit checkout request failed:", err);
+      const errorDetail =
+        err.response?.data?.detail ||
+        err.message ||
+        "Có lỗi xảy ra khi gửi yêu cầu trả phòng. Vui lòng kiểm tra kết nối và thử lại!";
       setFeedbackMessage({
         type: "error",
-        text: "Có lỗi xảy ra khi gửi yêu cầu trả phòng. Vui lòng thử lại!",
+        text: errorDetail,
       });
     } finally {
       setIsSubmitting(false);

@@ -421,12 +421,14 @@ export default function RoomRegistrationPage({
       window.dispatchEvent(new Event("occupancy-updated"));
     } catch (err) {
       console.error("Failed to submit room registration:", err);
+      const errorMsg =
+        err.response?.data?.detail ||
+        err.message ||
+        "Không thể gửi đơn đăng ký phòng vào lúc này. Vui lòng kiểm tra lại kết nối và thử lại.";
       setNoRoomWarning({
         show: true,
-        title: "Không tìm thấy phòng phù hợp",
-        message:
-          err.message ||
-          "Không có phòng phù hợp với nguyện vọng của bạn. Vui lòng kiểm tra lại thông tin và đăng ký lại.",
+        title: "Lỗi gửi đơn đăng ký",
+        message: errorMsg,
       });
     } finally {
       setIsSubmitting(false);

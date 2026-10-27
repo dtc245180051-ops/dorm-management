@@ -79,10 +79,12 @@ export const invoiceService = {
   /**
    * Lấy danh sách phòng phục vụ lập hóa đơn tiền điện nước
    */
-  async getUtilityCandidates(month = 'Tháng 09/2026') {
+  async getUtilityCandidates(month = '') {
     try {
+      const now = new Date();
+      const defaultMonth = `Tháng ${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
       const params = new URLSearchParams({
-        thang: month,
+        thang: month || defaultMonth,
       });
 
       const headers = await this.getAuthHeaders();

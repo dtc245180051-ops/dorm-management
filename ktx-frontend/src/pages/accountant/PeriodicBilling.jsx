@@ -5,22 +5,6 @@ import { getStudentAccount } from '../../services/studentAccountService';
 import studentNotificationService from '../../services/studentNotificationService';
 
 /**
- * Danh sách tháng thanh toán
- */
-const MONTH_OPTIONS = [
-  'Tháng 09/2026',
-  'Tháng 10/2026',
-  'Tháng 11/2026',
-  'Tháng 12/2026',
-  'Tháng 01/2027',
-  'Tháng 02/2027',
-  'Tháng 03/2027',
-  'Tháng 04/2027',
-  'Tháng 05/2027',
-  'Tháng 06/2027',
-];
-
-/**
  * Danh sách phạm vi áp dụng (theo loại phòng theo yêu cầu người dùng)
  */
 const APPLIED_TARGET_OPTIONS = [
@@ -41,13 +25,24 @@ const getDefaultDeadline = (days = 7) => {
   return toDateStr(d);
 };
 
-// Tháng trước, ví dụ hôm nay 03/10/2026 -> "Tháng 09/2026"
-const getPreviousMonthLabel = () => {
+// Format động theo dạng "Tháng MM/YYYY" của thời điểm hiện tại
+const getCurrentMonthLabel = () => {
   const d = new Date();
-  d.setDate(1); // tránh lỗi tràn ngày (31/03 -> tháng 2)
-  d.setMonth(d.getMonth() - 1);
-  const label = `Tháng ${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-  return MONTH_OPTIONS.includes(label) ? label : MONTH_OPTIONS[0];
+  return `Tháng ${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+};
+
+/**
+ * Sinh danh sách các tháng linh hoạt gần nhất quanh thời điểm hiện tại
+ * (ví dụ: 3 tháng trước đến 8 tháng tiếp theo)
+ */
+const generateMonthOptions = (pastMonths = 3, futureMonths = 8) => {
+  const options = [];
+  const now = new Date();
+  for (let i = -pastMonths; i <= futureMonths; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    options.push(`Tháng ${pad(d.getMonth() + 1)}/${d.getFullYear()}`);
+  }
+  return options;
 };
 
 // Năm học thực tế hiện tại, ví dụ hôm nay 19/10/2026 -> "2026 - 2027"
@@ -62,14 +57,17 @@ export default function PeriodicBilling({ searchTerm = '' }) {
   // Tab hiện tại: 'room' | 'utility'
   const [activeTab, setActiveTab] = useState('room');
 
-  // Form tiền phòng theo năm: Năm học thực tế hiện tại (fix cứng ví dụ: 2026 - 2027)
+  // Danh sách các tháng gần nhất sinh động theo thời gian thực
+  const monthOptions = useMemo(() => generateMonthOptions(3, 8), []);
+
+  // Form tiền phòng theo năm: Năm học thực tế hiện tại (ví dụ: 2026 - 2027)
   const schoolYear = useMemo(() => getCurrentSchoolYear(), []);
   const billingYear = useMemo(() => `Năm học ${schoolYear}`, [schoolYear]);
   const [appliedTarget, setAppliedTarget] = useState('Tất cả phòng (Tiêu chuẩn & Dịch vụ)');
   const [deadline, setDeadline] = useState(() => getDefaultDeadline());
 
-  // Form điện nước theo tháng: Cho phép chọn kỳ lập hóa đơn
-  const [utilityMonth, setUtilityMonth] = useState(() => getPreviousMonthLabel());
+  // Form điện nước theo tháng: Tự động lấy tháng hiện tại theo thời gian thực (new Date)
+  const [utilityMonth, setUtilityMonth] = useState(() => getCurrentMonthLabel());
   const [utilityTarget, setUtilityTarget] = useState('Tất cả các phòng đang có sinh viên');
   const [utilityDeadline, setUtilityDeadline] = useState(() => getDefaultDeadline());
   const [elecRate] = useState('3.500 VND/kWh');
@@ -698,7 +696,7 @@ export default function PeriodicBilling({ searchTerm = '' }) {
                 onChange={(e) => setUtilityMonth(e.target.value)}
                 title="Chọn kỳ lập hóa đơn tiền điện nước"
               >
-                {MONTH_OPTIONS.map((m) => (
+                {monthOptions.map((m) => (
                   <option key={m} value={m}>
                     Chọn tháng: {m.replace('Tháng ', '')}
                   </option>

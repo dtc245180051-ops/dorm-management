@@ -1,4 +1,15 @@
-venv/
+# Environment variables & secrets
 .env
+.env.*
+*.local
+!.env.example
+
+# Virtual environments
+venv/
+.venv/
+
+# Python cache & build
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.log

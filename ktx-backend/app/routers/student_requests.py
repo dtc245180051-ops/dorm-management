@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, get_current_user_optional
+from app.core.deps import get_current_user, get_current_user_optional, get_current_student
 from app.models.user import TaiKhoan, SinhVien, NguoiDung
 from app.models.contract import HopDong
 from app.models.room_request import RoomRequest
@@ -327,37 +327,36 @@ class CheckoutRoomRequest(BaseModel):
 )
 def submit_transfer_request(
     req: TransferRoomRequest,
+    current_student: SinhVien = Depends(get_current_student),
     db: Session = Depends(get_db),
 ):
-    """Tiếp nhận yêu cầu xin chuyển phòng từ sinh viên."""
+    """Tiếp nhận yêu cầu xin chuyển phòng từ sinh viên (chống IDOR)."""
     from app.services import occupancy_request_store
     data = req.model_dump()
-    clean_msv = (req.msv or "").strip().upper()
-    if clean_msv:
-        student = db.query(SinhVien).filter(SinhVien.msv == clean_msv).first()
-        if student:
-            if not data.get("ho_ten") and student.nguoi_dung:
-                data["ho_ten"] = student.nguoi_dung.ho_ten
-            data["gioi_tinh"] = student.gioi_tinh or data.get("gioi_tinh") or "Nam"
-            data["khoa"] = student.khoa or data.get("khoa") or ""
-            data["lop"] = student.lop or data.get("lop") or ""
+    clean_msv = current_student.msv.strip().upper()
+    data["msv"] = clean_msv
+    data["ho_ten"] = current_student.nguoi_dung.ho_ten if current_student.nguoi_dung else clean_msv
+    data["gioi_tinh"] = current_student.gioi_tinh or data.get("gioi_tinh") or "Nam"
+    data["khoa"] = current_student.khoa or data.get("khoa") or ""
+    data["lop"] = current_student.lop or data.get("lop") or ""
 
-            # Tra cứu vị trí phòng hiện tại từ hợp đồng ACTIVE
-            active_c = db.query(HopDong).filter(HopDong.msv == clean_msv, HopDong.trang_thai == "ACTIVE").first()
-            if active_c and active_c.giuong and active_c.giuong.phong:
-                p = active_c.giuong.phong
-                t = p.tang.toa_nha if p.tang else None
-                b_name = t.ten_toa if t else (f"Tòa {p.tang.ma_toa}" if p.tang and p.tang.ma_toa else "KTX")
-                g_code = active_c.giuong.ma_giuong.split("_")[-1] if active_c.giuong.ma_giuong else ""
-                data["vi_tri_hien_tai"] = f"Phòng P{p.so_phong} - {b_name} - Giường {g_code}"
-                data["phong_hien_tai"] = f"P{p.so_phong}"
+    # Tra cứu vị trí phòng hiện tại từ hợp đồng ACTIVE
+    active_c = db.query(HopDong).filter(HopDong.msv == clean_msv, HopDong.trang_thai == "ACTIVE").first()
+    if active_c and active_c.giuong and active_c.giuong.phong:
+        p = active_c.giuong.phong
+        t = p.tang.toa_nha if p.tang else None
+        b_name = t.ten_toa if t else (f"Tòa {p.tang.ma_toa}" if p.tang and p.tang.ma_toa else "KTX")
+        g_code = active_c.giuong.ma_giuong.split("_")[-1] if active_c.giuong.ma_giuong else ""
+        data["vi_tri_hien_tai"] = f"Phòng P{p.so_phong} - {b_name} - Giường {g_code}"
+        data["phong_hien_tai"] = f"P{p.so_phong}"
 
-            # Tra cứu công nợ thực tế của sinh viên
-            try:
-                from app.services.debt_service import DebtService
-                data["cong_no"] = DebtService.get_student_cong_no_label(db, clean_msv)
-            except Exception:
-                data["cong_no"] = "Chưa thanh toán (Chưa phát hành hóa đơn)"
+    # Tra cứu công nợ thực tế của sinh viên
+    try:
+        from app.services.debt_service import DebtService
+        data["cong_no"] = DebtService.get_student_cong_no_label(db, clean_msv)
+    except Exception:
+        data["cong_no"] = "Chưa thanh toán (Chưa phát hành hóa đơn)"
+
     stored = occupancy_request_store.add_transfer_request(data, db=db)
     return {
         "status": "success",
@@ -373,36 +372,35 @@ def submit_transfer_request(
 )
 def submit_checkout_request(
     req: CheckoutRoomRequest,
+    current_student: SinhVien = Depends(get_current_student),
     db: Session = Depends(get_db),
 ):
-    """Tiếp nhận yêu cầu xin trả phòng từ sinh viên."""
+    """Tiếp nhận yêu cầu xin trả phòng từ sinh viên (chống IDOR)."""
     from app.services import occupancy_request_store
     data = req.model_dump()
-    clean_msv = (req.msv or "").strip().upper()
-    if clean_msv:
-        student = db.query(SinhVien).filter(SinhVien.msv == clean_msv).first()
-        if student:
-            if not data.get("ho_ten") and student.nguoi_dung:
-                data["ho_ten"] = student.nguoi_dung.ho_ten
-            data["gioi_tinh"] = student.gioi_tinh or data.get("gioi_tinh") or "Nam"
-            data["khoa"] = student.khoa or data.get("khoa") or ""
-            data["lop"] = student.lop or data.get("lop") or ""
+    clean_msv = current_student.msv.strip().upper()
+    data["msv"] = clean_msv
+    data["ho_ten"] = current_student.nguoi_dung.ho_ten if current_student.nguoi_dung else clean_msv
+    data["gioi_tinh"] = current_student.gioi_tinh or data.get("gioi_tinh") or "Nam"
+    data["khoa"] = current_student.khoa or data.get("khoa") or ""
+    data["lop"] = current_student.lop or data.get("lop") or ""
 
-            active_c = db.query(HopDong).filter(HopDong.msv == clean_msv, HopDong.trang_thai == "ACTIVE").first()
-            if active_c and active_c.giuong and active_c.giuong.phong:
-                p = active_c.giuong.phong
-                t = p.tang.toa_nha if p.tang else None
-                b_name = t.ten_toa if t else (f"Tòa {p.tang.ma_toa}" if p.tang and p.tang.ma_toa else "KTX")
-                g_code = active_c.giuong.ma_giuong.split("_")[-1] if active_c.giuong.ma_giuong else ""
-                data["vi_tri_hien_tai"] = f"Phòng P{p.so_phong} - {b_name} - Giường {g_code}"
-                data["phong_hien_tai"] = f"P{p.so_phong}"
+    active_c = db.query(HopDong).filter(HopDong.msv == clean_msv, HopDong.trang_thai == "ACTIVE").first()
+    if active_c and active_c.giuong and active_c.giuong.phong:
+        p = active_c.giuong.phong
+        t = p.tang.toa_nha if p.tang else None
+        b_name = t.ten_toa if t else (f"Tòa {p.tang.ma_toa}" if p.tang and p.tang.ma_toa else "KTX")
+        g_code = active_c.giuong.ma_giuong.split("_")[-1] if active_c.giuong.ma_giuong else ""
+        data["vi_tri_hien_tai"] = f"Phòng P{p.so_phong} - {b_name} - Giường {g_code}"
+        data["phong_hien_tai"] = f"P{p.so_phong}"
 
-            # Tra cứu công nợ thực tế của sinh viên
-            try:
-                from app.services.debt_service import DebtService
-                data["cong_no"] = DebtService.get_student_cong_no_label(db, clean_msv)
-            except Exception:
-                data["cong_no"] = "Chưa thanh toán (Chưa phát hành hóa đơn)"
+    # Tra cứu công nợ thực tế của sinh viên
+    try:
+        from app.services.debt_service import DebtService
+        data["cong_no"] = DebtService.get_student_cong_no_label(db, clean_msv)
+    except Exception:
+        data["cong_no"] = "Chưa thanh toán (Chưa phát hành hóa đơn)"
+
     stored = occupancy_request_store.add_checkout_request(data, db=db)
     return {
         "status": "success",
@@ -417,25 +415,36 @@ def submit_checkout_request(
 )
 def get_current_room(
     msv: Optional[str] = Query(None, description="Mã sinh viên (tùy chọn)"),
-    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
+    current_user: TaiKhoan = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
     Trả về thông tin phòng hiện tại của sinh viên đang đăng nhập dựa vào hợp đồng ACTIVE.
     Nếu chưa có hợp đồng, trả về null để frontend hiển thị 'Chưa có phòng'.
+    Chống IDOR: Nếu là sinh viên, chỉ được xem thông tin của chính mình.
     """
     from app.models.contract import HopDong, Phi
     from app.models.invoice import HoaDon, TrangThaiHoaDon
     from app.models.dorm import Giuong, Phong, Tang, ToaNha
+    from app.models.user import VaiTro
     from sqlalchemy.orm import joinedload
 
-    # Lấy MSV từ query param hoặc tài khoản đang đăng nhập
-    target_msv = (msv or "").strip().upper() if msv else None
-    if not target_msv and current_user:
+    # Nếu là sinh viên, luôn luôn lấy thông tin phòng của tài khoản đang đăng nhập
+    if current_user.vai_tro == VaiTro.SINH_VIEN:
+        target_msv = None
         if current_user.nguoi_dung and current_user.nguoi_dung.sinh_vien:
             target_msv = current_user.nguoi_dung.sinh_vien.msv
-        elif current_user.ten_dang_nhap:
-            target_msv = current_user.ten_dang_nhap.upper()
+        else:
+            student = db.query(SinhVien).filter(
+                SinhVien.msv.ilike(current_user.ten_dang_nhap)
+            ).first()
+            if student:
+                target_msv = student.msv
+            else:
+                target_msv = current_user.ten_dang_nhap.upper()
+    else:
+        # Quản lý / Kế toán có thể tra cứu theo param msv
+        target_msv = (msv or "").strip().upper() if msv else None
 
     if not target_msv:
         return {"data": None, "message": "Chưa xác định được sinh viên"}

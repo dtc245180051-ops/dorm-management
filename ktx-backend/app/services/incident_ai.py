@@ -13,19 +13,11 @@ import logging
 import os
 import re
 from typing import Any, Dict, List, Optional
-from dotenv import load_dotenv
 import httpx
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
-
-# Tự động nạp file .env từ ktx-backend hoặc ktx-frontend nếu có
-load_dotenv()
-_frontend_env = os.path.join(os.path.dirname(__file__), "..", "..", "..", "ktx-frontend", ".env")
-if os.path.exists(_frontend_env):
-    load_dotenv(_frontend_env)
-
-# Đọc API key từ biến môi trường (hỗ trợ cả GEMINI_API_KEY và VITE_GEMINI_API_KEY)
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or os.environ.get("VITE_GEMINI_API_KEY", "")
 
 VALID_CATEGORIES = [
     "Điện nước",
@@ -159,9 +151,10 @@ def analyze_incident_with_ai(mo_ta: str, phong: Optional[str] = "") -> Dict[str,
             error_reason="Mô tả sự cố rỗng, không thể gửi tới mô hình AI.",
         )
 
-    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("VITE_GEMINI_API_KEY") or GEMINI_API_KEY
-    if not api_key:
-        error_msg = "Chưa cấu hình GEMINI_API_KEY trong tệp môi trường."
+    try:
+        api_key = settings.get_gemini_api_key(required=True)
+    except ValueError as err:
+        error_msg = str(err)
         logger.warning(f"analyze_incident_with_ai fallback: {error_msg}")
         return _heuristic_analyze(clean_mo_ta, phong, error_reason=error_msg)
 
@@ -352,10 +345,10 @@ def generate_daily_incident_summary(incidents_today: List[Dict[str, Any]]) -> st
     if total_count > 0 and pending_count == 0:
         return f"Toàn bộ {total_count} sự cố phát sinh hôm nay đã được xử lý dứt điểm, hiện không còn đầu việc tồn đọng."
 
-    # Lấy API key từ biến môi trường (hỗ trợ cả GEMINI_API_KEY và VITE_GEMINI_API_KEY)
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY") or GEMINI_API_KEY
-    if not api_key:
-        logger.warning("GEMINI_API_KEY chưa được cấu hình, chuyển sang fallback rule-based.")
+    try:
+        api_key = settings.get_gemini_api_key(required=True)
+    except ValueError as err:
+        logger.warning(f"generate_daily_incident_summary fallback: {err}")
         return _fallback_rule_based_summary(incidents_today)
 
     try:

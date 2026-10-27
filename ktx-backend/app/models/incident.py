@@ -65,6 +65,10 @@ class PhanAnh(Base):
         Text,
         nullable=True,
     )
+    hinh_anh: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
     ghi_chu_xu_ly: Mapped[Optional[str]] = mapped_column(
         Text,
         nullable=True,

@@ -26,7 +26,7 @@ def get_current_user(
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Not authenticated",
+        detail="Chưa đăng nhập hoặc phiên làm việc đã hết hạn",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
@@ -62,7 +62,7 @@ def get_current_user(
     except (JWTError, ValidationError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token không hợp lệ hoặc đã hết hạn",
+            detail="Chưa đăng nhập hoặc phiên làm việc đã hết hạn",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -95,7 +95,8 @@ class RoleChecker:
     """
     Dependency kiểm tra quyền truy cập dựa trên danh sách các vai trò cho phép (RBAC).
     Hỗ trợ tương thích giữa Quản Lý và Admin.
-    Ném lỗi 403 nếu vai trò của người dùng hiện tại không nằm trong danh sách.
+    Nếu chưa đăng nhập: Ném 401 Unauthorized (Chưa đăng nhập hoặc phiên làm việc đã hết hạn).
+    Nếu vai trò không nằm trong danh sách: Ném 403 Forbidden (Không có quyền truy cập chức năng này).
     """
 
     def __init__(self, allowed_roles: List[str]) -> None:
@@ -103,9 +104,7 @@ class RoleChecker:
         if "quanly" in self.allowed_roles or "quan_ly" in self.allowed_roles:
             self.allowed_roles.extend(["admin", "quanly", "quan_ly"])
 
-    def __call__(self, current_user: Optional[TaiKhoan] = Depends(get_current_user_optional)) -> Optional[TaiKhoan]:
-        if current_user is None:
-            return None
+    def __call__(self, current_user: TaiKhoan = Depends(get_current_user)) -> TaiKhoan:
         role_value = (
             current_user.vai_tro.value
             if hasattr(current_user.vai_tro, "value")
@@ -114,9 +113,47 @@ class RoleChecker:
         if role_value.lower() not in self.allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Forbidden: Tài khoản có vai trò '{role_value}' không có quyền truy cập",
+                detail="Không có quyền truy cập chức năng này",
             )
         return current_user
+
+
+def get_current_student(
+    current_user: TaiKhoan = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Lấy hồ sơ SinhVien gắn liền với tài khoản đăng nhập hiện tại từ JWT token.
+    Chống lỗ hổng IDOR: Đảm bảo sinh viên chỉ có thể thao tác trên chính hồ sơ của mình.
+    """
+    from app.models.user import SinhVien, VaiTro
+
+    role_val = (
+        current_user.vai_tro.value
+        if hasattr(current_user.vai_tro, "value")
+        else str(current_user.vai_tro)
+    )
+    if role_val.lower() not in ("sinhvien", "sinh_vien"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Không có quyền truy cập chức năng này",
+        )
+
+    student = None
+    if current_user.nguoi_dung and current_user.nguoi_dung.sinh_vien:
+        student = current_user.nguoi_dung.sinh_vien
+    else:
+        student = db.query(SinhVien).filter(
+            (SinhVien.msv.ilike(current_user.ten_dang_nhap)) |
+            (SinhVien.ma_nguoi_dung == (current_user.nguoi_dung.ma_nguoi_dung if current_user.nguoi_dung else None))
+        ).first()
+
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tài khoản chưa được liên kết với hồ sơ sinh viên hợp lệ trong hệ thống.",
+        )
+    return student
 
 
 # Pre-configured role dependencies
