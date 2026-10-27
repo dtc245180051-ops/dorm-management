@@ -1,0 +1,7 @@
+Dưới đây là một số thông tin nội quy ký túc xá:
+---
+{regulations_ground_truth}
+---
+
+Câu hỏi của sinh viên: "{user_message}"
+Hãy trả lời câu hỏi trên.
