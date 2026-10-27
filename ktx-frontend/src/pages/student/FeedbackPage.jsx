@@ -190,8 +190,12 @@ export default function FeedbackPage({
                 <Check className="w-5 h-5 stroke-[2.5]" />
               </div>
               <div>
-                <h3 className="font-bold text-base text-emerald-900 flex items-center gap-2">
-                  <span>Gửi phản ánh thành công! AI đã tiếp nhận và phân tích sự cố</span>
+                <h3 className="font-bold text-base text-emerald-900 flex items-center gap-2 flex-wrap">
+                  <span>
+                    {successTicket.is_ai_processed === false
+                      ? 'Gửi phản ánh thành công (Hệ thống phân loại dự phòng)'
+                      : 'Gửi phản ánh thành công! AI đã tiếp nhận và phân tích sự cố'}
+                  </span>
                   {successTicket.muc_do_uu_tien === 'Khẩn cấp' && (
                     <span className="px-2 py-0.5 text-xs font-bold bg-rose-100 text-rose-700 rounded-md border border-rose-200">
                       Khẩn cấp
@@ -205,14 +209,26 @@ export default function FeedbackPage({
                       {successTicket.ma_phan_anh || successTicket.id}
                     </span>
                     {successTicket.phan_loai && (
-                      <span className="ml-2 inline-block px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-800 rounded">
-                        AI phân loại: {successTicket.phan_loai}
+                      <span
+                        className={`ml-2 inline-block px-2 py-0.5 text-xs font-semibold rounded ${
+                          successTicket.is_ai_processed === false
+                            ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                            : 'bg-blue-100 text-blue-800 border border-blue-200'
+                        }`}
+                      >
+                        {successTicket.is_ai_processed === false ? 'Phân loại dự phòng: ' : 'AI phân loại: '}
+                        {successTicket.phan_loai}
                       </span>
                     )}
                   </p>
                   {successTicket.tieu_de && (
                     <p className="text-xs text-emerald-700">
-                      <strong>AI tóm tắt tiêu đề:</strong> &ldquo;{successTicket.tieu_de}&rdquo;
+                      <strong>{successTicket.is_ai_processed === false ? 'Tiêu đề trích xuất:' : 'AI tóm tắt tiêu đề:'}</strong> &ldquo;{successTicket.tieu_de}&rdquo;
+                    </p>
+                  )}
+                  {successTicket.is_ai_processed === false && successTicket.ai_error_reason && (
+                    <p className="text-[11px] text-amber-700 italic">
+                      Lưu ý kỹ thuật: AI gián đoạn ({successTicket.ai_error_reason}) - Đã chuyển sang bộ phân tích dự phòng an toàn.
                     </p>
                   )}
                 </div>

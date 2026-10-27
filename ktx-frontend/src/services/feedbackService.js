@@ -51,6 +51,12 @@ export const feedbackService = {
       });
       const created = response.data?.data;
       if (created) {
+        if (response.data?.is_ai_processed !== undefined) {
+          created.is_ai_processed = response.data.is_ai_processed;
+        }
+        if (response.data?.ai_error_reason !== undefined) {
+          created.ai_error_reason = response.data.ai_error_reason;
+        }
         const localList = getLocalIncidents();
         const merged = [created, ...localList.filter((item) => (item.id || item.ma_phan_anh) !== (created.id || created.ma_phan_anh))];
         saveLocalIncidents(merged);

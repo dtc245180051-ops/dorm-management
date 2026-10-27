@@ -205,7 +205,7 @@ export default function StudentDashboard({ user, onNavigate }) {
     window.addEventListener("student-incidents-updated", handleUpdate);
 
     loadNotifications();
-    const intervalNotifs = setInterval(loadNotifications, 3000);
+    const intervalNotifs = setInterval(loadNotifications, 30000);
     window.addEventListener("focus", loadNotifications);
     window.addEventListener("ktx-notifications-updated", loadNotifications);
     window.addEventListener("storage", loadNotifications);

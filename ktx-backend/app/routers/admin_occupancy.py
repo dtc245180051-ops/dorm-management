@@ -4,8 +4,8 @@ import re
 import uuid
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -14,6 +14,7 @@ from app.core.security import get_password_hash
 from app.models.user import SinhVien, TaiKhoan, NguoiDung, VaiTro
 from app.models.dorm import ToaNha, Tang, Phong, Giuong
 from app.models.contract import HopDong
+from app.models.room_request import RoomRequest
 from app.services import dorm_service, occupancy_request_store
 
 logger = logging.getLogger(__name__)
@@ -38,16 +39,64 @@ class RejectRequestPayload(BaseModel):
     summary="Lấy danh sách tất cả các đơn đăng ký chỗ ở (Quản lý)",
     dependencies=[Depends(RoleChecker(["QuanLy", "KeToan"]))],
 )
-def get_all_requests(db: Session = Depends(get_db)):
+def get_all_requests(
+    trang_thai: Optional[str] = Query(None, description="Lọc theo trạng thái đơn (PENDING, APPROVED, REJECTED,...)"),
+    msv: Optional[str] = Query(None, description="Lọc theo mã sinh viên"),
+    loai_don: Optional[str] = Query(None, description="Lọc theo loại đơn (DANG_KY, CHUYEN_PHONG, TRA_PHONG)"),
+    start_date: Optional[str] = Query(None, description="Lọc từ ngày (dd/mm/YYYY hoặc YYYY-mm-dd)"),
+    end_date: Optional[str] = Query(None, description="Lọc đến ngày (dd/mm/YYYY hoặc YYYY-mm-dd)"),
+    db: Session = Depends(get_db),
+):
     """
-    Trả về danh sách tất cả các đơn đăng ký đang chờ xử lý và lịch sử xử lý.
+    Truy vấn danh sách đơn đăng ký, chuyển phòng và trả phòng trực tiếp từ MySQL bằng SQLAlchemy ORM,
+    hỗ trợ lọc theo trạng thái, mã sinh viên, loại đơn và ngày gửi.
     """
     from app.services.debt_service import DebtService
-    all_reqs = occupancy_request_store.get_all_requests()
+
+    query = db.query(RoomRequest)
+
+    if trang_thai:
+        clean_status = trang_thai.strip().upper()
+        if clean_status in ("CHO_DUYET", "PENDING"):
+            query = query.filter(RoomRequest.trang_thai.in_(["PENDING", "CHO_DUYET"]))
+        elif clean_status in ("DA_DUYET", "APPROVED"):
+            query = query.filter(RoomRequest.trang_thai.in_(["APPROVED", "DA_DUYET"]))
+        elif clean_status in ("TU_CHOI", "REJECTED"):
+            query = query.filter(RoomRequest.trang_thai.in_(["TU_CHOI", "REJECTED"]))
+        else:
+            query = query.filter(RoomRequest.trang_thai == clean_status)
+
+    if msv:
+        clean_msv = msv.strip().upper()
+        query = query.filter(or_(RoomRequest.student_id == clean_msv, RoomRequest.ma_yeu_cau == clean_msv))
+
+    if loai_don:
+        query = query.filter(RoomRequest.loai_don == loai_don.strip().upper())
+
+    if start_date:
+        try:
+            s_dt = datetime.datetime.strptime(start_date.strip(), "%Y-%m-%d")
+        except ValueError:
+            s_dt = datetime.datetime.strptime(start_date.strip(), "%d/%m/%Y")
+        query = query.filter(RoomRequest.created_at >= s_dt)
+
+    if end_date:
+        try:
+            e_dt = datetime.datetime.strptime(end_date.strip(), "%Y-%m-%d")
+        except ValueError:
+            e_dt = datetime.datetime.strptime(end_date.strip(), "%d/%m/%Y")
+        query = query.filter(RoomRequest.created_at <= e_dt + datetime.timedelta(days=1))
+
+    all_req_models = query.order_by(RoomRequest.id.desc()).all()
+    all_reqs = [r.to_dict() for r in all_req_models]
+
     for req in all_reqs:
-        msv = (req.get("msv") or "").strip().upper()
-        if msv:
-            req["cong_no"] = DebtService.get_student_cong_no_label(db, msv)
+        req_msv = (req.get("msv") or "").strip().upper()
+        if req_msv:
+            try:
+                req["cong_no"] = DebtService.get_student_cong_no_label(db, req_msv)
+            except Exception:
+                pass
     return all_reqs
 
 
@@ -64,8 +113,8 @@ def get_request_detail(
     Trả về chi tiết đơn đăng ký của sinh viên kèm gợi ý xếp chỗ của hệ thống/AI.
     """
     clean_id = request_id.strip()
-    # 1. Kiểm tra đơn trong occupancy_request_store trước
-    stored = occupancy_request_store.get_request_by_id(clean_id)
+    # 1. Kiểm tra đơn trong MySQL thông qua occupancy_request_store
+    stored = occupancy_request_store.get_request_by_id(clean_id, db=db)
     if stored:
         # Tra cứu công nợ thực tế của sinh viên từ database
         msv = (stored.get("msv") or "").strip().upper()
@@ -236,6 +285,11 @@ def get_available_beds_hierarchical(db: Session = Depends(get_db)):
     summary="Phê duyệt đơn đăng ký & tự động tạo hợp đồng xếp phòng",
     dependencies=[Depends(RoleChecker(["QuanLy", "KeToan"]))],
 )
+@router.post(
+    "/requests/{request_id}/approve",
+    summary="Phê duyệt đơn đăng ký & tự động tạo hợp đồng xếp phòng (alias)",
+    dependencies=[Depends(RoleChecker(["QuanLy", "KeToan"]))],
+)
 def approve_request(
     request_id: str,
     payload: ApproveRequestPayload,
@@ -250,7 +304,7 @@ def approve_request(
     - Tạo hoặc cập nhật bản ghi HopDong trạng thái ACTIVE và commit vào MySQL.
     """
     clean_id = request_id.strip()
-    registration = occupancy_request_store.get_request_by_id(clean_id)
+    registration = occupancy_request_store.get_request_by_id(clean_id, db=db)
     if not registration:
         raise HTTPException(status_code=404, detail="Không tìm thấy đơn đăng ký")
     if registration.get("trang_thai") not in ("PENDING", "CHO_DUYET"):
@@ -317,14 +371,14 @@ def approve_request(
     if existing_contract:
         raise HTTPException(status_code=409, detail="Sinh viên đã có hợp đồng lưu trú đang hiệu lực")
 
-    # 1. Tìm thông tin đơn từ store
-    req_item = occupancy_request_store.get_request_by_id(clean_id)
+    # 1. Tìm thông tin đơn từ MySQL
+    req_item = occupancy_request_store.get_request_by_id(clean_id, db=db)
     target_msv = payload.msv or (req_item.get("msv") if req_item else None) or clean_id
     target_msv = target_msv.strip()
 
     # Nếu clean_id là mã đơn (bắt đầu bằng DK- hoặc #) và req_item chưa có, quét danh sách tất cả các đơn
     if (target_msv.startswith("DK-") or target_msv.startswith("#DK")) and not req_item:
-        for r in occupancy_request_store.get_all_requests():
+        for r in occupancy_request_store.get_all_requests(db=db):
             if r.get("id") == clean_id or r.get("ma_yeu_cau") == clean_id:
                 req_item = r
                 if r.get("msv"):
@@ -442,7 +496,7 @@ def approve_request(
         )
         db.add(new_contract)
 
-    # 4. Cập nhật trong store để quản lý thấy ngay trên giao diện
+    # 4. Cập nhật trạng thái đơn trong MySQL
     occupancy_request_store.update_request_status(
         clean_id,
         "APPROVED",
@@ -456,6 +510,7 @@ def approve_request(
             "ma_giuong": bed.ma_giuong,
             "so_giuong": bed.ma_giuong,
         },
+        db=db,
     )
 
     try:
@@ -504,6 +559,7 @@ def reject_request(
         clean_id,
         "TU_CHOI",
         {"ly_do_tu_choi": payload.ly_do_tu_choi},
+        db=db,
     )
 
     return {
@@ -524,13 +580,17 @@ def reject_request(
 def approve_transfer_request(
     request_id: str,
     payload: ApproveRequestPayload,
+    db: Session = Depends(get_db),
 ):
     clean_id = request_id.strip()
     updated = occupancy_request_store.update_request_status(
         clean_id,
         "DA_DUYET",
         {"xep_phong": payload.model_dump()},
+        db=db,
     )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu chuyển phòng")
     return {
         "status": "success",
         "message": "Phê duyệt yêu cầu chuyển phòng thành công",
@@ -545,13 +605,17 @@ def approve_transfer_request(
 def reject_transfer_request(
     request_id: str,
     payload: RejectRequestPayload,
+    db: Session = Depends(get_db),
 ):
     clean_id = request_id.strip()
     updated = occupancy_request_store.update_request_status(
         clean_id,
         "TU_CHOI",
         {"ly_do_tu_choi": payload.ly_do_tu_choi},
+        db=db,
     )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu chuyển phòng")
     return {
         "status": "success",
         "message": "Từ chối yêu cầu chuyển phòng thành công",
@@ -565,12 +629,16 @@ def reject_transfer_request(
 )
 def approve_checkout_request(
     request_id: str,
+    db: Session = Depends(get_db),
 ):
     clean_id = request_id.strip()
     updated = occupancy_request_store.update_request_status(
         clean_id,
         "DA_DUYET",
+        db=db,
     )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu trả phòng")
     return {
         "status": "success",
         "message": "Phê duyệt yêu cầu trả phòng thành công",
@@ -585,13 +653,17 @@ def approve_checkout_request(
 def reject_checkout_request(
     request_id: str,
     payload: RejectRequestPayload,
+    db: Session = Depends(get_db),
 ):
     clean_id = request_id.strip()
     updated = occupancy_request_store.update_request_status(
         clean_id,
         "TU_CHOI",
         {"ly_do_tu_choi": payload.ly_do_tu_choi},
+        db=db,
     )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu trả phòng")
     return {
         "status": "success",
         "message": "Từ chối yêu cầu trả phòng thành công",

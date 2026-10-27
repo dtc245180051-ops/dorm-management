@@ -218,6 +218,8 @@ def create_incident(
     tieu_de = req.tieu_de.strip() if (req.tieu_de and req.tieu_de.strip()) else ai_result["tieu_de"]
     phan_loai = req.loai_phan_anh.strip() if (req.loai_phan_anh and req.loai_phan_anh.strip()) else ai_result["phan_loai"]
     muc_do_uu_tien = ai_result["muc_do_uu_tien"]
+    is_ai_processed = bool(ai_result.get("is_ai_processed", False))
+    ai_error_reason = ai_result.get("ai_error_reason")
 
     # Sinh mã phản ánh duy nhất PA-xxxxxx
     incident_code = f"PA-{uuid.uuid4().hex[:6].upper()}"
@@ -250,6 +252,8 @@ def create_incident(
             phong=req.phong or "",
             mo_ta=clean_mo_ta,
             ngay_tao=datetime.datetime.now(),
+            is_ai_processed=is_ai_processed,
+            ai_error_reason=ai_error_reason,
         )
         db.add(new_db_incident)
         db.commit()
@@ -274,12 +278,21 @@ def create_incident(
         "trang_thai_label": "Chờ xử lý",
         "ngay_gui": datetime.datetime.now().isoformat(),
         "ngay_tao": datetime.datetime.now().isoformat(),
+        "is_ai_processed": is_ai_processed,
+        "ai_error_reason": ai_error_reason,
     }
     created = incident_store.add_incident(payload)
 
+    if is_ai_processed:
+        resp_msg = "Gửi phản ánh thành công! AI đã tiếp nhận và phân tích sự cố."
+    else:
+        resp_msg = f"Gửi phản ánh thành công! (Lưu ý: Mô hình AI gián đoạn, hệ thống dùng phân loại dự phòng. Lý do: {ai_error_reason or 'Fallback Heuristic'})"
+
     return {
         "status": "success",
-        "message": "Gửi phản ánh thành công! AI đã tiếp nhận và phân tích sự cố.",
+        "message": resp_msg,
+        "is_ai_processed": is_ai_processed,
+        "ai_error_reason": ai_error_reason,
         "data": created,
     }
 
@@ -372,6 +385,8 @@ def get_incidents(
                         "trang_thai_label": "Đang xử lý" if rec.trang_thai == "DANG_XU_LY" else ("Đã xử lý" if rec.trang_thai in ("DA_XU_LY", "HOAN_THANH") else "Chờ xử lý"),
                         "ngay_gui": rec.ngay_gui.isoformat() if rec.ngay_gui else None,
                         "ghi_chu_xu_ly": rec.ghi_chu_xu_ly or "",
+                        "is_ai_processed": getattr(rec, "is_ai_processed", False),
+                        "ai_error_reason": getattr(rec, "ai_error_reason", None),
                     }
                     items.append(mapped)
                     incident_store.add_incident(mapped)
@@ -398,6 +413,8 @@ def get_incidents(
                         "trang_thai": rec.trang_thai or "CHO_XU_LY",
                         "ngay_gui": rec.ngay_gui.isoformat() if rec.ngay_gui else None,
                         "ghi_chu_xu_ly": rec.ghi_chu_xu_ly or "",
+                        "is_ai_processed": getattr(rec, "is_ai_processed", False),
+                        "ai_error_reason": getattr(rec, "ai_error_reason", None),
                     })
                 items = incident_store.get_all_incidents()
             except Exception as e:

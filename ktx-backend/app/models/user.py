@@ -12,6 +12,7 @@ from app.core.database import Base
 if TYPE_CHECKING:
     from app.models.contract import HopDong, YeuCauChuyenTraPhong
     from app.models.incident import PhanAnh, ViPham
+    from app.models.room_request import RoomRequest
 
 
 class VaiTro(str, enum.Enum):
@@ -106,6 +107,11 @@ class NguoiDung(Base):
         "KeToan",
         back_populates="nguoi_dung",
         uselist=False,
+        cascade="all, delete-orphan",
+    )
+    room_requests: Mapped[List["RoomRequest"]] = relationship(
+        "RoomRequest",
+        back_populates="user",
         cascade="all, delete-orphan",
     )
 
@@ -205,6 +211,11 @@ class SinhVien(Base):
     vi_phams: Mapped[List["ViPham"]] = relationship(
         "ViPham",
         back_populates="sinh_vien",
+        cascade="all, delete-orphan",
+    )
+    room_requests: Mapped[List["RoomRequest"]] = relationship(
+        "RoomRequest",
+        back_populates="student",
         cascade="all, delete-orphan",
     )
 

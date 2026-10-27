@@ -281,44 +281,246 @@ Trả về kết quả ở định dạng JSON thuần túy (không kèm markdow
 }
 
 /**
+ * NGUỒN DỮ LIỆU BẮT BUỘC (GROUND TRUTH) - NỘI QUY KTX TRƯỜNG ĐẠI HỌC CNTT & TRUYỀN THÔNG (ICTU)
+ */
+export const KTX_REGULATIONS_GROUND_TRUTH = `
+# NỘI QUY KÝ TÚC XÁ TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN & TRUYỀN THÔNG
+
+### Điều 1. Đối tượng điều chỉnh và phạm vi áp dụng
+1. Nội quy này áp dụng cho tất cả học sinh, sinh viên, học viên, nghiên cứu sinh, lưu học sinh (gọi chung là người học - NH) ở tại Ký túc xá Trường Đại học Công nghệ Thông tin & Truyền thông (KTX).
+2. Người học ở nội trú phải tuân thủ các nội dung về nếp sống, sinh hoạt, an ninh trật tự, giữ gìn tài sản, vệ sinh môi trường, phòng cháy, chữa cháy, phát ngôn, chia sẻ thông tin, văn hóa ứng xử nơi công cộng, trên không gian mạng, khung xử lý kỷ luật với những hành vi vi phạm các quy định được nêu trong văn bản này.
+
+### Điều 2. Quy định chung
+1. Người học có nhu cầu ở nội trú phải đăng ký và làm các thủ tục cần thiết với BQL KTX trước khi được bố trí ở trong KTX. NH có thể đăng ký ở trong KTX theo hình thức trực tuyến.
+2. Chấp hành nghiêm túc sự quản lý, điều động, sắp xếp chỗ ở của BQL KTX.
+3. Người học khi ra, vào KTX phải xuất trình thẻ sinh viên, học viên, nghiên cứu sinh, lưu học sinh hoặc các giấy tờ liên quan do BQL KTX cấp (nếu có). Khách đến liên hệ công tác, bạn bè, người thân của NH đến thăm phải báo cáo và thực hiện theo sự hướng dẫn của trực ban KTX.
+4. Nộp tiền lệ phí nhà ở, tiền điện, nước và các khoản tiền sử dụng dịch vụ khác đầy đủ, đúng hạn theo thông báo của BQL KTX.
+
+### Điều 3. Quy định về sinh hoạt của người học tại Khu nội trú
+1. Giờ mở/đóng cổng:
+   - Giờ mùa hè: Mở cổng lúc 05:00 | Đóng cổng lúc 23:00.
+   - Giờ mùa đông: Mở cổng lúc 05:30 | Đóng cổng lúc 22:30.
+2. NH phải có mặt tại phòng trước giờ đóng cổng hàng ngày và chỉ được ra khỏi phòng sau giờ mở cổng (các trường hợp vào KTX muộn hơn hoặc ra sớm hơn phải báo cáo và được sự đồng ý của trực ban KTX); Thực hiện đầy đủ, đúng thời hạn các thủ tục đăng ký tạm trú, tạm vắng theo Luật cư trú.
+3. Mỗi phòng ở cử 01 Trưởng phòng. Trưởng phòng có trách nhiệm hướng dẫn thành viên trong phòng thực hiện Nội quy, Quy định của Khu nội trú.
+4. Không được tiếp khách, tổ chức các hoạt động trong giờ tự học và giờ nghỉ ảnh hưởng tới việc sinh hoạt, học tập của bạn cùng phòng và toàn Khu nội trú:
+   - Buổi sáng: từ 07:30 đến 11:00.
+   - Buổi chiều: từ 13:30 đến 17:00.
+5. Chơi thể thao đúng nơi quy định; không chơi thể thao trong phòng ở, hành lang, ban công, lối đi, vườn cây,...
+6. Cần có tác phong, ăn mặc, lời nói chuẩn mực. "Đi nhẹ - Nói khẽ - Cười duyên" trong KTX, đặc biệt là vào giờ tự học và giờ nghỉ; Trang phục phải lịch sự, gọn gàng khi xuống phòng làm việc với cán bộ BQL KTX.
+7. Giữ gìn vệ sinh chung, đổ rác, chất thải đúng nơi quy định; tham gia đầy đủ, có chất lượng công tác tuyên truyền, tổng vệ sinh KTX khi được phân công.
+8. Tắm, giặt, phơi quần áo, màn,... và vệ sinh cá nhân đúng nơi quy định.
+9. Giữ gìn phòng ở sạch sẽ, có lịch trực vệ sinh phòng ở, không đổ hóa chất vào bồn cầu, luôn đậy nắp xi phông và thoát sàn để ngăn ngừa tóc, rác,... gây tắc hệ thống thoát chất thải.
+10. Khi đi học phải khóa cửa, khi đi ngủ phải đóng cửa. Khi về nghỉ hè, nghỉ tết, đi thực tập, thực tế chuyên môn phải gửi tài sản có giá trị (nếu có) tại Kho của BQL KTX.
+11. Chỉ được đem vào phòng những đồ dùng cá nhân thiết yếu theo mùa; quần áo, sách vở, đồ dùng cá nhân phải sắp xếp gọn gàng, ngăn nắp và để đúng nơi quy định.
+12. Quản lý, sử dụng tài sản đúng quy định, tiết kiệm, hiệu quả; Tự bảo quản tài sản cá nhân; Chịu trách nhiệm đền bù tài sản công do bản thân gây ra hư hỏng, mất mát.
+13. Để xe đúng nơi quy định; không để xe trong phòng ở, trên hành lang, chân cầu thang, xung quanh các tòa nhà trong KTX.
+14. Vệ sinh sạch sẽ phòng ở trước khi bàn giao phòng ở cho BQL KTX khi nghỉ hè, nghỉ Tết hoặc kết thúc hợp đồng ở nội trú.
+15. Thực hiện tốt công tác phòng, chống dịch bệnh. Khi có dịch bệnh xảy ra, người học phải chấp hành đúng theo quy định và hướng dẫn của Bộ Y tế, của địa phương và của BQL KTX.
+
+### Điều 4. Quy định đối với cán bộ, nhân viên trực ban và đội thanh niên xung kích / đội tự quản
+1. Đối với cán bộ, nhân viên: Đảm bảo thực hiện các nhiệm vụ được phân công, đảm bảo thời gian, ngày giờ công lao động theo quy định.
+2. Trong mỗi ca trực, CBNV có trách nhiệm hỗ trợ lẫn nhau nếu có phát sinh các tình huống phức tạp xảy ra trong Khu nội trú.
+3. Đội thanh niên xung kích / đội tự quản được thành lập để hỗ trợ các hoạt động đảm bảo an ninh, trật tự và các hoạt động khác trong Khu nội trú; Được hưởng chế độ, chính sách theo Quy định của Trường.
+
+### Điều 5. Các hành vi người học không được làm trong KTX
+1. Sản xuất, tàng trữ, sử dụng, buôn bán, vận chuyển, phát tán các loại vũ khí, chất gây cháy, gây nổ, hóa chất độc hại, ma túy và các chế phẩm của ma túy, các tài liệu, ấn phẩm, phim ảnh, thông tin phản động, đồi trụy và các vật dụng không được phép khác theo quy định của Nhà nước.
+2. Tổ chức hoặc tham gia các hoạt động đánh bạc, số đề, mại dâm và các tệ nạn xã hội khác dưới mọi hình thức.
+3. Uống rượu bia, gây gổ đánh nhau hoặc kích động đánh nhau, tổ chức băng nhóm, phe phái, tụ tập gây mất an ninh, trật tự trong và ngoài KTX.
+4. Cung cấp, đăng tải, phản ánh, chia sẻ, cập nhật thông tin không chính xác, thiếu căn cứ, không trung thực, một chiều các hoạt động trong KTX ra bên ngoài tạo dư luận xấu và bất ổn tới uy tín, thương hiệu của Nhà trường nói chung và KTX nói riêng.
+5. Tự ý sửa chữa, cải tạo phòng ở, di chuyển trang thiết bị, vật tư của KTX ra khỏi vị trí được bố trí. Có hành vi hủy hoại, trộm cắp tài sản của Nhà nước, của đơn vị đào tạo, của KTX và tài sản riêng của công dân; sử dụng tài sản công không đúng mục đích.
+6. Tự ý chuyển đổi chỗ ở, cho người khác hay đưa người vào phòng ở mà chưa được phép của Ban Quản lý KTX.
+7. Có hành động thiếu văn hoá, trái thuần phong mỹ tục, gây mất trật tự công cộng, gây ô nhiễm môi trường; đặt bát hương, thờ cúng trong KTX. Tổ chức, tham gia truyền bá các hoạt động tôn giáo, tín ngưỡng trái pháp luật.
+8. Nấu ăn trong KTX.
+9. Che chắn phòng ở, giường ngủ làm mất mỹ quan hoặc nhằm mục đích không lành mạnh. Viết, vẽ bậy và tùy tiện treo, dán quảng cáo, áp phích lên tường, phòng ở và trong khuôn viên KTX.
+10. Báo cháy giả, nghịch phá hoặc có hành vi phá hoại hệ thống phòng cháy chữa cháy, cứu nạn cứu hộ.
+11. Nuôi, chăn, thả động vật trong KTX.
+
+### Điều 6. Khen thưởng, kỷ luật
+1. Tập thể, cá nhân có thành tích trong các mặt phong trào, thực hiện tốt nội quy sẽ được xem xét đề nghị khen thưởng vào mỗi năm học. Các cá nhân có thành tích xuất sắc sẽ được xem xét khen thưởng đột xuất theo quy định.
+2. Trong trường hợp NH vi phạm nội quy, tùy mức độ BQL KTX sẽ có hình thức xử lý như sau: Khiển trách, Cảnh cáo, Buộc rời khỏi KTX, nặng hơn có thể đề nghị truy cứu trách nhiệm hình sự.
+3. NH ở nội trú phải chấp hành nghiêm nội quy, thực hiện đầy đủ những điều cam kết với BQL KTX.
+4. Kết quả khen thưởng, kỷ luật của NH ở nội trú sẽ được thông báo về nhà trường (nơi NH đang học tập) để làm cơ sở đánh giá điểm rèn luyện hằng năm.
+
+### Điều 7. Chấm dứt hiệu lực của Quyết định kỷ luật
+1. NH bị kỷ luật khiển trách: Sau 03 tháng kể từ ngày có quyết định kỷ luật, nếu NH không tái phạm hoặc không vi phạm đến mức phải xử lý kỷ luật thì được chấm dứt hiệu lực của quyết định kỷ luật và được hưởng quyền lợi của NH ở nội trú. NH muốn đăng ký ở nội trú phải cam kết tuân thủ nội quy mới được xét duyệt.
+2. NH bị kỷ luật cảnh cáo: Sau 06 tháng kể từ ngày có quyết định kỷ luật, nếu NH không tái phạm hoặc không vi phạm đến mức phải xử lý kỷ luật thì được chấm dứt hiệu lực của quyết định kỷ luật và được hưởng quyền lợi của NH ở nội trú. NH muốn đăng ký ở nội trú phải cam kết tuân thủ nội quy mới được xét duyệt.
+3. NH bị kỷ luật buộc rời khỏi KTX: Không được đăng ký ở nội trú các năm tiếp theo. Kết quả kỷ luật được thông báo về đơn vị đào tạo, với gia đình NH và chính quyền địa phương liên quan để phối hợp giáo dục, quản lý.
+`;
+
+/**
  * Tri thức nghiệp vụ KTX dự phòng thông minh khi offline hoặc hết quota API
+ * Trích dẫn chuẩn xác từng Điều theo đúng văn bản Nội quy
  */
 function getSmartLocalChatbotReply(question) {
-  const q = String(question || "").toLowerCase().trim();
+  const qRaw = String(question || "").toLowerCase().trim();
+  const qNorm = qRaw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d");
 
-  if (/giờ|mở cổng|đóng cổng|giới nghiêm|về muộn/i.test(q)) {
-    return "⏰ Giờ đóng/mở cổng KTX ICTU:\n- Mùa hè: Mở cổng lúc 05:00, đóng cổng giới nghiêm lúc 23:00.\n- Mùa đông: Mở cổng lúc 05:30, đóng cổng lúc 22:30.\nNếu về muộn vì lý do học tập, bạn cần xuất trình thẻ sinh viên cho cán bộ trực ký túc xá nhé!";
+  // 1. Thể thao / đá bóng / cầu lông (ưu tiên nhận diện trước để tránh nhầm chữ "chơi")
+  if (
+    /the thao|da bong|da cau|cau long|bong ban|choi the thao|tap the duc|san bong|tap the thao/.test(qNorm) ||
+    /thể thao|đá bóng|đá cầu|cầu lông|bóng bàn|tập thể dục|chơi thể thao/i.test(qRaw)
+  ) {
+    return "⚽ **Quy định chơi thể thao:**\nBạn có thể chơi thể thao tại các khu vực được quy định (như sân thể thao KTX).\nLưu ý: Không chơi thể thao trong phòng ở, hành lang, ban công, lối đi hay vườn cây để đảm bảo an toàn và tránh gây ồn ào ảnh hưởng đến người khác nhé.";
   }
 
-  if (/nấu ăn|bếp|bếp từ|gas/i.test(q)) {
-    return "🍳 Quy định nấu ăn: Nhằm đảm bảo an toàn phòng cháy chữa cháy, KTX nghiêm cấm nấu ăn bằng bếp gas, bếp từ công suất lớn trong phòng ở. Bạn có thể sử dụng khu vực bếp chung hoặc nhà ăn KTX nhé!";
+  // 2. Để xe / Gửi xe / Nhà xe
+  if (
+    /\b(de xe|gui xe|nha xe|bai xe|xe may|xe dap)\b/.test(qNorm) ||
+    /gửi xe|để xe|nhà xe|bãi xe|xe máy|xe đạp/i.test(qRaw)
+  ) {
+    return "🛵 **Quy định để xe & gửi xe:**\n- Bạn để xe đúng nơi quy định tại nhà xe / khu vực trông giữ xe của KTX nhé.\n- Tuyệt đối không để xe trong phòng ở, trên hành lang, chân cầu thang hoặc xung quanh các tòa nhà.";
   }
 
-  if (/chuyển phòng|đổi phòng|trả phòng/i.test(q)) {
-    return "🔄 Thủ tục chuyển / trả phòng:\nBạn chỉ cần vào mục 'Chuyển / trả phòng' trên menu bên trái, chọn tab Chuyển phòng hoặc Trả phòng, điền lý do và gửi đơn. Ban Quản lý sẽ xét duyệt trực tuyến trong vòng 24 - 48h.";
+  // 3. Nuôi thú cưng / Chó mèo / Động vật (không dùng chữ 'cho' đơn lẻ tránh nhầm với cho bạn, cho phép, chỗ ở)
+  if (
+    /nuoi cho|nuoi meo|nuoi thu|nuoi dong vat|thu cung|cho meo|con cho|con meo/.test(qNorm) ||
+    /thú cưng|động vật/i.test(qRaw) ||
+    (/chó|mèo/i.test(qRaw) && /nuôi|thú|chó|mèo|động vật/i.test(qRaw))
+  ) {
+    return "🐾 **Quy định nuôi thú cưng:**\nKý túc xá không cho phép nuôi chó, mèo hay bất kỳ động vật, thú cưng nào trong phòng để giữ gìn vệ sinh và không gian chung.";
   }
 
-  if (/tiền phòng|điện nước|thanh toán|học phí|vietqr|ngân hàng|chi phí/i.test(q)) {
-    return "💳 Thanh toán chi phí KTX:\n- Tiền phòng và tiền điện nước được thanh toán trực tuyến qua mã VietQR tại mục 'Thanh toán phí KTX'.\n- Hạn thanh toán định kỳ: Trước ngày 15 hàng tháng.\n- Hệ thống đối soát tự động cập nhật trạng thái 'Đã hoàn tất' ngay khi ngân hàng khớp lệnh.";
+  // 4. Nấu ăn trong KTX
+  if (
+    /nau an|bep|bep tu|bep ga|gas|dun nau|nau nuong/.test(qNorm) ||
+    /nấu ăn|bếp|bếp từ|bếp ga|gas|đun nấu/i.test(qRaw)
+  ) {
+    return "🍳 **Quy định nấu ăn:**\nKý túc xá nghiêm cấm nấu ăn trong phòng ở dưới mọi hình thức nhằm đảm bảo an toàn phòng cháy chữa cháy.";
   }
 
-  if (/hỏng|sự cố|báo hỏng|cháy bóng|mất nước|mất điện|sửa chữa|tắc cống/i.test(q)) {
-    return "🛠️ Báo cáo sự cố cơ sở vật chất:\nBạn hãy vào mục 'Gửi phản ánh' trên thanh menu, nhập mô tả sự cố (kèm hình ảnh nếu có). Trợ lý AI sẽ tự động phân loại và gửi kỹ thuật viên đến sửa chữa ngay cho phòng bạn.";
+  // 5. Giờ giấc đóng/mở cổng, giới nghiêm, ra vào KTX
+  if (
+    /gio|mo cong|dong cong|gioi nghiem|ve muon|ra som|di muon|ve tre/.test(qNorm) ||
+    /giờ|mở cổng|đóng cổng|giới nghiêm|về muộn|ra sớm|đi muộn/i.test(qRaw)
+  ) {
+    return "⏰ **Giờ mở và đóng cổng KTX:**\n- **Mùa hè:** Mở cổng lúc `05:00` | Đóng cổng lúc `23:00`\n- **Mùa đông:** Mở cổng lúc `05:30` | Đóng cổng lúc `22:30`\nBạn nhớ có mặt tại phòng trước giờ đóng cổng. Nếu có việc cần ra sớm hoặc về muộn, bạn hãy báo cáo trực ban KTX nhé.";
   }
 
-  if (/đăng ký|thủ tục ở|thuê phòng|vào ở/i.test(q)) {
-    return "📝 Đăng ký nội trú KTX:\nSinh viên thực hiện nộp đơn tại mục 'Đăng ký phòng'. Hệ thống AI sẽ tự động phân tích nguyện vọng (loại phòng, tầng, giới tính) và gợi ý xếp phòng tối ưu nhất cho bạn.";
+  // 6. Tiếp khách & Giờ tự học, bạn bè vào phòng
+  if (
+    /tiep khach|ban be|nguoi than|gio tu hoc|gio nghi|tham ban|den tham|qua dem|vao phong|den choi|o nho/.test(qNorm) ||
+    /tiếp khách|bạn bè|thăm|giờ nghỉ|giờ tự học|người thân|qua đêm|vào phòng|ở nhờ/i.test(qRaw)
+  ) {
+    return "👥 **Quy định tiếp khách & bạn bè đến thăm:**\n- Bạn bè hoặc người thân đến thăm cần báo cáo với trực ban KTX.\n- Không tiếp khách và không tổ chức hoạt động trong giờ tự học và giờ nghỉ:\n  + **Buổi sáng:** từ `07:30` đến `11:00`\n  + **Buổi chiều:** từ `13:30` đến `17:00`\n- Tuyệt đối không tự ý cho người lạ ở lại phòng qua đêm.";
   }
 
-  if (/thú cưng|chó|mèo|động vật/i.test(q)) {
-    return "🐾 Quy định nuôi thú cưng: Theo nội quy Ký túc xá ICTU, sinh viên không được phép nuôi chó, mèo hoặc bất kỳ động vật nào trong phòng nhằm đảm bảo vệ sinh và mỹ quan chung.";
+  // 7. Văn hóa ứng xử, tác phong, trang phục, ồn ào
+  if (
+    /tac phong|an mac|trang phuc|di nhe noi khe|cuoi duyen|on ao|tieng on|mat trat tu/.test(qNorm) ||
+    /tác phong|ăn mặc|trang phục|đi nhẹ nói khẽ|cười duyên|ồn ào|mất trật tự/i.test(qRaw)
+  ) {
+    return "🗣️ **Văn hóa ứng xử & tác phong:**\n- Tác phong, ăn mặc, lời nói chuẩn mực. Thực hiện *'Đi nhẹ - Nói khẽ - Cười duyên'*, đặc biệt vào giờ tự học và giờ nghỉ.\n- Trang phục lịch sự, gọn gàng khi đến phòng làm việc của Ban Quản lý KTX.";
   }
 
-  if (/liên hệ|hotline|số điện thoại|ban quản lý|văn phòng/i.test(q)) {
-    return "📞 Ban Quản lý KTX ICTU:\n- Địa chỉ: Đường Z115, xã Quyết Thắng, TP. Thái Nguyên\n- Hotline hỗ trợ: 0208.3846.254\n- Giờ hành chính: 08:00 - 17:00 từ Thứ 2 đến Thứ 6.";
+  // 8. Vệ sinh phòng ở, đổ rác, chống tắc cống
+  if (
+    /ve sinh|rac|don phong|truc nhat|bon cau|thoat san|tac cong/.test(qNorm) ||
+    /vệ sinh|rác|dọn phòng|trực nhật|bồn cầu|thoát sàn|tắc cống/i.test(qRaw)
+  ) {
+    return "🧹 **Quy định vệ sinh phòng ở:**\n- Giữ gìn phòng sạch sẽ, phân công lịch trực nhật phòng và đổ rác đúng nơi quy định.\n- Không đổ hóa chất vào bồn cầu; luôn đậy nắp thoát sàn để tránh tóc, rác gây tắc cống.\n- Dọn dẹp vệ sinh sạch sẽ trước khi bàn giao phòng khi nghỉ hè, nghỉ Tết hoặc kết thúc hợp đồng.";
   }
 
-  return "Chào bạn! Mình là Trợ lý AI KTX ICTU. Mình có thể hỗ trợ bạn về:\n- ⏰ Giờ giấc giới nghiêm & đóng/mở cổng KTX\n- 📝 Thủ tục đăng ký, chuyển phòng, trả phòng\n- 💳 Hướng dẫn thanh toán tiền phòng & điện nước qua VietQR\n- 🛠️ Hướng dẫn gửi phản ánh hỏng hóc, sửa chữa điện nước\nBạn có câu hỏi cụ thể nào về KTX không?";
+  // 9. Giặt giũ & phơi phóng
+  if (
+    /tam|giat|phoi|quan ao|man|giat do/.test(qNorm) ||
+    /tắm|giặt|phơi|quần áo|màn/i.test(qRaw)
+  ) {
+    return "👕 **Quy định giặt và phơi đồ:**\nBạn thực hiện tắm, giặt và phơi quần áo, màn... đúng nơi quy định của tòa nhà KTX nhé.";
+  }
+
+  // 10. Khóa cửa, gửi đồ khi nghỉ hè/Tết, bảo quản tài sản
+  if (
+    /khoa cua|di ngu|nghi he|nghi tet|gui do|kho gui do|bao quan tai san|tai san/.test(qNorm) ||
+    /khóa cửa|đi ngủ|nghỉ hè|nghỉ tết|gửi đồ|kho|tài sản/i.test(qRaw)
+  ) {
+    return "🔐 **Bảo quản tài sản & gửi đồ:**\n- Khi đi học phải khóa cửa, khi đi ngủ phải đóng cửa phòng.\n- Tự bảo quản tài sản cá nhân và có ý thức giữ gìn tài sản chung của phòng.\n- Khi về nghỉ hè, nghỉ Tết hoặc đi thực tập, bạn có thể gửi đồ có giá trị tại Kho của Ban Quản lý KTX.";
+  }
+
+  // 11. Đem đồ dùng, thiết bị cá nhân vào phòng
+  if (
+    /do dung|thiet bi|mang vao|do dung ca nhan|vat dung/.test(qNorm) ||
+    /đồ dùng|thiết bị|mang vào|vật dụng/i.test(qRaw)
+  ) {
+    return "📦 **Đồ dùng mang vào phòng:**\nChỉ được đem vào phòng những đồ dùng cá nhân thiết yếu theo mùa; quần áo, sách vở và đồ dùng cá nhân phải sắp xếp gọn gàng, ngăn nắp và để đúng nơi quy định.";
+  }
+
+  // 12. Rượu bia, đánh nhau, đánh bạc, tệ nạn
+  if (
+    /ruou|bia|danh nhau|gay roi|danh bac|so de|mai dam|te nan|vu khi|ma tuy/.test(qNorm) ||
+    /rượu|bia|đánh nhau|gây rối|đánh bạc|số đề|mại dâm|tệ nạn|vũ khí|ma túy/i.test(qRaw)
+  ) {
+    return "🚫 **Trật tự & An toàn:**\nNghiêm cấm uống rượu bia, đánh nhau, đánh bạc, số đề, tàng trữ vũ khí, chất cháy nổ hoặc tụ tập gây mất an ninh trật tự trong và ngoài KTX.";
+  }
+
+  // 13. Sửa chữa phòng, di chuyển tài sản
+  if (
+    /sua phong|cai tao|di chuyen giuong|di chuyen do|vat tu|trom cap/.test(qNorm) ||
+    /sửa phòng|cải tạo|di chuyển giường|vật tư|trộm cắp/i.test(qRaw)
+  ) {
+    return "🔨 **Sửa chữa & di chuyển tài sản:**\nNghiêm cấm tự ý sửa chữa, cải tạo phòng ở; tự ý di chuyển trang thiết bị, giường tủ của KTX ra khỏi vị trí ban đầu; không sử dụng tài sản công sai mục đích.";
+  }
+
+  // 14. Che chắn giường, vẽ bậy, dán quảng cáo
+  if (
+    /che chan|che giuong|ve bay|dan quang cao|ap phich/.test(qNorm) ||
+    /che chắn|che giường|vẽ bậy|dán quảng cáo|áp phích/i.test(qRaw)
+  ) {
+    return "🎨 **Mỹ quan phòng ở:**\nKhông che chắn phòng ở, giường ngủ làm mất mỹ quan; nghiêm cấm viết, vẽ bậy và tùy tiện treo, dán quảng cáo, áp phích lên tường phòng ở và khuôn viên KTX.";
+  }
+
+  // 15. Báo cháy giả, nghịch thiết bị PCCC
+  if (
+    /pccc|bao chay|phong chay|chua chay|pha hoai pccc/.test(qNorm) ||
+    /báo cháy|phòng cháy|chữa cháy|pccc/i.test(qRaw)
+  ) {
+    return "🧯 **Quy định PCCC:**\nNghiêm cấm báo cháy giả, nghịch phá hoặc có hành vi phá hoại hệ thống phòng cháy chữa cháy, cứu nạn cứu hộ trong KTX.";
+  }
+
+  // 16. Khen thưởng & Các hình thức kỷ luật
+  if (
+    /ky luat|vi pham|hinh thuc xu ly|bi phat|khen thuong|khien trach|canh cao|buoc roi|duoi|xoa ky luat|thoi han/.test(qNorm) ||
+    /kỷ luật|vi phạm|hình thức xử lý|bị phạt|khen thưởng|khiển trách|cảnh cáo|buộc rời/i.test(qRaw)
+  ) {
+    return "⚖️ **Quy định xử lý vi phạm & Kỷ luật:**\n- Các mức xử lý gồm: **Khiển trách**, **Cảnh cáo**, **Buộc rời khỏi KTX**.\n- Thời hạn chấm dứt hiệu lực kỷ luật nếu không tái phạm:\n  + Khiển trách: Sau **03 tháng**\n  + Cảnh cáo: Sau **06 tháng**\n  + Buộc rời khỏi KTX: Không được đăng ký ở lại KTX các năm tiếp theo.";
+  }
+
+  // 17. Chuyển phòng, đổi phòng, trả phòng
+  if (
+    /chuyen phong|doi phong|tra phong|doi cho o|chuyen giuong/.test(qNorm) ||
+    /chuyển phòng|đổi phòng|trả phòng|chuyển chỗ ở/i.test(qRaw)
+  ) {
+    return "🔄 **Thủ tục chuyển / trả phòng:**\nBạn vào mục **'Chuyển / trả phòng'** trên menu để gửi yêu cầu cho Ban Quản lý duyệt, không tự ý chuyển chỗ hay đổi giường nhé.";
+  }
+
+  // 18. Nộp tiền phòng, điện nước, lệ phí
+  if (
+    /tien phong|dien nuoc|thanh toan|le phi|dong tien|vietqr|hoc phi/.test(qNorm) ||
+    /tiền phòng|điện nước|thanh toán|lệ phí|đóng tiền/i.test(qRaw)
+  ) {
+    return "💳 **Thanh toán chi phí KTX:**\nBạn có thể nộp tiền phòng và tiền điện nước trực tuyến qua mã VietQR tại mục **'Thanh toán phí KTX'** trên thanh menu trước hạn thông báo hàng tháng nhé.";
+  }
+
+  // 19. Đăng ký phòng, thủ tục vào ở
+  if (
+    /dang ky|thu tuc o|vao o|dang ky phong|thue phong/.test(qNorm) ||
+    /đăng ký|thủ tục ở|vào ở|đăng ký phòng/i.test(qRaw)
+  ) {
+    return "📝 **Đăng ký ở KTX:**\nBạn có thể đăng ký trực tuyến tại mục **'Đăng ký phòng'** trên menu. Hệ thống sẽ tiếp nhận và gửi Ban Quản lý xét duyệt bố trí chỗ ở cho bạn.";
+  }
+
+  // 20. Thẻ sinh viên, thủ tục ra vào KTX
+  if (
+    /the sinh vien|xuat trinh the|the ktx|ra vao ktx/.test(qNorm) ||
+    /thẻ sinh viên|xuất trình thẻ|thẻ ktx|ra vào/i.test(qRaw)
+  ) {
+    return "🪪 **Quy định xuất trình thẻ ra vào:**\nSinh viên khi ra, vào KTX cần xuất trình thẻ sinh viên hoặc giấy tờ liên quan khi có yêu cầu từ Ban Quản lý hoặc bảo vệ trực ban.";
+  }
+
+  return "Rất tiếc, thông tin này hiện chưa có trong văn bản Nội quy được cung cấp. Bạn vui lòng liên hệ trực tiếp Ban Quản lý để được hỗ trợ cụ thể.";
 }
 
 //** 2. HÀM TRẢ LỜI CHATBOT TƯ VẤN KTX */
@@ -329,15 +531,31 @@ export async function askGeminiChatbot(userMessage, conversationHistory = []) {
 
   try {
     const prompt = `
-Bạn là Trợ lý AI Ký túc xá Đại học Công nghệ Thông tin & Truyền thông (ICTU).
-Nhiệm vụ của bạn: Trả lời thân thiện, lịch sự, ngắn gọn và chính xác bằng tiếng Việt dựa trên quy định KTX ICTU:
-- Giờ KTX: Mùa hè mở cổng lúc 5h00, đóng cổng giới nghiêm lúc 23h00; Mùa đông mở lúc 5h30, đóng lúc 22h30.
-- Nội quy: Nghiêm cấm nấu ăn trong phòng, không cờ bạc, không gây mất trật tự, không nuôi động vật, tiếp khách đúng giờ.
-- Tiền phòng, điện nước: Thanh toán qua mã VietQR trước ngày 15 hàng tháng.
-- Mọi thủ tục đăng ký phòng, chuyển phòng đều thực hiện trực tuyến.
+Bạn là Trợ lý Ảo hỗ trợ giải đáp Nội quy và Quy định của Ký túc xá / Tòa nhà.
 
-Câu hỏi của sinh viên: "${userMessage}"
-Hãy trả lời sinh viên:
+### NGUỒN DỮ LIỆU BẮT BUỘC (GROUND TRUTH):
+Dưới đây là toàn bộ tài liệu "NỘI QUY" được cung cấp từ hệ thống:
+---
+${KTX_REGULATIONS_GROUND_TRUTH}
+---
+
+### QUY TẮC PHẢN HỒI (BẮT BUỘC TUÂN THỦ NGHIÊM NGẶT):
+1. TRẢ LỜI TỰ NHIÊN, THÂN THIỆN & KHÔNG NÊU SỐ ĐIỀU KHOẢN:
+   - Dựa trực tiếp vào nội dung trong tài liệu "NỘI QUY" ở trên.
+   - TUYỆT ĐỐI KHÔNG đưa các trích dẫn điều khoản luật cứng nhắc (như "Khoản X - Điều Y", "Căn cứ Điều...") vào câu trả lời, trừ khi người dùng hỏi đích danh số điều khoản.
+   - Trả lời thân thiện, súc tích, ngắt dòng thành các gạch đầu dòng rõ ràng, dễ hiểu cho sinh viên.
+
+2. LINH HOẠT VỚI CÂU HỎI MỞ:
+   - Phân tích ngữ cảnh của người dùng thay vì chỉ khớp câu từ máy móc với một số ít mẫu câu định sẵn.
+   - Nếu người dùng hỏi một ý nằm trong nội quy bằng nhiều cách diễn đạt khác nhau, bạn vẫn phải tìm đúng điều khoản tương ứng trong tài liệu để trả lời.
+
+3. XỬ LÝ KHI KHÔNG CÓ THÔNG TIN:
+   - Chỉ khi nội dung người dùng hỏi HOÀN TOÀN KHÔNG XUẤT HIỆN trong tài liệu nội quy trên, bạn mới trả lời: 
+     "Rất tiếc, thông tin này hiện chưa có trong văn bản Nội quy được cung cấp. Bạn vui lòng liên hệ trực tiếp Ban Quản lý để được hỗ trợ cụ thể."
+   - Tuyệt đối không tự suy diễn hoặc dùng kiến thức ngoài tài liệu để tạo ra quy định giả định.
+
+### CÂU HỎI CỦA NGƯỜI DÙNG:
+"${userMessage}"
 `;
 
     const modelCandidates = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
@@ -367,3 +585,4 @@ Hãy trả lời sinh viên:
     return getSmartLocalChatbotReply(userMessage);
   }
 }
+

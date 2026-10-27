@@ -39,6 +39,99 @@ const getAnnouncements = () => {
   }
 };
 
+/**
+ * Component hiển thị tin nhắn chatbot được định dạng sạch đẹp,
+ * loại bỏ các ký tự dấu sao thô (** và *) và ngắt dòng rõ ràng, trực quan.
+ */
+function FormattedChatMessage({ text, isUser }) {
+  if (isUser) {
+    return <span className="whitespace-pre-wrap">{text}</span>;
+  }
+
+  const lines = String(text || "").split("\n");
+
+  const formatInline = (content) => {
+    // Regex khớp **in đậm**, *(in nghiêng)* hoặc *in nghiêng*, `mã`
+    const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(content.substring(lastIndex, match.index));
+      }
+      const token = match[0];
+      if (token.startsWith("**") && token.endsWith("**")) {
+        parts.push(
+          <strong key={match.index} className="font-semibold text-slate-900">
+            {token.slice(2, -2)}
+          </strong>
+        );
+      } else if (token.startsWith("*") && token.endsWith("*")) {
+        parts.push(
+          <span key={match.index} className="text-slate-500 font-normal italic text-[11px]">
+            {token.slice(1, -1)}
+          </span>
+        );
+      } else if (token.startsWith("`") && token.endsWith("`")) {
+        parts.push(
+          <span
+            key={match.index}
+            className="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-mono text-[11px] font-semibold rounded border border-blue-200/60 inline-block my-0.5"
+          >
+            {token.slice(1, -1)}
+          </span>
+        );
+      }
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < content.length) {
+      parts.push(content.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : content;
+  };
+
+  return (
+    <div className="space-y-1.5 text-xs leading-relaxed break-words">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          return <div key={idx} className="h-1" />;
+        }
+
+        const isBullet = trimmed.startsWith("- ") || trimmed.startsWith("+ ") || trimmed.startsWith("• ");
+        const isSubBullet = trimmed.startsWith("+ ");
+        const content = isBullet ? trimmed.replace(/^[-+•]\s*/, "") : line;
+
+        if (isBullet) {
+          return (
+            <div
+              key={idx}
+              className={`flex items-start gap-1.5 ${
+                isSubBullet ? "pl-3 text-slate-600" : "pl-0.5 text-slate-700"
+              }`}
+            >
+              <span className="text-blue-500 font-bold shrink-0 mt-0.5 text-[10px]">
+                •
+              </span>
+              <div className="flex-1">{formatInline(content)}</div>
+            </div>
+          );
+        }
+
+        return (
+          <div key={idx} className="text-slate-800">
+            {formatInline(line)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function StudentLayout({
   children,
   activeTab = "register",
@@ -116,10 +209,10 @@ export default function StudentLayout({
     syncNotifications();
     studentNotificationService.syncFromBackend().then(() => syncNotifications());
 
-    // Quét định kỳ mỗi 3 giây để nhận thông báo mới nhất ngay khi Kế toán hoặc BQL thao tác
+    // Quét định kỳ mỗi 30 giây để nhận thông báo mới nhất ngay khi Kế toán hoặc BQL thao tác
     const intervalId = setInterval(() => {
       studentNotificationService.syncFromBackend().then(() => syncNotifications());
-    }, 3000);
+    }, 30000);
 
     const onWindowFocus = () => {
       studentNotificationService.syncFromBackend().then(() => syncNotifications());
@@ -700,12 +793,12 @@ export default function StudentLayout({
                   className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl leading-relaxed ${msg.sender === "user"
+                    className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl leading-relaxed ${msg.sender === "user"
                       ? "bg-blue-600 text-white rounded-br-sm"
                       : "bg-white text-slate-800 border border-slate-200/80 shadow-sm rounded-bl-sm"
                       }`}
                   >
-                    {msg.text}
+                    <FormattedChatMessage text={msg.text} isUser={msg.sender === "user"} />
                   </div>
                 </div>
               ))}

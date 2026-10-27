@@ -22,6 +22,8 @@ export function extractStudentCode(studentInput) {
   } else if (studentInput && typeof studentInput === "object") {
     raw =
       studentInput.code ||
+      studentInput.student_code ||
+      studentInput.studentCode ||
       studentInput.student_id ||
       studentInput.studentId ||
       studentInput.msv ||
@@ -30,8 +32,12 @@ export function extractStudentCode(studentInput) {
       studentInput.email?.split?.("@")?.[0] ||
       studentInput.nguoi_dung?.sinh_vien?.msv ||
       studentInput.user?.code ||
+      studentInput.user?.student_code ||
+      studentInput.user?.studentCode ||
       studentInput.user?.student_id ||
+      studentInput.user?.studentId ||
       studentInput.user?.msv ||
+      studentInput.user?.email?.split?.("@")?.[0] ||
       "";
   }
 

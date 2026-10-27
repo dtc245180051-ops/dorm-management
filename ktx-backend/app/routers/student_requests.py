@@ -2,12 +2,14 @@ import uuid
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user, get_current_user_optional
 from app.models.user import TaiKhoan, SinhVien, NguoiDung
 from app.models.contract import HopDong
+from app.models.room_request import RoomRequest
 from app.services import dorm_service, occupancy_request_store
 
 router = APIRouter(prefix="/student/requests", tags=["Yêu cầu Lưu trú Sinh viên"])
@@ -161,14 +163,14 @@ def register_room(
         )
 
     clean_msv = req.msv.strip().upper()
-    existing_request = next(
-        (
-            request
-            for request in occupancy_request_store.get_registration_requests()
-            if request.get("msv", "").strip().upper() == clean_msv
-            and request.get("trang_thai") in ("PENDING", "CHO_DUYET")
-        ),
-        None,
+    existing_request = (
+        db.query(RoomRequest)
+        .filter(
+            RoomRequest.student_id == clean_msv,
+            RoomRequest.loai_don == "DANG_KY",
+            RoomRequest.trang_thai.in_(["PENDING", "CHO_DUYET"]),
+        )
+        .first()
     )
     if existing_request:
         raise HTTPException(
@@ -255,12 +257,12 @@ def register_room(
 
     request_id = f"DK-{uuid.uuid4().hex[:6].upper()}"
 
-    # Lưu vào store trung tâm để Quản lý tiếp nhận ngay lập tức kèm gợi ý phù hợp
+    # Tạo bản ghi ORM RoomRequest lưu trực tiếp vào MySQL database
     req_dict = req.model_dump()
     req_dict["msv"] = clean_msv
     req_dict["id"] = request_id
     req_dict["ma_yeu_cau"] = request_id
-    stored_request = occupancy_request_store.add_request(req_dict)
+    stored_request = occupancy_request_store.add_request(req_dict, db=db)
 
     return {
         "status": "success",
@@ -281,18 +283,20 @@ def get_my_registration_requests(
     msv: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    """Trả về danh sách các đơn đăng ký chỗ ở của sinh viên."""
-    from app.services import occupancy_request_store
+    """Trả về danh sách các đơn đăng ký chỗ ở của sinh viên trực tiếp từ CSDL MySQL."""
     from app.services.student_helper import resolve_student_msv
-    requests = occupancy_request_store.get_registration_requests()
+    query = db.query(RoomRequest).filter(RoomRequest.loai_don == "DANG_KY")
     if msv:
         raw_msv = msv.strip()
         clean_msv = resolve_student_msv(raw_msv, db) or raw_msv.upper()
-        return [
-            r for r in requests
-            if r.get("msv", "").strip().upper() in (clean_msv, raw_msv.upper())
-        ]
-    return requests
+        query = query.filter(
+            or_(
+                RoomRequest.student_id == clean_msv,
+                RoomRequest.student_id == raw_msv.upper(),
+            )
+        )
+    requests = query.order_by(RoomRequest.id.desc()).all()
+    return [r.to_dict() for r in requests]
 
 
 class TransferRoomRequest(BaseModel):
@@ -354,7 +358,7 @@ def submit_transfer_request(
                 data["cong_no"] = DebtService.get_student_cong_no_label(db, clean_msv)
             except Exception:
                 data["cong_no"] = "Chưa thanh toán (Chưa phát hành hóa đơn)"
-    stored = occupancy_request_store.add_transfer_request(data)
+    stored = occupancy_request_store.add_transfer_request(data, db=db)
     return {
         "status": "success",
         "message": "Gửi yêu cầu chuyển phòng thành công",
@@ -399,7 +403,7 @@ def submit_checkout_request(
                 data["cong_no"] = DebtService.get_student_cong_no_label(db, clean_msv)
             except Exception:
                 data["cong_no"] = "Chưa thanh toán (Chưa phát hành hóa đơn)"
-    stored = occupancy_request_store.add_checkout_request(data)
+    stored = occupancy_request_store.add_checkout_request(data, db=db)
     return {
         "status": "success",
         "message": "Gửi yêu cầu trả phòng thành công",
@@ -518,32 +522,34 @@ def get_current_room(
 
         return None
 
-    # 0. Kiểm tra nếu sinh viên đã được duyệt trả phòng (checkout)
-    checkout_req = next(
-        (
-            r for r in occupancy_request_store.get_transfer_checkout_requests()
-            if r.get("msv", "").strip().upper() == target_msv
-            and (r.get("trang_thai") in ("DA_DUYET", "APPROVED") or r.get("trang_thai_label") == "Đã duyệt")
-            and r.get("loai_don") == "TRA_PHONG"
-        ),
-        None,
+    # 0. Kiểm tra nếu sinh viên đã được duyệt trả phòng (checkout) trong CSDL
+    checkout_req = (
+        db.query(RoomRequest)
+        .filter(
+            RoomRequest.student_id == target_msv,
+            RoomRequest.loai_don == "TRA_PHONG",
+            RoomRequest.trang_thai.in_(["DA_DUYET", "APPROVED"]),
+        )
+        .first()
     )
     if checkout_req:
         return {"data": None, "message": "Sinh viên đã hoàn tất thủ tục trả phòng"}
 
-    # 1. Kiểm tra nếu sinh viên đã được duyệt chuyển phòng trong occupancy_request_store
-    transfer_req = next(
-        (
-            r for r in occupancy_request_store.get_transfer_checkout_requests()
-            if r.get("msv", "").strip().upper() == target_msv
-            and (r.get("trang_thai") in ("DA_DUYET", "APPROVED") or r.get("trang_thai_label") == "Đã duyệt")
-            and r.get("loai_don") == "CHUYEN_PHONG"
-        ),
-        None,
+    # 1. Kiểm tra nếu sinh viên đã được duyệt chuyển phòng trong CSDL
+    transfer_req = (
+        db.query(RoomRequest)
+        .filter(
+            RoomRequest.student_id == target_msv,
+            RoomRequest.loai_don == "CHUYEN_PHONG",
+            RoomRequest.trang_thai.in_(["DA_DUYET", "APPROVED"]),
+        )
+        .order_by(RoomRequest.id.desc())
+        .first()
     )
-    if transfer_req and transfer_req.get("xep_phong"):
+    transfer_req_dict = transfer_req.to_dict() if transfer_req else None
+    if transfer_req_dict and transfer_req_dict.get("xep_phong"):
         import re
-        xp = transfer_req["xep_phong"]
+        xp = transfer_req_dict["xep_phong"]
         raw_toa = str(xp.get("ma_toa", "A1"))
         toa_clean = raw_toa.replace("TOA_", "").replace("Tòa ", "").replace("Tòa", "").strip() or "A1"
         toa_label = f"Tòa {toa_clean}"
@@ -795,16 +801,31 @@ def get_current_room(
     summary="Lấy lịch sử các yêu cầu chuyển và trả phòng",
 )
 def get_transfer_checkout_history(db: Session = Depends(get_db)):
-    """Lấy danh sách lịch sử yêu cầu chuyển và trả phòng."""
-    from app.services import occupancy_request_store
+    """Lấy danh sách lịch sử yêu cầu chuyển và trả phòng từ MySQL."""
+    from app.models.room_request import RoomRequest
     from app.models.user import SinhVien
-    reqs = occupancy_request_store.get_transfer_checkout_requests()
-    reg_reqs = occupancy_request_store.get_all_requests()
+
+    req_models = (
+        db.query(RoomRequest)
+        .filter(RoomRequest.loai_don.in_(["CHUYEN_PHONG", "TRA_PHONG"]))
+        .order_by(RoomRequest.id.desc())
+        .all()
+    )
+    reqs = [r.to_dict() for r in req_models]
+
+    reg_models = (
+        db.query(RoomRequest)
+        .filter(RoomRequest.loai_don == "DANG_KY")
+        .order_by(RoomRequest.id.desc())
+        .all()
+    )
+    reg_reqs = [r.to_dict() for r in reg_models]
+
     enriched = []
     for r in reqs:
         item = dict(r)
         r_msv = (item.get("msv") or "").strip().upper()
-        # 1. Đồng bộ thông tin từ REGISTRATION_REQUESTS
+        # 1. Đồng bộ thông tin từ đơn đăng ký
         reg = next((reg for reg in reg_reqs if (reg.get("msv") or "").strip().upper() == r_msv), None)
         if reg:
             for field in [
@@ -859,29 +880,30 @@ def get_my_stay_contracts(
 
     raw_msv = msv.strip()
     clean_msv = resolve_student_msv(raw_msv, db) or raw_msv.upper()
-    from app.services import occupancy_request_store
     import re
 
     # 1. Kiểm tra yêu cầu chuyển phòng đã duyệt
-    transfer_req = next(
-        (
-            r for r in occupancy_request_store.get_transfer_checkout_requests()
-            if r.get("msv", "").strip().upper() in (clean_msv, raw_msv.upper())
-            and (r.get("trang_thai") in ("DA_DUYET", "APPROVED") or r.get("trang_thai_label") == "Đã duyệt")
-            and r.get("loai_don") == "CHUYEN_PHONG"
-        ),
-        None,
+    transfer_req = (
+        db.query(RoomRequest)
+        .filter(
+            or_(RoomRequest.student_id == clean_msv, RoomRequest.student_id == raw_msv.upper()),
+            RoomRequest.loai_don == "CHUYEN_PHONG",
+            RoomRequest.trang_thai.in_(["DA_DUYET", "APPROVED"]),
+        )
+        .order_by(RoomRequest.id.desc())
+        .first()
     )
 
     # 2. Kiểm tra yêu cầu trả phòng đã duyệt
-    checkout_req = next(
-        (
-            r for r in occupancy_request_store.get_transfer_checkout_requests()
-            if r.get("msv", "").strip().upper() in (clean_msv, raw_msv.upper())
-            and (r.get("trang_thai") in ("DA_DUYET", "APPROVED") or r.get("trang_thai_label") == "Đã duyệt")
-            and r.get("loai_don") == "TRA_PHONG"
-        ),
-        None,
+    checkout_req = (
+        db.query(RoomRequest)
+        .filter(
+            or_(RoomRequest.student_id == clean_msv, RoomRequest.student_id == raw_msv.upper()),
+            RoomRequest.loai_don == "TRA_PHONG",
+            RoomRequest.trang_thai.in_(["DA_DUYET", "APPROVED"]),
+        )
+        .order_by(RoomRequest.id.desc())
+        .first()
     )
 
     contracts = (

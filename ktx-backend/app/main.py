@@ -88,6 +88,14 @@ try:
             if "anh_hop_dong" not in sv_cols:
                 conn.execute(text("ALTER TABLE sinh_vien ADD COLUMN anh_hop_dong VARCHAR(255) NULL"))
                 conn.commit()
+    if "phan_anh" in inspector.get_table_names():
+        pa_cols = [c["name"] for c in inspector.get_columns("phan_anh")]
+        with engine.connect() as conn:
+            if "is_ai_processed" not in pa_cols:
+                conn.execute(text("ALTER TABLE phan_anh ADD COLUMN is_ai_processed BOOLEAN DEFAULT 0"))
+            if "ai_error_reason" not in pa_cols:
+                conn.execute(text("ALTER TABLE phan_anh ADD COLUMN ai_error_reason TEXT NULL"))
+            conn.commit()
     Base.metadata.create_all(bind=engine)
 except Exception as e:
     print(f"Warning on database startup/migration: {e}")
