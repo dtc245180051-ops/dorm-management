@@ -7,6 +7,7 @@ from app.models.reconciliation import GiaoDichNganHang, TrangThaiDoiSoat
 from app.models.user import KeToan, NguoiDung, QuanLy, SinhVien, TaiKhoan, VaiTro
 
 from app.models.report import BaoCaoDinhKy
+from app.models.room_request import RoomRequest
 
 __all__ = [
     # User & Identity
@@ -24,6 +25,7 @@ __all__ = [
     # Contracts & Billing
     "HopDong",
     "YeuCauChuyenTraPhong",
+    "RoomRequest",
     "Phi",
     "ThanhToan",
     "HoaDon",

@@ -70,8 +70,8 @@ export default function StudentNotificationsPage({ onSelectTab, onNavigate }) {
       loadData();
     };
 
-    // Quét định kỳ mỗi 3 giây và khi quay lại tab để nhận thông báo tức thì khi Quản lý thao tác
-    const intervalId = setInterval(handleUpdate, 3000);
+    // Quét định kỳ mỗi 30 giây và khi quay lại tab để nhận thông báo tức thì khi Quản lý thao tác
+    const intervalId = setInterval(handleUpdate, 30000);
     window.addEventListener("focus", handleUpdate);
 
     window.addEventListener("ktx-notifications-updated", handleUpdate);

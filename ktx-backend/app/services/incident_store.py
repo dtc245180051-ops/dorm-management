@@ -59,6 +59,8 @@ def add_incident(data: dict) -> dict:
         "trang_thai": data.get("trang_thai", "CHO_XU_LY"),
         "trang_thai_label": data.get("trang_thai_label", "Chờ xử lý"),
         "ghi_chu_xu_ly": data.get("ghi_chu_xu_ly", ""),
+        "is_ai_processed": bool(data.get("is_ai_processed", False)),
+        "ai_error_reason": data.get("ai_error_reason"),
     }
 
     # Đưa lên đầu danh sách
@@ -69,15 +71,13 @@ def add_incident(data: dict) -> dict:
 
 def get_all_incidents() -> List[Dict]:
     """Lấy danh sách toàn bộ phản ánh cho Ban Quản lý KTX."""
-    if not INCIDENTS:
-        _load_store()
+    _load_store()
     return INCIDENTS
 
 
 def get_today_incidents() -> List[Dict]:
     """Lấy danh sách các phản ánh gửi trong ngày hôm nay."""
-    if not INCIDENTS:
-        _load_store()
+    _load_store()
     today_str = datetime.date.today().isoformat()
     return [
         pa for pa in INCIDENTS

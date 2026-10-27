@@ -312,7 +312,7 @@ export default function ViolationManagement({ searchTerm = "" }) {
     };
 
     fetchViolations();
-    const interval = setInterval(fetchViolations, 3000);
+    const interval = setInterval(fetchViolations, 30000);
     return () => clearInterval(interval);
   }, []);
 

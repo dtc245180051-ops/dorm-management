@@ -202,7 +202,7 @@ export default function IncidentManagement({ searchTerm = '' }) {
 
       {/* CARD AI TÓM TẮT SỰ CỐ TRONG NGÀY (IncidentSummaryCard) */}
       <IncidentSummaryCard
-        refreshTrigger={incidents.length}
+        refreshTrigger={incidents.map((i) => `${i.id || i.ma_phan_anh}_${i.trang_thai}`).join(',')}
         onRefresh={fetchIncidents}
       />
 
@@ -379,21 +379,31 @@ export default function IncidentManagement({ searchTerm = '' }) {
                       </td>
                       {/* Cột Phân loại: Hiển thị nhãn do AI tự gắn */}
                       <td className="py-3.5 px-4">
-                        <span
-                          className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-semibold border ${
-                            categoryName === 'Điện nước'
-                              ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
-                              : categoryName === 'An ninh trật tự'
-                              ? 'bg-purple-50 text-purple-700 border-purple-200'
-                              : categoryName === 'Vệ sinh'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : categoryName === 'Cơ sở vật chất'
-                              ? 'bg-blue-50 text-blue-700 border-blue-200'
-                              : 'bg-slate-100 text-slate-700 border-slate-200'
-                          }`}
-                        >
-                          {categoryName}
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span
+                            className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-semibold border ${
+                              categoryName === 'Điện nước'
+                                ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
+                                : categoryName === 'An ninh trật tự'
+                                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                : categoryName === 'Vệ sinh'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : categoryName === 'Cơ sở vật chất'
+                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            {categoryName}
+                          </span>
+                          {item.is_ai_processed === false && (
+                            <span
+                              className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200 font-medium"
+                              title={item.ai_error_reason || 'Phân loại bằng luật heuristic dự phòng khi AI gián đoạn'}
+                            >
+                              Dự phòng
+                            </span>
+                          )}
+                        </div>
                       </td>
                       {/* Cột Tiêu đề & Nội dung: Dòng trên in đậm Tiêu đề ngắn do AI sinh ra, dòng dưới hiển thị Mô tả chi tiết của sinh viên */}
                       <td className="py-3.5 px-4 max-w-sm">

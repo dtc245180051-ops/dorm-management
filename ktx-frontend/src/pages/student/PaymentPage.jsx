@@ -934,162 +934,184 @@ export default function PaymentPage({ onSelectTab, onNavigate }) {
         {/* 4. MODAL QUÉT MÃ QR VIETQR CHUYỂN KHOẢN (KHI BẤM "THANH TOÁN")              */}
         {/* ========================================================================= */}
         {isModalOpen && selectedInvoice && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs select-none">
-            <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 flex flex-col items-center">
-              {/* Nút đóng modal */}
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="w-full text-center mt-2">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold mb-2">
-                  <QrCode className="w-3.5 h-3.5" />
-                  <span>VietQR Nhanh 24/7 • {selectedInvoice.name}</span>
-                </div>
-                <h3 className="text-xl font-bold text-slate-800">
-                  Thanh toán {selectedInvoice.name}
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Mở ứng dụng ngân hàng hoặc ví điện tử để quét mã QR
-                </p>
-              </div>
-
-              {/* Khung QR Code */}
-              <div className="relative mt-5 p-3 bg-white border border-slate-200 rounded-2xl shadow-xs">
-                <img
-                  src={qrUrl}
-                  alt={`VietQR ${selectedInvoice.name}`}
-                  className="w-56 h-56 object-contain"
-                />
-                {timeLeft === 0 && (
-                  <div className="absolute inset-0 bg-white/90 backdrop-blur-xs rounded-2xl flex flex-col items-center justify-center p-4">
-                    <p className="text-xs font-semibold text-rose-600 mb-2">
-                      Mã QR đã hết hiệu lực
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 sm:p-4 backdrop-blur-xs select-none overflow-y-auto">
+            <div className="relative w-full max-w-2xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 p-4 sm:p-6 my-auto max-h-[92vh] flex flex-col overflow-y-auto">
+              {/* Header modal */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <QrCode className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base sm:text-lg font-bold text-slate-800">
+                        Thanh toán {selectedInvoice.name}
+                      </h3>
+                      <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-semibold">
+                        VietQR 24/7
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Mở ứng dụng ngân hàng hoặc ví điện tử để quét mã QR chuyển khoản
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setTimeLeft(900)}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-xl transition cursor-pointer"
-                    >
-                      <RotateCw className="w-3.5 h-3.5" />
-                      Làm mới mã QR
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Đồng hồ đếm ngược */}
-              <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
-                <span>Hết hạn trong:</span>
-                <span className="font-bold text-rose-600 font-mono">
-                  {formattedTime}
-                </span>
-              </div>
-
-              {/* Thông tin chuyển khoản chi tiết */}
-              <div className="w-full bg-slate-50 rounded-2xl p-4 mt-4 space-y-2.5 border border-slate-200/70 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Ngân hàng:</span>
-                  <span className="font-bold text-slate-800">TPBank</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Số tài khoản:</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-slate-800 font-mono">
-                      {ACCOUNT_NO}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleCopy(ACCOUNT_NO, "accountNo")}
-                      className="text-blue-600 hover:text-blue-700 p-1 hover:bg-blue-50 rounded transition cursor-pointer"
-                      title="Sao chép số tài khoản"
-                    >
-                      {copiedField === "accountNo" ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
-                    </button>
                   </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Chủ tài khoản:</span>
-                  <span className="font-bold text-slate-800">
-                    {ACCOUNT_NAME}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Khoản thanh toán:</span>
-                  <span className="font-bold text-slate-800">
-                    {selectedInvoice.name} ({selectedInvoice.period})
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Số tiền:</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-blue-600 text-sm">
-                      {selectedInvoice.amountDisplay}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleCopy(String(selectedInvoice.amount), "amount")
-                      }
-                      className="text-blue-600 hover:text-blue-700 p-1 hover:bg-blue-50 rounded transition cursor-pointer"
-                      title="Sao chép số tiền"
-                    >
-                      {copiedField === "amount" ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between pt-1 border-t border-slate-200">
-                  <span className="text-slate-500 font-semibold">Nội dung CK:</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold text-blue-700 font-mono bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                      {rawTransferContent}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleCopy(rawTransferContent, "content")
-                      }
-                      className="text-blue-600 hover:text-blue-700 p-1 hover:bg-blue-50 rounded transition cursor-pointer"
-                      title="Sao chép nội dung chuyển khoản"
-                    >
-                      {copiedField === "content" ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
 
-              <div className="mt-2 w-full text-center">
-                <p className="text-[11px] text-amber-700 bg-amber-50 rounded-xl p-2 border border-amber-200/80">
-                  Lưu ý: Giữ nguyên nội dung <strong>{rawTransferContent}</strong> để hệ thống đối soát gạch nợ tự động.
-                </p>
-              </div>
-
-              {/* Nút xác nhận */}
-              <div className="w-full mt-4">
                 <button
                   type="button"
-                  onClick={handleConfirmPayment}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl transition shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition cursor-pointer"
+                  title="Đóng"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Xác nhận đã chuyển khoản ({selectedInvoice.name})</span>
+                  <X className="w-5 h-5" />
                 </button>
+              </div>
+
+              {/* Body: 2 cột trên sm/md */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 sm:gap-5 pt-3.5 items-center">
+                {/* Cột trái: Khung QR Code + Đếm ngược */}
+                <div className="sm:col-span-5 flex flex-col items-center justify-center bg-slate-50/90 rounded-2xl p-3 sm:p-4 border border-slate-200/60">
+                  <div className="relative p-2 bg-white border border-slate-200 rounded-xl shadow-xs">
+                    <img
+                      src={qrUrl}
+                      alt={`VietQR ${selectedInvoice.name}`}
+                      className="w-36 h-36 sm:w-44 sm:h-44 object-contain"
+                    />
+                    {timeLeft === 0 && (
+                      <div className="absolute inset-0 bg-white/95 backdrop-blur-xs rounded-xl flex flex-col items-center justify-center p-3 text-center">
+                        <p className="text-[11px] font-semibold text-rose-600 mb-2">
+                          Mã QR đã hết hiệu lực
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setTimeLeft(900)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-medium rounded-lg transition cursor-pointer shadow-xs"
+                        >
+                          <RotateCw className="w-3 h-3" />
+                          Làm mới mã
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Đồng hồ đếm ngược */}
+                  <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+                    <span>Hết hạn trong:</span>
+                    <span className="font-bold text-rose-600 font-mono text-xs">
+                      {formattedTime}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 text-center mt-0.5">
+                    Hỗ trợ quét qua mọi ngân hàng
+                  </span>
+                </div>
+
+                {/* Cột phải: Thông tin chuyển khoản + Nút xác nhận */}
+                <div className="sm:col-span-7 flex flex-col justify-between space-y-2.5">
+                  <div className="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-200/70 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Ngân hàng:</span>
+                      <span className="font-bold text-slate-800">TPBank</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Số tài khoản:</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-slate-800 font-mono">
+                          {ACCOUNT_NO}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(ACCOUNT_NO, "accountNo")}
+                          className="text-blue-600 hover:text-blue-700 p-0.5 hover:bg-blue-50 rounded transition cursor-pointer"
+                          title="Sao chép số tài khoản"
+                        >
+                          {copiedField === "accountNo" ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Chủ tài khoản:</span>
+                      <span className="font-bold text-slate-800 text-[11px]">
+                        {ACCOUNT_NAME}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Khoản thanh toán:</span>
+                      <span className="font-semibold text-slate-800">
+                        {selectedInvoice.name} ({selectedInvoice.period})
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Số tiền:</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-blue-600 text-sm">
+                          {selectedInvoice.amountDisplay}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleCopy(String(selectedInvoice.amount), "amount")
+                          }
+                          className="text-blue-600 hover:text-blue-700 p-0.5 hover:bg-blue-50 rounded transition cursor-pointer"
+                          title="Sao chép số tiền"
+                        >
+                          {copiedField === "amount" ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1.5 border-t border-slate-200">
+                      <span className="text-slate-600 font-semibold">Nội dung CK:</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-blue-700 font-mono bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-xs">
+                          {rawTransferContent}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleCopy(rawTransferContent, "content")
+                          }
+                          className="text-blue-600 hover:text-blue-700 p-0.5 hover:bg-blue-50 rounded transition cursor-pointer"
+                          title="Sao chép nội dung chuyển khoản"
+                        >
+                          {copiedField === "content" ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cảnh báo ghi đúng nội dung */}
+                  <div className="w-full">
+                    <p className="text-[11px] text-amber-800 bg-amber-50/90 rounded-xl px-2.5 py-1.5 border border-amber-200/80 leading-relaxed">
+                      Lưu ý: Giữ đúng nội dung <strong>{rawTransferContent}</strong> để hệ thống đối soát gạch nợ tự động.
+                    </p>
+                  </div>
+
+                  {/* Nút xác nhận */}
+                  <button
+                    type="button"
+                    onClick={handleConfirmPayment}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold rounded-xl transition shadow-md flex items-center justify-center cursor-pointer active:scale-98 whitespace-nowrap px-4"
+                  >
+                    <span>Xác nhận đã chuyển khoản</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -71,6 +71,15 @@ class PhanAnh(Base):
     )
     ngay_tao: Mapped[Optional[datetime.datetime]] = mapped_column(
         DateTime,
+        nullable=True,
+    )
+    is_ai_processed: Mapped[Optional[bool]] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=True,
+    )
+    ai_error_reason: Mapped[Optional[str]] = mapped_column(
+        Text,
         nullable=True,
     )
 

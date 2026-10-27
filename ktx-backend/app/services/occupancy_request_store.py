@@ -1,266 +1,401 @@
 import datetime
-import json
-import os
-from typing import Dict, List, Optional
+import re
+import uuid
+from typing import Any, Dict, List, Optional
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
 
-STORE_FILE = os.path.join(os.path.dirname(__file__), "..", "data_store_requests.json")
-
-# In-memory store lưu trữ danh sách các đơn đăng ký chỗ ở để liên kết trực tiếp
-# giữa sinh viên và quản lý KTX
-REGISTRATION_REQUESTS: List[Dict] = []
-TRANSFER_CHECKOUT_REQUESTS: List[Dict] = []
-
-def _save_store():
-    try:
-        with open(STORE_FILE, "w", encoding="utf-8") as f:
-            json.dump({
-                "REGISTRATION_REQUESTS": REGISTRATION_REQUESTS,
-                "TRANSFER_CHECKOUT_REQUESTS": TRANSFER_CHECKOUT_REQUESTS,
-            }, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print("Lỗi lưu trữ file store:", e)
-
-def _load_store():
-    global REGISTRATION_REQUESTS, TRANSFER_CHECKOUT_REQUESTS
-    if os.path.exists(STORE_FILE):
-        try:
-            with open(STORE_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if "REGISTRATION_REQUESTS" in data and isinstance(data["REGISTRATION_REQUESTS"], list):
-                    loaded_ids = {r.get("id") for r in data["REGISTRATION_REQUESTS"]}
-                    merged = list(data["REGISTRATION_REQUESTS"])
-                    for r in REGISTRATION_REQUESTS:
-                        if r.get("id") not in loaded_ids:
-                            merged.append(r)
-                    REGISTRATION_REQUESTS.clear()
-                    REGISTRATION_REQUESTS.extend(merged)
-
-                if "TRANSFER_CHECKOUT_REQUESTS" in data and isinstance(data["TRANSFER_CHECKOUT_REQUESTS"], list):
-                    loaded_tc_ids = {r.get("id") for r in data["TRANSFER_CHECKOUT_REQUESTS"]}
-                    merged_tc = list(data["TRANSFER_CHECKOUT_REQUESTS"])
-                    for r in TRANSFER_CHECKOUT_REQUESTS:
-                        if r.get("id") not in loaded_tc_ids:
-                            merged_tc.append(r)
-                    TRANSFER_CHECKOUT_REQUESTS.clear()
-                    TRANSFER_CHECKOUT_REQUESTS.extend(merged_tc)
-        except Exception as e:
-            print("Lỗi tải file store:", e)
+from app.core.database import SessionLocal
+from app.models.dorm import Phong
+from app.models.room_request import RoomRequest
+from app.models.user import NguoiDung, SinhVien
 
 
-def add_request(req_data: dict) -> dict:
-    """Thêm một đơn đăng ký mới vào hệ thống quản lý."""
-    now = datetime.datetime.now()
-    date_str = now.strftime("%d/%m/%Y")
-    time_str = now.strftime("%H:%M")
+def _get_session(db: Optional[Session] = None):
+    """Context manager nội bộ để quản lý session DB an toàn."""
+    class SessionContext:
+        def __init__(self, external_db: Optional[Session]):
+            self.external_db = external_db
+            self.session = None
 
-    new_req = {
-        "id": req_data.get("id") or req_data.get("ma_yeu_cau") or f"DK-{len(REGISTRATION_REQUESTS) + 1:03d}",
-        "ma_yeu_cau": req_data.get("ma_yeu_cau") or req_data.get("id") or f"DK-{len(REGISTRATION_REQUESTS) + 1:03d}",
-        "msv": req_data.get("msv", ""),
-        "ho_ten": req_data.get("ho_ten", "Sinh viên"),
-        "gioi_tinh": req_data.get("gioi_tinh", ""),
-        "ngay_sinh": req_data.get("ngay_sinh", ""),
-        "cccd": req_data.get("cccd", ""),
-        "so_dien_thoai": req_data.get("so_dien_thoai", ""),
-        "email": req_data.get("email", ""),
-        "khoa": req_data.get("khoa", ""),
-        "lop": req_data.get("lop", ""),
-        "dia_chi": req_data.get("dia_chi", ""),
-        "doi_tuong_uu_tien": req_data.get("doi_tuong_uu_tien", "Không thuộc diện ưu tiên"),
-        "nguoi_giam_ho": req_data.get("nguoi_giam_ho") or req_data.get("ho_ten_nguoi_giam_ho") or req_data.get("ho_ten_phu_huynh") or "",
-        "moi_quan_he": req_data.get("moi_quan_he", ""),
-        "sdt_nguoi_giam_ho": req_data.get("sdt_nguoi_giam_ho") or req_data.get("sdt_phu_huynh") or "",
-        "loai_phong": req_data.get("loai_phong", "") or "Phòng tiêu chuẩn",
-        "tang_mong_muon": req_data.get("tang_mong_muon", ""),
-        "muc_gia_mong_muon": req_data.get("muc_gia_mong_muon", ""),
-        "nguyen_vong": req_data.get("noi_dung_nguyen_vong") or req_data.get("nguyen_vong") or req_data.get("nguyen_vong_label") or "Xin đăng ký phòng KTX",
-        "nguyen_vong_phong": req_data.get("nguyen_vong_phong", ""),
-        "nguyen_vong_label": req_data.get("nguyen_vong_label", ""),
-        "ngay_dang_ky": date_str,
-        "ngay_gui": f"{date_str} {time_str}",
-        "ngay_gui_time": f"{date_str} {time_str}",
-        "nam_hoc": req_data.get("nam_hoc") or "2026-2027",
-        "trang_thai": "PENDING",
-        "trang_thai_label": "Đang xét duyệt",
-        "ma_toa_mong_muon": req_data.get("ma_toa_mong_muon", ""),
-    }
+        def __enter__(self) -> Session:
+            if self.external_db is not None:
+                return self.external_db
+            self.session = SessionLocal()
+            return self.session
 
-    # Đưa lên đầu danh sách để quản lý thấy ngay đơn mới nhất
-    REGISTRATION_REQUESTS.insert(0, new_req)
-    _save_store()
-    return new_req
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            if self.session is not None:
+                self.session.close()
+
+    return SessionContext(db)
 
 
-def get_registration_requests() -> List[Dict]:
-    """Lấy danh sách các đơn đăng ký chỗ ở."""
-    _load_store()
-    return REGISTRATION_REQUESTS
+def _find_room_id(db: Session, text: Optional[str]) -> Optional[str]:
+    """Tìm mã phòng tương ứng trong CSDL."""
+    if not text:
+        return None
+    clean = str(text).strip()
+    p = db.query(Phong).filter(Phong.ma_phong == clean).first()
+    if p:
+        return p.ma_phong
 
-
-def get_all_requests() -> List[Dict]:
-    """Lấy danh sách tất cả các đơn đăng ký, chuyển phòng và trả phòng."""
-    _load_store()
-    return TRANSFER_CHECKOUT_REQUESTS + REGISTRATION_REQUESTS
-
-
-def get_request_by_id(req_id: str) -> Optional[Dict]:
-    """Tìm đơn theo ID hoặc MSV."""
-    _load_store()
-    clean_id = req_id.strip().lower().replace("#", "")
-    for req in TRANSFER_CHECKOUT_REQUESTS:
-        rid = req.get("id", "").lower().replace("#", "")
-        rmsv = req.get("msv", "").lower()
-        rmyc = req.get("ma_yeu_cau", "").lower().replace("#", "")
-        if rid == clean_id or rmsv == clean_id or rmyc == clean_id:
-            return req
-
-    for req in REGISTRATION_REQUESTS:
-        rid = req.get("id", "").lower().replace("#", "")
-        rmsv = req.get("msv", "").lower()
-        rmyc = req.get("ma_yeu_cau", "").lower().replace("#", "")
-        if rid == clean_id or rmsv == clean_id or rmyc == clean_id:
-            return req
+    digits = re.findall(r"\d+", clean)
+    if digits:
+        p = db.query(Phong).filter(Phong.so_phong == digits[0]).first()
+        if p:
+            return p.ma_phong
     return None
 
 
-def update_request_status(req_id: str, new_status: str, extra_data: Optional[dict] = None) -> Optional[Dict]:
-    """Cập nhật trạng thái đơn (DA_DUYET hoặc TU_CHOI)."""
-    req = get_request_by_id(req_id)
-    if req:
-        req["trang_thai"] = new_status
-        req["trang_thai_label"] = "Đã duyệt" if new_status in ("DA_DUYET", "APPROVED") else "Từ chối"
-        if extra_data:
-            req.update(extra_data)
-        _save_store()
-        return req
-    return None
+def add_request(req_data: dict, db: Optional[Session] = None) -> dict:
+    """Thêm một đơn đăng ký mới vào hệ thống quản lý MySQL."""
+    with _get_session(db) as session:
+        now = datetime.datetime.utcnow()
+        date_str = now.strftime("%d/%m/%Y")
+        time_str = now.strftime("%H:%M")
+
+        clean_msv = (req_data.get("msv") or "").strip().upper()
+        student = session.query(SinhVien).filter(SinhVien.msv == clean_msv).first() if clean_msv else None
+        user_id = student.ma_nguoi_dung if student else None
+
+        req_code = req_data.get("id") or req_data.get("ma_yeu_cau")
+        if not req_code:
+            count = session.query(RoomRequest).count()
+            req_code = f"DK-{uuid.uuid4().hex[:6].upper()}"
+
+        full_data = dict(req_data)
+        full_data["id"] = req_code
+        full_data["ma_yeu_cau"] = req_code
+        full_data["msv"] = clean_msv
+        full_data["ngay_dang_ky"] = full_data.get("ngay_dang_ky") or date_str
+        full_data["ngay_gui"] = full_data.get("ngay_gui") or f"{date_str} {time_str}"
+        full_data["ngay_gui_time"] = full_data.get("ngay_gui_time") or f"{date_str} {time_str}"
+        full_data["trang_thai"] = "PENDING"
+        full_data["trang_thai_label"] = "Đang xét duyệt"
+
+        reason = (
+            full_data.get("noi_dung_nguyen_vong")
+            or full_data.get("nguyen_vong")
+            or full_data.get("nguyen_vong_label")
+            or "Xin đăng ký phòng KTX"
+        )
+        target_room_id = _find_room_id(session, full_data.get("nguyen_vong_phong") or full_data.get("ma_phong"))
+
+        new_req = RoomRequest(
+            ma_yeu_cau=req_code,
+            user_id=user_id,
+            student_id=clean_msv if student else None,
+            loai_don="DANG_KY",
+            phong_hien_tai_id=None,
+            phong_mong_muon_id=target_room_id,
+            ly_do=reason,
+            trang_thai="PENDING",
+            extra_data=full_data,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(new_req)
+        session.commit()
+        session.refresh(new_req)
+        return new_req.to_dict()
 
 
-# Các hàm xử lý yêu cầu chuyển phòng và trả phòng
+def get_registration_requests(db: Optional[Session] = None) -> List[Dict]:
+    """Lấy danh sách các đơn đăng ký chỗ ở từ MySQL."""
+    with _get_session(db) as session:
+        requests = (
+            session.query(RoomRequest)
+            .filter(RoomRequest.loai_don == "DANG_KY")
+            .order_by(RoomRequest.id.desc())
+            .all()
+        )
+        return [r.to_dict() for r in requests]
 
 
-def add_transfer_request(data: dict) -> dict:
-    req_num = len(TRANSFER_CHECKOUT_REQUESTS) + 231
-    req_id = data.get("id") or f"YC-{req_num:04d}"
-    today_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
-    
-    phong_hien_tai = data.get("phong_hien_tai", "")
-    toa_hien_tai = data.get("toa_hien_tai", "")
-    if not toa_hien_tai and " - " in data.get("vi_tri_hien_tai", ""):
-        for vp in data.get("vi_tri_hien_tai", "").split(" - "):
-            if "Tòa" in vp:
-                toa_hien_tai = vp.strip()
-                break
-
-    phong_mong_muon = data.get("phong_mong_muon", "")
-    from_label = f"{phong_hien_tai} ({toa_hien_tai})" if toa_hien_tai and phong_hien_tai and f"({toa_hien_tai})" not in phong_hien_tai else phong_hien_tai
-
-    if " - " in phong_mong_muon:
-        p_parts = phong_mong_muon.split(" - ")
-        to_label = f"{p_parts[0].strip()} ({p_parts[1].strip()})"
-        target_short = p_parts[0].strip()
-    else:
-        to_label = phong_mong_muon.strip()
-        target_short = phong_mong_muon.strip()
-
-    if data.get("phong_lien_quan") and "→" in data.get("phong_lien_quan"):
-        phong_lien_quan = data.get("phong_lien_quan")
-        if "(" not in phong_lien_quan and from_label and to_label:
-            phong_lien_quan = f"{from_label} → {to_label}"
-    else:
-        phong_lien_quan = f"{from_label} → {to_label}" if from_label and to_label else (to_label or from_label)
-
-    new_req = {
-        "id": req_id,
-        "ma_yeu_cau": f"#{req_id}",
-        "loai_yeu_cau": "Chuyển phòng",
-        "loai_don": "CHUYEN_PHONG",
-        "msv": data.get("msv", ""),
-        "ho_ten": data.get("ho_ten", ""),
-        "gioi_tinh": data.get("gioi_tinh", ""),
-        "khoa": data.get("khoa", ""),
-        "lop": data.get("lop", ""),
-        "vi_tri_hien_tai": data.get("vi_tri_hien_tai", phong_hien_tai),
-        "cong_no": data.get("cong_no", "Chưa thanh toán (Chưa phát hành hóa đơn)"),
-        "ngay_gui": data.get("ngay_gui") or today_str,
-        "phong_lien_quan": phong_lien_quan,
-        "phong_hien_tai": from_label,
-        "phong_dich": to_label,
-        "ly_do": data.get("ly_do", "Chuyển phòng"),
-        "ngay_mong_muon": data.get("ngay_mong_muon", ""),
-        "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", ""),
-        "trang_thai": "CHO_DUYET",
-        "trang_thai_label": "Chờ duyệt",
-    }
-    TRANSFER_CHECKOUT_REQUESTS.insert(0, new_req)
-    _save_store()
-    return new_req
+def get_all_requests(db: Optional[Session] = None) -> List[Dict]:
+    """Lấy danh sách tất cả các đơn đăng ký, chuyển phòng và trả phòng từ MySQL."""
+    with _get_session(db) as session:
+        requests = (
+            session.query(RoomRequest)
+            .order_by(RoomRequest.id.desc())
+            .all()
+        )
+        return [r.to_dict() for r in requests]
 
 
-def add_checkout_request(data: dict) -> dict:
-    req_num = len(TRANSFER_CHECKOUT_REQUESTS) + 231
-    req_id = data.get("id") or f"YC-{req_num:04d}"
-    today_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
-    
-    phong_hien_tai = data.get("phong_hien_tai", "")
-    
-    dia_chi_sau_tra = data.get("dia_chi_sau_tra") or data.get("dia_chi_lien_he") or ""
-    dia_chi_chi_tiet = data.get("dia_chi_chi_tiet") or {}
-    if (not dia_chi_chi_tiet or not any(dia_chi_chi_tiet.values())) and dia_chi_sau_tra:
-        parts = [s.strip() for s in dia_chi_sau_tra.split(",") if s.strip()]
-        if len(parts) >= 3:
-            dia_chi_chi_tiet = {
-                "tinh": parts[-1],
-                "huyen": parts[-2],
-                "so_nha": ", ".join(parts[:-2]),
-            }
-        elif len(parts) == 2:
-            dia_chi_chi_tiet = {
-                "tinh": parts[1],
-                "huyen": "",
-                "so_nha": parts[0],
-            }
-        elif len(parts) == 1:
-            dia_chi_chi_tiet = {
-                "tinh": parts[0],
-                "huyen": "",
-                "so_nha": "",
-            }
+def get_request_by_id(req_id: str, db: Optional[Session] = None) -> Optional[Dict]:
+    """Tìm đơn theo ID, Mã yêu cầu hoặc MSV từ MySQL."""
+    if not req_id:
+        return None
+    clean_id = req_id.strip().replace("#", "")
 
-    new_req = {
-        "id": req_id,
-        "ma_yeu_cau": f"#{req_id}",
-        "loai_yeu_cau": "Trả phòng",
-        "loai_don": "TRA_PHONG",
-        "msv": data.get("msv", ""),
-        "ho_ten": data.get("ho_ten", ""),
-        "gioi_tinh": data.get("gioi_tinh", ""),
-        "khoa": data.get("khoa", ""),
-        "lop": data.get("lop", ""),
-        "vi_tri_hien_tai": data.get("vi_tri_hien_tai", phong_hien_tai),
-        "cong_no": data.get("cong_no", "Chưa thanh toán (Chưa phát hành hóa đơn)"),
-        "ngay_gui": data.get("ngay_gui") or today_str,
-        "phong_lien_quan": phong_hien_tai,
-        "phong_hien_tai": phong_hien_tai,
-        "ly_do": data.get("ly_do", "Trả phòng"),
-        "ngay_mong_muon": data.get("ngay_mong_muon", ""),
-        "dia_chi_sau_tra": dia_chi_sau_tra,
-        "dia_chi_chi_tiet": dia_chi_chi_tiet,
-        "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", ""),
-        "trang_thai": "CHO_DUYET",
-        "trang_thai_label": "Chờ duyệt",
-    }
-    TRANSFER_CHECKOUT_REQUESTS.insert(0, new_req)
-    _save_store()
-    return new_req
+    with _get_session(db) as session:
+        # 1. Tìm chính xác theo mã yêu cầu
+        req = (
+            session.query(RoomRequest)
+            .filter(
+                or_(
+                    RoomRequest.ma_yeu_cau == clean_id,
+                    RoomRequest.ma_yeu_cau == f"#{clean_id}",
+                    RoomRequest.ma_yeu_cau == req_id.strip(),
+                )
+            )
+            .first()
+        )
+        if req:
+            return req.to_dict()
+
+        # 2. Nếu là số tự tăng id
+        if clean_id.isdigit():
+            req = session.query(RoomRequest).filter(RoomRequest.id == int(clean_id)).first()
+            if req:
+                return req.to_dict()
+
+        # 3. Tìm theo MSV
+        req = (
+            session.query(RoomRequest)
+            .filter(RoomRequest.student_id == clean_id.upper())
+            .order_by(RoomRequest.id.desc())
+            .first()
+        )
+        if req:
+            return req.to_dict()
+
+        return None
 
 
-def get_transfer_checkout_requests() -> List[Dict]:
-    _load_store()
-    return TRANSFER_CHECKOUT_REQUESTS
+def update_request_status(
+    req_id: str,
+    new_status: str,
+    extra_data: Optional[dict] = None,
+    db: Optional[Session] = None,
+) -> Optional[Dict]:
+    """Cập nhật trạng thái đơn trong MySQL."""
+    clean_id = req_id.strip().replace("#", "")
+
+    with _get_session(db) as session:
+        req = (
+            session.query(RoomRequest)
+            .filter(
+                or_(
+                    RoomRequest.ma_yeu_cau == clean_id,
+                    RoomRequest.ma_yeu_cau == f"#{clean_id}",
+                    RoomRequest.ma_yeu_cau == req_id.strip(),
+                    RoomRequest.student_id == clean_id.upper(),
+                )
+            )
+            .order_by(RoomRequest.id.desc())
+            .first()
+        )
+        if not req and clean_id.isdigit():
+            req = session.query(RoomRequest).filter(RoomRequest.id == int(clean_id)).first()
+
+        if req:
+            req.trang_thai = new_status
+            data = dict(req.extra_data or {})
+            data["trang_thai"] = new_status
+            data["trang_thai_label"] = "Đã duyệt" if new_status in ("DA_DUYET", "APPROVED") else "Từ chối"
+
+            if extra_data:
+                data.update(extra_data)
+                if "ly_do_tu_choi" in extra_data:
+                    req.ly_do_tu_choi = extra_data["ly_do_tu_choi"]
+                if "xep_phong" in extra_data and isinstance(extra_data["xep_phong"], dict):
+                    xp_phong = extra_data["xep_phong"].get("phong_id")
+                    if xp_phong:
+                        room_id = _find_room_id(session, xp_phong)
+                        if room_id:
+                            req.phong_mong_muon_id = room_id
+
+            req.extra_data = data
+            req.updated_at = datetime.datetime.utcnow()
+            session.commit()
+            session.refresh(req)
+            return req.to_dict()
+
+        return None
 
 
-# Tự động nạp dữ liệu khi nạp module
-_load_store()
+def add_transfer_request(data: dict, db: Optional[Session] = None) -> dict:
+    """Thêm yêu cầu chuyển phòng vào MySQL."""
+    with _get_session(db) as session:
+        count = session.query(RoomRequest).count()
+        req_num = count + 231
+        req_id = data.get("id") or f"YC-{req_num:04d}"
+        clean_code = req_id.replace("#", "").strip()
+
+        now = datetime.datetime.utcnow()
+        today_str = now.strftime("%d/%m/%Y %H:%M")
+
+        phong_hien_tai = data.get("phong_hien_tai", "")
+        toa_hien_tai = data.get("toa_hien_tai", "")
+        if not toa_hien_tai and " - " in data.get("vi_tri_hien_tai", ""):
+            for vp in data.get("vi_tri_hien_tai", "").split(" - "):
+                if "Tòa" in vp:
+                    toa_hien_tai = vp.strip()
+                    break
+
+        phong_mong_muon = data.get("phong_mong_muon", "")
+        from_label = (
+            f"{phong_hien_tai} ({toa_hien_tai})"
+            if toa_hien_tai and phong_hien_tai and f"({toa_hien_tai})" not in phong_hien_tai
+            else phong_hien_tai
+        )
+
+        if " - " in phong_mong_muon:
+            p_parts = phong_mong_muon.split(" - ")
+            to_label = f"{p_parts[0].strip()} ({p_parts[1].strip()})"
+        else:
+            to_label = phong_mong_muon.strip()
+
+        if data.get("phong_lien_quan") and "→" in data.get("phong_lien_quan"):
+            phong_lien_quan = data.get("phong_lien_quan")
+            if "(" not in phong_lien_quan and from_label and to_label:
+                phong_lien_quan = f"{from_label} → {to_label}"
+        else:
+            phong_lien_quan = f"{from_label} → {to_label}" if from_label and to_label else (to_label or from_label)
+
+        clean_msv = (data.get("msv") or "").strip().upper()
+        student = session.query(SinhVien).filter(SinhVien.msv == clean_msv).first() if clean_msv else None
+        user_id = student.ma_nguoi_dung if student else None
+
+        new_dict = {
+            "id": clean_code,
+            "ma_yeu_cau": f"#{clean_code}",
+            "loai_yeu_cau": "Chuyển phòng",
+            "loai_don": "CHUYEN_PHONG",
+            "msv": clean_msv,
+            "ho_ten": data.get("ho_ten", ""),
+            "gioi_tinh": data.get("gioi_tinh", ""),
+            "khoa": data.get("khoa", ""),
+            "lop": data.get("lop", ""),
+            "vi_tri_hien_tai": data.get("vi_tri_hien_tai", phong_hien_tai),
+            "cong_no": data.get("cong_no", "Chưa thanh toán (Chưa phát hành hóa đơn)"),
+            "ngay_gui": data.get("ngay_gui") or today_str,
+            "phong_lien_quan": phong_lien_quan,
+            "phong_hien_tai": from_label,
+            "phong_dich": to_label,
+            "ly_do": data.get("ly_do", "Chuyển phòng"),
+            "ngay_mong_muon": data.get("ngay_mong_muon", ""),
+            "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", ""),
+            "trang_thai": "CHO_DUYET",
+            "trang_thai_label": "Chờ duyệt",
+        }
+
+        curr_room_id = _find_room_id(session, phong_hien_tai)
+        target_room_id = _find_room_id(session, phong_mong_muon)
+
+        new_req = RoomRequest(
+            ma_yeu_cau=clean_code,
+            student_id=clean_msv if student else None,
+            user_id=user_id,
+            loai_don="CHUYEN_PHONG",
+            phong_hien_tai_id=curr_room_id,
+            phong_mong_muon_id=target_room_id,
+            ly_do=new_dict["ly_do"],
+            trang_thai="CHO_DUYET",
+            extra_data=new_dict,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(new_req)
+        session.commit()
+        session.refresh(new_req)
+        return new_req.to_dict()
 
 
+def add_checkout_request(data: dict, db: Optional[Session] = None) -> dict:
+    """Thêm yêu cầu trả phòng vào MySQL."""
+    with _get_session(db) as session:
+        count = session.query(RoomRequest).count()
+        req_num = count + 231
+        req_id = data.get("id") or f"YC-{req_num:04d}"
+        clean_code = req_id.replace("#", "").strip()
+
+        now = datetime.datetime.utcnow()
+        today_str = now.strftime("%d/%m/%Y %H:%M")
+
+        phong_hien_tai = data.get("phong_hien_tai", "")
+        dia_chi_sau_tra = data.get("dia_chi_sau_tra") or data.get("dia_chi_lien_he") or ""
+        dia_chi_chi_tiet = data.get("dia_chi_chi_tiet") or {}
+        if (not dia_chi_chi_tiet or not any(dia_chi_chi_tiet.values())) and dia_chi_sau_tra:
+            parts = [s.strip() for s in dia_chi_sau_tra.split(",") if s.strip()]
+            if len(parts) >= 3:
+                dia_chi_chi_tiet = {
+                    "tinh": parts[-1],
+                    "huyen": parts[-2],
+                    "so_nha": ", ".join(parts[:-2]),
+                }
+            elif len(parts) == 2:
+                dia_chi_chi_tiet = {
+                    "tinh": parts[1],
+                    "huyen": "",
+                    "so_nha": parts[0],
+                }
+            elif len(parts) == 1:
+                dia_chi_chi_tiet = {
+                    "tinh": parts[0],
+                    "huyen": "",
+                    "so_nha": "",
+                }
+
+        clean_msv = (data.get("msv") or "").strip().upper()
+        student = session.query(SinhVien).filter(SinhVien.msv == clean_msv).first() if clean_msv else None
+        user_id = student.ma_nguoi_dung if student else None
+
+        new_dict = {
+            "id": clean_code,
+            "ma_yeu_cau": f"#{clean_code}",
+            "loai_yeu_cau": "Trả phòng",
+            "loai_don": "TRA_PHONG",
+            "msv": clean_msv,
+            "ho_ten": data.get("ho_ten", ""),
+            "gioi_tinh": data.get("gioi_tinh", ""),
+            "khoa": data.get("khoa", ""),
+            "lop": data.get("lop", ""),
+            "vi_tri_hien_tai": data.get("vi_tri_hien_tai", phong_hien_tai),
+            "cong_no": data.get("cong_no", "Chưa thanh toán (Chưa phát hành hóa đơn)"),
+            "ngay_gui": data.get("ngay_gui") or today_str,
+            "phong_lien_quan": phong_hien_tai,
+            "phong_hien_tai": phong_hien_tai,
+            "ly_do": data.get("ly_do", "Trả phòng"),
+            "ngay_mong_muon": data.get("ngay_mong_muon", ""),
+            "dia_chi_sau_tra": dia_chi_sau_tra,
+            "dia_chi_chi_tiet": dia_chi_chi_tiet,
+            "mo_ta": data.get("mo_ta_chi_tiet") or data.get("mo_ta", ""),
+            "trang_thai": "CHO_DUYET",
+            "trang_thai_label": "Chờ duyệt",
+        }
+
+        curr_room_id = _find_room_id(session, phong_hien_tai)
+
+        new_req = RoomRequest(
+            ma_yeu_cau=clean_code,
+            student_id=clean_msv if student else None,
+            user_id=user_id,
+            loai_don="TRA_PHONG",
+            phong_hien_tai_id=curr_room_id,
+            phong_mong_muon_id=None,
+            ly_do=new_dict["ly_do"],
+            trang_thai="CHO_DUYET",
+            extra_data=new_dict,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(new_req)
+        session.commit()
+        session.refresh(new_req)
+        return new_req.to_dict()
+
+
+def get_transfer_checkout_requests(db: Optional[Session] = None) -> List[Dict]:
+    """Lấy danh sách các đơn chuyển phòng và trả phòng từ MySQL."""
+    with _get_session(db) as session:
+        requests = (
+            session.query(RoomRequest)
+            .filter(RoomRequest.loai_don.in_(["CHUYEN_PHONG", "TRA_PHONG"]))
+            .order_by(RoomRequest.id.desc())
+            .all()
+        )
+        return [r.to_dict() for r in requests]

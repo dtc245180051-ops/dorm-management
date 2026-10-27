@@ -15,18 +15,18 @@ function getInitialStudentStatus(studentMsv) {
     return cachedStudentStatusState;
   }
 
-  try {
-    const code = (
-      studentMsv ||
-      localStorage.getItem("ktx_msv") ||
-      localStorage.getItem("ktx_student_msv") ||
-      localStorage.getItem("ktx_username") ||
-      localStorage.getItem("ktx_email")?.split("@")[0] ||
-      ""
-    )
-      .trim()
-      .toLowerCase();
+  const code = (
+    studentMsv ||
+    localStorage.getItem("ktx_msv") ||
+    localStorage.getItem("ktx_student_msv") ||
+    localStorage.getItem("ktx_username") ||
+    localStorage.getItem("ktx_email")?.split("@")[0] ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
 
+  try {
     // 1. Kiểm tra sessionStorage
     const sessionCached = sessionStorage.getItem("ktx_cached_student_status");
     if (sessionCached) {
