@@ -58,19 +58,19 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
         if (parsed?.so_phong || parsed?.phong_hien_tai) {
           return {
             ...parsed,
-            phong_hien_tai: parsed.phong_hien_tai || `P${parsed.so_phong} - ${parsed.toa || "Tòa A1"}`,
-            thanh_vien: parsed.thanh_vien && parsed.thanh_vien !== "3/4 người" ? parsed.thanh_vien : "1/4 người",
-            thoi_gian_luu_tru: parsed.thoi_gian_luu_tru || "19/10/2026 – Nay",
-            so_phong: parsed.so_phong || "P203",
+            phong_hien_tai: parsed.phong_hien_tai || (parsed.so_phong ? `P${parsed.so_phong} - ${parsed.toa || ""}` : "Chưa có phòng nội trú"),
+            thanh_vien: parsed.thanh_vien || "—",
+            thoi_gian_luu_tru: parsed.thoi_gian_luu_tru || "",
+            so_phong: parsed.so_phong || "",
           };
         }
       }
     } catch (_) {}
     return {
-      phong_hien_tai: "P203 - Tòa A1",
-      thanh_vien: "1/4 người",
-      thoi_gian_luu_tru: "19/10/2026 – Nay",
-      so_phong: "P203",
+      phong_hien_tai: "Chưa có phòng nội trú",
+      thanh_vien: "—",
+      thoi_gian_luu_tru: "Chưa ở",
+      so_phong: "",
     };
   });
 
@@ -198,7 +198,7 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
           roomData?.thoi_gian_luu_tru ||
           (assignedRoom.ngay_bat_dau
             ? `${assignedRoom.ngay_bat_dau} – Nay`
-            : "19/10/2026 – Nay");
+            : "");
 
         setCurrentRoomInfo({
           ...assignedRoom,

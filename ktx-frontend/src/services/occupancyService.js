@@ -102,19 +102,19 @@ function getLocalCurrentRoomInfo() {
         (t.trang_thai === "DA_DUYET" || t.trang_thai === "APPROVED" || t.trang_thai_label === "Đã duyệt") &&
         t.loai_don === "CHUYEN_PHONG"
     );
-    if (approvedTransfer && approvedTransfer.xep_phong) {
+    if (approvedTransfer && approvedTransfer.xep_phong && (approvedTransfer.xep_phong.phong_id || approvedTransfer.xep_phong.so_phong)) {
       const xp = approvedTransfer.xep_phong;
-      const rawPhong = String(xp.phong_id || "203");
+      const rawPhong = String(xp.so_phong || xp.phong_id || "");
       const matchNum = rawPhong.match(/\d+/);
-      const roomClean = matchNum ? matchNum[0] : "203";
-      const rawToa = String(xp.ma_toa || "A1").replace("TOA_", "").replace("Tòa ", "").replace("Tòa", "").trim() || "A1";
-      const toaLabel = `Tòa ${rawToa}`;
-      const giuongClean = String(xp.giuong_id || "G01").split("_").pop() || "G01";
-      const tangVal = roomClean[0] || "2";
+      const roomClean = matchNum ? matchNum[0] : rawPhong;
+      const rawToa = String(xp.ten_toa || xp.ma_toa || "").replace("TOA_", "").replace("Tòa ", "").replace("Tòa", "").trim();
+      const toaLabel = rawToa ? `Tòa ${rawToa}` : "";
+      const giuongClean = String(xp.giuong_id || "").split("_").pop() || "";
+      const tangVal = xp.so_tang || (roomClean ? roomClean[0] : "");
       return {
-        phong_hien_tai: `${roomClean} – ${toaLabel}`,
+        phong_hien_tai: roomClean ? `${roomClean}${toaLabel ? ` – ${toaLabel}` : ""}` : "",
         so_phong: roomClean,
-        phong: `P${roomClean}`,
+        phong: roomClean ? `P${roomClean}` : "",
         toa: toaLabel,
         tang: tangVal,
         giuong: giuongClean,
@@ -122,15 +122,11 @@ function getLocalCurrentRoomInfo() {
         so_thanh_vien: 1,
         suc_chua: "4 người",
         thanh_vien: "1/4 người",
-        thoi_gian_luu_tru: `${approvedTransfer.ngay_gui || "19/10/2026"} – Nay`,
-        ngay_nhan_phong: approvedTransfer.ngay_gui || "19/10/2026",
-        ngay_bat_dau: approvedTransfer.ngay_gui || "19/10/2026",
-        loai_phong: "Phòng tiêu chuẩn",
-        billing: {
-          amount: "4.800.000 đ",
-          period: "/năm",
-          status: "Đã thanh toán",
-        },
+        thoi_gian_luu_tru: approvedTransfer.ngay_gui ? `${approvedTransfer.ngay_gui} – Nay` : "",
+        ngay_nhan_phong: approvedTransfer.ngay_gui || "",
+        ngay_bat_dau: approvedTransfer.ngay_gui || "",
+        loai_phong: xp.loai_phong || "Phòng tiêu chuẩn",
+        billing: null,
         danh_sach_thanh_vien: [
           {
             msv: studentMsv || localStorage.getItem("ktx_username") || "",
@@ -140,8 +136,8 @@ function getLocalCurrentRoomInfo() {
             lop: localStorage.getItem("ktx_lop") || "",
             khoa: localStorage.getItem("ktx_khoa") || "",
             so_dien_thoai: localStorage.getItem("ktx_phone") || "",
-            vai_tro: "Bạn (Trưởng phòng)",
-            ngay_vao: approvedTransfer.ngay_gui || "19/10/2026",
+            vai_tro: "Thành viên",
+            ngay_vao: approvedTransfer.ngay_gui || "",
             trang_thai: "DANG_O",
             trang_thai_label: "Đang ở",
             is_current_user: true,
@@ -204,14 +200,14 @@ function saveLocalCurrentRoomInfo(info) {
             acc.currentResidence = {
               ...(acc.currentResidence || {}),
               isActive: true,
-              building: info.toa || acc.currentResidence?.building || "Tòa A1",
-              roomNumber: String(info.so_phong || "203"),
-              floor: info.tang || (String(info.so_phong)[0] || "2"),
-              bed: info.giuong || info.so_giuong || "G01",
-              roomType: info.loai_phong || info.roomType || "Phòng dịch vụ",
-              loai_phong: info.loai_phong || info.roomType || "Phòng dịch vụ",
+              building: info.toa || acc.currentResidence?.building || "",
+              roomNumber: String(info.so_phong || ""),
+              floor: info.tang || (String(info.so_phong)[0] || ""),
+              bed: info.giuong || info.so_giuong || "",
+              roomType: info.loai_phong || info.roomType || "Phòng tiêu chuẩn",
+              loai_phong: info.loai_phong || info.roomType || "Phòng tiêu chuẩn",
               contractStatus: "ACTIVE",
-              startDate: info.ngay_bat_dau || "19/10/2026",
+              startDate: info.ngay_bat_dau || "",
               endDate: info.ngay_ket_thuc || "",
             };
             localStorage.setItem("ktx_student_account", JSON.stringify(acc));

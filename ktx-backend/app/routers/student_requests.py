@@ -515,12 +515,12 @@ def get_current_room(
         )
         if active_contract:
             rent = 4800000
-            if active_contract.tong_tien_thue:
+            if getattr(active_contract, "tong_tien_thue", None):
                 rent = int(active_contract.tong_tien_thue)
-            elif active_contract.don_gia_dinh_ky:
+            elif getattr(active_contract, "don_gia_dinh_ky", None):
                 rent = int(active_contract.don_gia_dinh_ky)
-            elif active_contract.giuong and active_contract.giuong.phong and active_contract.giuong.phong.don_gia:
-                rent = int(active_contract.giuong.phong.don_gia)
+            elif active_contract.giuong and active_contract.giuong.phong and getattr(active_contract.giuong.phong, "gia_tien_nam", None):
+                rent = int(active_contract.giuong.phong.gia_tien_nam)
 
             amt_str = f"{rent:,}".replace(",", ".") + " đ"
             return {
@@ -559,25 +559,25 @@ def get_current_room(
     if transfer_req_dict and transfer_req_dict.get("xep_phong"):
         import re
         xp = transfer_req_dict["xep_phong"]
-        raw_toa = str(xp.get("ma_toa", "A1"))
-        toa_clean = raw_toa.replace("TOA_", "").replace("Tòa ", "").replace("Tòa", "").strip() or "A1"
-        toa_label = f"Tòa {toa_clean}"
-        raw_phong = str(xp.get("phong_id", "203"))
+        raw_toa = str(xp.get("ma_toa", ""))
+        toa_clean = raw_toa.replace("TOA_", "").replace("Tòa ", "").replace("Tòa", "").strip()
+        toa_label = f"Tòa {toa_clean}" if toa_clean else ""
+        raw_phong = str(xp.get("phong_id", "") or xp.get("so_phong", ""))
         match_num = re.search(r"\d+", raw_phong)
-        phong_clean = match_num.group(0) if match_num else "203"
-        raw_giuong = str(xp.get("giuong_id", "G01"))
-        giuong_clean = raw_giuong.split("_")[-1].replace("Giường ", "").strip() or "G01"
-        tang_val = phong_clean[0] if (phong_clean and phong_clean[0].isdigit()) else "2"
-        date_gui = transfer_req.get("ngay_gui", "19/10/2026")
+        phong_clean = match_num.group(0) if match_num else raw_phong
+        raw_giuong = str(xp.get("giuong_id", ""))
+        giuong_clean = raw_giuong.split("_")[-1].replace("Giường ", "").strip()
+        tang_val = str(xp.get("so_tang") or (phong_clean[0] if (phong_clean and phong_clean[0].isdigit()) else ""))
+        date_gui = transfer_req_dict.get("ngay_gui", "")
         if " " in date_gui:
             date_gui = date_gui.split(" ")[0]
 
         stu_record = db.query(SinhVien).filter(SinhVien.msv == target_msv).first()
         user_record = stu_record.nguoi_dung if stu_record else None
-        stu_name = user_record.ho_ten if user_record else (transfer_req.get("ho_ten") or "Sinh viên")
-        stu_phone = user_record.so_dien_thoai if user_record else (transfer_req.get("so_dien_thoai") or "")
-        stu_lop = stu_record.lop if stu_record else (transfer_req.get("lop") or "")
-        stu_khoa = stu_record.khoa if stu_record else (transfer_req.get("khoa") or "")
+        stu_name = user_record.ho_ten if user_record else (transfer_req_dict.get("ho_ten") or "Sinh viên")
+        stu_phone = user_record.so_dien_thoai if user_record else (transfer_req_dict.get("so_dien_thoai") or "")
+        stu_lop = stu_record.lop if stu_record else (transfer_req_dict.get("lop") or "")
+        stu_khoa = stu_record.khoa if stu_record else (transfer_req_dict.get("khoa") or "")
 
         target_phong = db.query(Phong).filter(
             (Phong.so_phong == phong_clean) | (Phong.ma_phong.ilike(f"%{phong_clean}%"))
@@ -585,7 +585,7 @@ def get_current_room(
 
         members_transfer = []
         if target_phong:
-            room_beds = db.query(Giuong).filter(Giuong.ma_phong == target_phong.ma_phong).all()
+            room_beds = db.query(Giuong).filter(Giuong.ma_phong == target_phong.ma_phong).order_by(Giuong.ma_giuong.asc()).all()
             room_contracts = (
                 db.query(HopDong)
                 .options(joinedload(HopDong.sinh_vien).joinedload(SinhVien.nguoi_dung))
@@ -725,8 +725,8 @@ def get_current_room(
     clean_so_phong = str(room.so_phong).replace("P", "").strip() if room.so_phong else ""
     bed_code = bed.ma_giuong.split("_")[-1] if bed.ma_giuong else ""
 
-    # Lấy danh sách thành viên theo giường trong phòng từ DB
-    room_beds = db.query(Giuong).filter(Giuong.ma_phong == room.ma_phong).all()
+    # Lấy danh sách thành viên theo giường trong phòng từ DB (sắp xếp giường từ G01 -> G04)
+    room_beds = db.query(Giuong).filter(Giuong.ma_phong == room.ma_phong).order_by(Giuong.ma_giuong.asc()).all()
     room_contracts = (
         db.query(HopDong)
         .options(joinedload(HopDong.sinh_vien).joinedload(SinhVien.nguoi_dung))
@@ -989,18 +989,19 @@ def get_my_stay_contracts(
         })
 
     # Nếu có yêu cầu chuyển phòng được duyệt, chèn hợp đồng phòng mới lên đầu
-    if transfer_req and transfer_req.get("xep_phong") and not checkout_req:
-        xp = transfer_req["xep_phong"]
-        raw_toa = str(xp.get("ma_toa", "A1"))
-        toa_clean = raw_toa.replace("TOA_", "").replace("Tòa ", "").replace("Tòa", "").strip() or "A1"
-        toa_label = f"Tòa {toa_clean}"
-        raw_phong = str(xp.get("phong_id", "203"))
+    transfer_dict = transfer_req.to_dict() if transfer_req else None
+    if transfer_dict and transfer_dict.get("xep_phong") and not checkout_req:
+        xp = transfer_dict["xep_phong"]
+        raw_toa = str(xp.get("ma_toa", ""))
+        toa_clean = raw_toa.replace("TOA_", "").replace("Tòa ", "").replace("Tòa", "").strip()
+        toa_label = f"Tòa {toa_clean}" if toa_clean else ""
+        raw_phong = str(xp.get("phong_id", "") or xp.get("so_phong", ""))
         match_num = re.search(r"\d+", raw_phong)
-        phong_clean = match_num.group(0) if match_num else "203"
-        raw_giuong = str(xp.get("giuong_id", "G01"))
-        giuong_clean = raw_giuong.split("_")[-1].replace("Giường ", "").strip() or "G01"
-        tang_val = phong_clean[0] if (phong_clean and phong_clean[0].isdigit()) else "2"
-        date_gui = transfer_req.get("ngay_gui", "19/10/2026")
+        phong_clean = match_num.group(0) if match_num else raw_phong
+        raw_giuong = str(xp.get("giuong_id", ""))
+        giuong_clean = raw_giuong.split("_")[-1].replace("Giường ", "").strip()
+        tang_val = str(xp.get("so_tang") or (phong_clean[0] if (phong_clean and phong_clean[0].isdigit()) else ""))
+        date_gui = transfer_dict.get("ngay_gui", "")
         if " " in date_gui:
             date_gui = date_gui.split(" ")[0]
 

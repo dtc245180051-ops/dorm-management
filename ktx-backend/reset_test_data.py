@@ -98,7 +98,7 @@ def reset_test_data():
         db.execute(text("SET FOREIGN_KEY_CHECKS = 1;"))
         db.commit()
 
-        # 5. Dọn dẹp các file JSON store về mảng rỗng []
+        # 5. Dọn dẹp hoàn toàn các file JSON store cũ nếu còn tồn tại
         app_dir = os.path.join(BASE_DIR, "app")
         json_files_to_clean = [
             "data_store_requests.json",
@@ -110,11 +110,11 @@ def reset_test_data():
         ]
         for jf in json_files_to_clean:
             target_path = os.path.join(app_dir, jf)
-            try:
-                with open(target_path, "w", encoding="utf-8") as f:
-                    json.dump([], f, ensure_ascii=False, indent=2)
-            except Exception:
-                pass
+            if os.path.exists(target_path):
+                try:
+                    os.remove(target_path)
+                except Exception:
+                    pass
 
         # In thông báo hoàn tất chuẩn theo yêu cầu
         print("Đã làm sạch dữ liệu sinh viên thành công, sẵn sàng test mới!")

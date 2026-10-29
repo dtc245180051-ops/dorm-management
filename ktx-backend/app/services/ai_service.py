@@ -96,7 +96,8 @@ _persistent_client = httpx.Client(
 
 
 def _call_gemini_models(prompt: str, timeout: float = 8.0) -> Optional[str]:
-    """Gọi Google Gemini API lần lượt qua các model candidates với cơ chế tối ưu kết nối"""
+    """Gọi Google Gemini API lần lượt qua các model candidates với cơ chế tối ưu kết nối và tự phục hồi"""
+    global _persistent_client
     try:
         api_key = settings.get_gemini_api_key(required=True)
     except ValueError as e:
@@ -104,11 +105,11 @@ def _call_gemini_models(prompt: str, timeout: float = 8.0) -> Optional[str]:
         logger.warning(f"Không có GEMINI_API_KEY hợp lệ: {e}")
         return None
 
-    headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
+    # Ưu tiên gemini-3.1-flash-lite tốc độ cao, hạn mức quota lớn và không bị ngốn token bởi reasoning
     model_candidates = [
         "gemini-3.1-flash-lite",
-        "gemini-3-flash-preview",
         "gemini-3.5-flash",
+        "gemini-3-flash-preview",
         "gemini-2.0-flash",
         "gemini-1.5-flash",
     ]
@@ -117,39 +118,63 @@ def _call_gemini_models(prompt: str, timeout: float = 8.0) -> Optional[str]:
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.2,
-            "maxOutputTokens": 450,
+            "maxOutputTokens": 1200,
         },
     }
 
     for model_name in model_candidates:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-        try:
-            res = _persistent_client.post(
-                url,
-                headers=headers,
-                json=body,
-                timeout=timeout,
-            )
-            if res.status_code == 200:
-                payload = res.json()
-                candidates = payload.get("candidates", [])
-                if candidates:
-                    content = candidates[0].get("content", {})
-                    parts = content.get("parts", [])
-                    if parts and "text" in parts[0]:
-                        return parts[0]["text"]
-            else:
-                err_detail = res.text[:200]
-                print(f"⚠️ [Chatbot AI] Gemini ({model_name}) HTTP {res.status_code}: {err_detail}")
-                logger.warning(f"Gemini API ({model_name}) HTTP {res.status_code}: {err_detail}")
-                if res.status_code in (401, 403):
-                    # Key không hợp lệ hoặc thiếu quyền truy cập (ví dụ token AQ. không phải API key AIzaSy)
-                    print("⚠️ [Chatbot AI] API key không hợp lệ (HTTP 401/403). Vui lòng cập nhật API key chuẩn (bắt đầu bằng AIzaSy) vào file .env.")
+        for attempt in range(2):
+            try:
+                res = _persistent_client.post(
+                    url,
+                    headers=headers,
+                    json=body,
+                    timeout=timeout,
+                )
+                if res.status_code == 200:
+                    payload = res.json()
+                    candidates = payload.get("candidates", [])
+                    if candidates:
+                        cand = candidates[0]
+                        finish_reason = cand.get("finishReason")
+                        content = cand.get("content", {})
+                        parts = content.get("parts", [])
+                        if parts and "text" in parts[0]:
+                            text = parts[0]["text"]
+                            # Nếu bị cắt ngang do chạm trần token khi câu chưa hoàn chỉnh, bỏ qua thử model tiếp theo
+                            if finish_reason == "MAX_TOKENS" and (len(text) < 150 or not text.strip().endswith(('.', '!', '?', '"', '”', '\n'))):
+                                logger.warning(f"Gemini {model_name} bị cắt cụt do MAX_TOKENS: {text[-60:]}")
+                                continue
+                            return text
+                elif res.status_code == 503:
+                    # Model bị quá tải tạm thời (Spikes in demand), thử model tiếp theo ngay
+                    logger.warning(f"Gemini model {model_name} quá tải (HTTP 503), chuyển model tiếp theo")
                     break
-        except Exception as e:
-            print(f"❌ [Chatbot AI] Lỗi kết nối Gemini ({model_name}): {e}")
-            logger.warning(f"Lỗi khi gọi Gemini ({model_name}): {e}")
+                elif res.status_code == 429:
+                    # Quota bị giới hạn, lập tức nhảy sang candidate tiếp theo
+                    logger.warning(f"Gemini API ({model_name}) HTTP 429 Quota Exceeded, thử candidate khác...")
+                    break
+                elif res.status_code in (401, 403):
+                    print("⚠️ [Chatbot AI] API key không hợp lệ (HTTP 401/403). Vui lòng cập nhật API key chuẩn vào file .env.")
+                    logger.warning(f"Gemini API ({model_name}) HTTP {res.status_code}: {res.text[:120]}")
+                    break
+                else:
+                    logger.warning(f"Gemini API ({model_name}) HTTP {res.status_code}: {res.text[:120]}")
+                    break
+            except Exception as e:
+                logger.warning(f"Lỗi khi gọi Gemini ({model_name}, lần {attempt + 1}): {e}")
+                # Nếu kết nối bị ngắt do mạng, tái tạo client mới để làm mới socket pool
+                try:
+                    _persistent_client.close()
+                except Exception:
+                    pass
+                _persistent_client = httpx.Client(
+                    timeout=10.0,
+                    limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+                )
     return None
+
 
 
 

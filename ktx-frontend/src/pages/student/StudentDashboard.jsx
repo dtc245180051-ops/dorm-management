@@ -361,41 +361,75 @@ export default function StudentDashboard({ user, onNavigate }) {
         <div
           className="student-stat-card"
           onClick={() => {
-            const rawRoom = currentRoomInfo?.so_phong || "203";
+            if (!currentRoomInfo || !currentRoomInfo.so_phong) {
+              setActiveModal({
+                title: "Danh sách thành viên phòng",
+                desc: "Bạn chưa được xếp phòng",
+                detail: "Hiện tại bạn chưa đăng ký phòng hoặc chưa được xếp phòng nội trú. Vui lòng thực hiện 'Đăng ký phòng' để được xếp phòng và xem danh sách thành viên.",
+              });
+              return;
+            }
+
+            const rawRoom = currentRoomInfo.so_phong || currentRoomInfo.phong || "";
             const cleanRoom = String(rawRoom).replace(/^P/i, "");
-            const rawToa = currentRoomInfo?.toa || "Tòa A1";
-            const roomTitle = `P${cleanRoom} - ${rawToa.startsWith("Tòa") ? rawToa : `Tòa ${rawToa}`}`;
+            const rawToa = currentRoomInfo.toa || "";
+            const roomTitle = `P${cleanRoom}${rawToa ? ` - ${rawToa.startsWith("Tòa") ? rawToa : `Tòa ${rawToa}`}` : ""}`;
             
             const currentMsv = getSafeStudentCode();
             const currentName = (user?.nguoi_dung?.ho_ten || user?.ho_ten || user?.fullName || localStorage.getItem("ktx_fullname") || "Sinh viên").trim();
 
-            const memberList = (currentRoomInfo?.danh_sach_thanh_vien && currentRoomInfo.danh_sach_thanh_vien.length > 0)
-              ? currentRoomInfo.danh_sach_thanh_vien
+            const maxCap = parseInt(String(currentRoomInfo.suc_chua || "4").match(/\d+/)?.[0] || 4, 10);
+            let memberList = (Array.isArray(currentRoomInfo.danh_sach_thanh_vien) && currentRoomInfo.danh_sach_thanh_vien.length > 0)
+              ? [...currentRoomInfo.danh_sach_thanh_vien]
               : [
                   {
                     msv: currentMsv,
                     ho_ten: currentName,
-                    giuong: currentRoomInfo?.giuong || "G01",
-                    so_giuong: currentRoomInfo?.giuong || "G01",
+                    giuong: currentRoomInfo.giuong || currentRoomInfo.so_giuong || "G03",
+                    so_giuong: currentRoomInfo.giuong || currentRoomInfo.so_giuong || "G03",
                     lop: user?.lop || localStorage.getItem("ktx_lop") || "",
                     khoa: user?.khoa || localStorage.getItem("ktx_khoa") || "",
                     so_dien_thoai: user?.so_dien_thoai || localStorage.getItem("ktx_phone") || "",
-                    vai_tro: "Bạn (Trưởng phòng)",
-                    ngay_vao: currentRoomInfo?.ngay_bat_dau || "01/10/2026",
+                    vai_tro: "Thành viên",
+                    ngay_vao: currentRoomInfo.ngay_bat_dau || currentRoomInfo.ngay_nhan_phong || "",
                     trang_thai: "DANG_O",
                     trang_thai_label: "Đang ở",
                     is_current_user: true,
                   },
                 ];
 
+            if (memberList.length < maxCap) {
+              const existingBeds = new Set(memberList.map(m => String(m.giuong || m.so_giuong || "").trim()));
+              for (let i = 1; i <= maxCap; i++) {
+                const bedCode = `G0${i}`;
+                if (!existingBeds.has(bedCode) && !existingBeds.has(`G${i}`)) {
+                  memberList.push({
+                    msv: null,
+                    ho_ten: "Chưa có người ở",
+                    giuong: bedCode,
+                    so_giuong: bedCode,
+                    lop: null,
+                    khoa: null,
+                    so_dien_thoai: null,
+                    vai_tro: "Chỗ trống",
+                    ngay_vao: null,
+                    trang_thai: "TRONG",
+                    trang_thai_label: "Còn trống",
+                    is_empty: true,
+                  });
+                }
+              }
+              memberList.sort((a, b) => String(a.giuong || "").localeCompare(String(b.giuong || "")));
+            }
+
             setActiveModal({
               type: "room_members",
               title: "Danh sách thành viên phòng",
               roomTitle,
-              tang: currentRoomInfo?.tang || "2",
+              tang: currentRoomInfo.tang || "",
               members: memberList,
               so_thanh_vien: memberList.filter(m => !m.is_empty && m.msv).length || 1,
-              suc_chua: currentRoomInfo?.suc_chua || "4 người",
+              suc_chua: currentRoomInfo.suc_chua || `${maxCap} người`,
             });
           }}
         >
@@ -1261,7 +1295,7 @@ export default function StudentDashboard({ user, onNavigate }) {
                   justifyContent: "space-between"
                 }}>
                   <span>* Dữ liệu sinh viên nội trú được xác thực từ KTX</span>
-                  <span>Ngày vào: {currentRoomInfo?.ngay_bat_dau || "19/10/2026"}</span>
+                  <span>Ngày vào: {currentRoomInfo?.ngay_bat_dau || currentRoomInfo?.ngay_nhan_phong || "--/--/----"}</span>
                 </div>
               </div>
             ) : (
