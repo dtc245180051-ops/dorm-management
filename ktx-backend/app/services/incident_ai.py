@@ -173,7 +173,7 @@ def analyze_incident_with_ai(mo_ta: str, phong: Optional[str] = "") -> Dict[str,
     )
 
     headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
-    model_candidates = ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-1.5-flash"]
+    model_candidates = ["gemini-3.1-flash-lite", "gemini-3-flash-preview", "gemini-3.5-flash"]
     last_error_reason: Optional[str] = None
     res = None
 
@@ -379,7 +379,7 @@ def generate_daily_incident_summary(incidents_today: List[Dict[str, Any]]) -> st
 
         # 3. Gửi request đến Gemini API với header xác thực và hỗ trợ các phiên bản model mới
         headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
-        model_candidates = ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-1.5-flash"]
+        model_candidates = ["gemini-3-flash-preview", "gemini-3.5-flash", "gemini-3.1-flash-lite"]
         res = None
 
         for model_name in model_candidates:

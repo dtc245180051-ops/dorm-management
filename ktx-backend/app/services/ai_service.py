@@ -74,8 +74,14 @@ def _extract_json_from_text(raw_text: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _call_gemini_models(prompt: str, timeout: float = 12.0) -> Optional[str]:
-    """Gọi Google Gemini API lần lượt qua các model candidates"""
+_persistent_client = httpx.Client(
+    timeout=10.0,
+    limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+)
+
+
+def _call_gemini_models(prompt: str, timeout: float = 8.0) -> Optional[str]:
+    """Gọi Google Gemini API lần lượt qua các model candidates với cơ chế tối ưu kết nối"""
     try:
         api_key = settings.get_gemini_api_key(required=True)
     except ValueError as e:
@@ -83,15 +89,23 @@ def _call_gemini_models(prompt: str, timeout: float = 12.0) -> Optional[str]:
         return None
 
     headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
-    model_candidates = ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-1.5-flash"]
+    model_candidates = ["gemini-3.1-flash-lite", "gemini-3-flash-preview", "gemini-3.5-flash"]
+
+    body = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": 450,
+        },
+    }
 
     for model_name in model_candidates:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         try:
-            res = httpx.post(
+            res = _persistent_client.post(
                 url,
                 headers=headers,
-                json={"contents": [{"parts": [{"text": prompt}]}]},
+                json=body,
                 timeout=timeout,
             )
             if res.status_code == 200:
@@ -332,7 +346,9 @@ def chat_regulation_with_ai(user_message: str, conversation_history: list = None
 
         reply = _call_gemini_models(prompt, timeout=15.0)
         if reply and len(reply.strip()) > 5:
-            return {"reply": reply.strip(), "source": "gemini"}
+            # Chuẩn hóa gạch đầu dòng: Chuyển các dấu sao (*) đầu dòng thành gạch ngang (-) chuẩn theo Prompt V3
+            formatted_reply = re.sub(r'(?m)^(\s*)\*(\s+)', r'\1- ', reply)
+            return {"reply": formatted_reply.strip(), "source": "gemini"}
     except Exception as e:
         logger.warning(f"Lỗi khi gọi Gemini Chatbot: {e}")
 
