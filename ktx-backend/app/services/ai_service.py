@@ -105,6 +105,8 @@ def _call_gemini_models(prompt: str, timeout: float = 8.0) -> Optional[str]:
         logger.warning(f"Không có GEMINI_API_KEY hợp lệ: {e}")
         return None
 
+    headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
+
     # Ưu tiên gemini-3.1-flash-lite tốc độ cao, hạn mức quota lớn và không bị ngốn token bởi reasoning
     model_candidates = [
         "gemini-3.1-flash-lite",
