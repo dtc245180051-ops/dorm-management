@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ChevronLeft,
   ChevronDown,
@@ -6,9 +6,13 @@ import {
   CheckCircle2,
   AlertTriangle,
   X,
+  Sparkles,
+  Bot,
+  Wand2,
 } from 'lucide-react';
 import AdminLayout from '../../layouts/Admin';
 import occupancyService from '../../services/occupancyService';
+import { matchRoomWithGemini } from '../../services/geminiService';
 import ProcessCheckoutPage from './ProcessCheckoutPage';
 
 export default function ProcessTransferPage({
@@ -26,6 +30,10 @@ export default function ProcessTransferPage({
   const [selectedRoom, setSelectedRoom] = useState('A203');
   const [selectedBed, setSelectedBed] = useState('G04');
 
+  // Trạng thái AI gợi ý xếp phòng
+  const [aiRecommendation, setAiRecommendation] = useState(null);
+  const [isAiMatching, setIsAiMatching] = useState(false);
+
   // Modal từ chối
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -41,6 +49,117 @@ export default function ProcessTransferPage({
     }, 3000);
   };
 
+  // Hàm chạy AI gợi ý xếp phòng thông minh
+  const runAiSuggestion = useCallback(async (detail, tree) => {
+    if (!detail || !tree || tree.length === 0) return;
+
+    setIsAiMatching(true);
+    try {
+      const rawTarget =
+        detail?.phong_dich ||
+        detail?.phong_mong_muon ||
+        (detail?.phong_lien_quan && detail.phong_lien_quan.includes('→')
+          ? detail.phong_lien_quan.split('→')[1]
+          : '') ||
+        '';
+
+      const candidateRooms = tree.flatMap((building) =>
+        (building.rooms || [])
+          .filter((room) => (room.beds || []).length > 0)
+          .map((room) => {
+            const beds = room.beds || [];
+            const roomGender = String(room.gioi_tinh || building.gioi_tinh || '');
+            return {
+              ...room,
+              ten_phong: `Phòng ${room.so_phong || room.ma_phong}`,
+              toa: building.ten_toa || `Tòa ${building.ma_toa}`,
+              gioi_tinh: roomGender,
+              loai_phong: room.loai_phong || 'Phòng tiêu chuẩn',
+              so_tang: room.so_tang || 1,
+              danh_sach_giuong: beds.map((bed) => ({
+                ...bed,
+                da_co_nguoi: false,
+              })),
+            };
+          })
+      );
+
+      const studentPayload = {
+        ...detail,
+        gioi_tinh: detail?.gioi_tinh || 'Nữ',
+        phong_mong_muon: rawTarget,
+        nguyen_vong: rawTarget,
+        noi_dung_nguyen_vong: rawTarget,
+        mo_ta: detail?.mo_ta || detail?.ly_do || '',
+      };
+
+      const result = await matchRoomWithGemini(studentPayload, candidateRooms);
+      setAiRecommendation(result);
+
+      // Tự động chọn Tòa, Phòng, Giường theo kết quả AI
+      if (result?.suggestion || result?.best_room_id) {
+        const recToa = String(result?.toa || result?.suggestion?.ma_toa || '').trim().toLowerCase();
+        const recRoom = String(result?.best_room_id || result?.suggestion?.ma_phong || '').trim().toLowerCase();
+        const recBed = String(result?.giuong || result?.suggestion?.ma_giuong || '').trim().toLowerCase();
+
+        // 1. Tìm Tòa
+        const matchedBld =
+          tree.find((b) => {
+            const bMa = String(b.ma_toa || '').toLowerCase();
+            const bTen = String(b.ten_toa || '').toLowerCase();
+            return (
+              recToa === bMa ||
+              recToa === bTen ||
+              recToa.includes(bMa) ||
+              bTen.includes(recToa) ||
+              (recToa.includes('a1') && (bMa.includes('a1') || bTen.includes('a1'))) ||
+              (recToa.includes('b') && (bMa.includes('b') || bTen.includes('b')))
+            );
+          }) || tree[0];
+
+        if (matchedBld) {
+          setSelectedBuilding(matchedBld.ma_toa);
+          const bldRooms = matchedBld.rooms || [];
+
+          // 2. Tìm Phòng
+          const roomToken = recRoom.replace(/^phòng\s*/i, '').replace(/^p/i, '').trim();
+          const matchedRm =
+            bldRooms.find((r) => {
+              const rMa = String(r.ma_phong || '').toLowerCase();
+              const rSo = String(r.so_phong || '').toLowerCase();
+              return (
+                rMa === recRoom ||
+                rSo === roomToken ||
+                rMa.includes(roomToken) ||
+                recRoom.includes(rSo)
+              );
+            }) || bldRooms[0];
+
+          if (matchedRm) {
+            setSelectedRoom(matchedRm.ma_phong);
+            const rmBeds = matchedRm.beds || [];
+
+            // 3. Tìm Giường
+            const bedToken = recBed.split('_').pop().replace(/^giường\s*/i, '').trim();
+            const matchedB =
+              rmBeds.find((b) => {
+                const bMa = String(b.ma_giuong || '').toLowerCase();
+                return bMa === recBed || bMa.includes(bedToken);
+              }) || rmBeds[0];
+
+            if (matchedB) {
+              setSelectedBed(matchedB.ma_giuong);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Lỗi chạy AI xếp phòng chuyển đổi:', err);
+    } finally {
+      setIsAiMatching(false);
+    }
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -50,78 +169,31 @@ export default function ProcessTransferPage({
           occupancyService.getAvailableBeds(),
         ]);
 
+        // Luôn đồng bộ phòng hiện tại từ API thực tế nếu có
+        try {
+          const msv = detail?.msv || detail?.ma_sinh_vien;
+          if (msv) {
+            const currentRoomRes = await occupancyService.getCurrentRoomInfo(msv);
+            if (currentRoomRes?.data) {
+              const p = currentRoomRes.data.phong || `Phòng P${currentRoomRes.data.so_phong}`;
+              const t = currentRoomRes.data.toa || '';
+              const g = currentRoomRes.data.giuong || currentRoomRes.data.so_giuong || '';
+              detail.vi_tri_hien_tai = `${p} - ${t} - Giường ${g}`;
+              detail.phong_hien_tai = `${p} (${t})`;
+            }
+          }
+        } catch (syncErr) {
+          console.warn('Không thể đồng bộ phòng hiện tại realtime:', syncErr);
+        }
+
         setRequestData(detail);
 
         const tree = Array.isArray(bedsData) && bedsData.length > 0 ? bedsData : [];
         setBuildingTree(tree);
 
-        // Khớp Tòa - Phòng - Giường theo đúng nguyện vọng chuyển của sinh viên
+        // Khởi động AI gợi ý xếp phòng ngay khi tải dữ liệu
         if (tree.length > 0) {
-          const extractRoomDigits = (str = "") => {
-            const m = String(str).match(/\d+/);
-            return m ? m[0] : "";
-          };
-
-          const rawTarget =
-            detail?.phong_dich ||
-            detail?.phong_mong_muon ||
-            (detail?.phong_lien_quan && detail.phong_lien_quan.includes("→")
-              ? detail.phong_lien_quan.split("→")[1]
-              : "") ||
-            "";
-
-          const targetDigits = extractRoomDigits(rawTarget);
-
-          // Trích xuất gợi ý tòa từ vị trí hiện tại hoặc nguyện vọng
-          const viTri = detail?.vi_tri_hien_tai || "";
-          const toaMatch = viTri.match(/Tòa\s+([A-Za-z0-9]+)/i);
-          const currentBuildingCode = toaMatch ? toaMatch[1].toUpperCase() : "";
-
-          let matchedBuilding = null;
-          let matchedRoom = null;
-
-          if (targetDigits) {
-            for (const bld of tree) {
-              const bldCode = String(bld.ma_toa || "").toUpperCase();
-              const rm = (bld.rooms || []).find((r) => {
-                const rDigits = extractRoomDigits(r.so_phong || r.ma_phong);
-                return rDigits === targetDigits;
-              });
-              if (rm) {
-                if (!matchedBuilding || (currentBuildingCode && bldCode.includes(currentBuildingCode))) {
-                  matchedBuilding = bld;
-                  matchedRoom = rm;
-                  if (currentBuildingCode && bldCode.includes(currentBuildingCode)) {
-                    break;
-                  }
-                }
-              }
-            }
-          }
-
-          if (!matchedBuilding) {
-            matchedBuilding =
-              tree.find((b) => currentBuildingCode && String(b.ma_toa).toUpperCase().includes(currentBuildingCode)) ||
-              tree[0];
-          }
-
-          setSelectedBuilding(matchedBuilding.ma_toa);
-
-          const rooms = matchedBuilding.rooms || [];
-          if (rooms.length > 0) {
-            const finalRoom = matchedRoom || rooms[0];
-            setSelectedRoom(finalRoom.ma_phong);
-
-            const beds = finalRoom.beds || [];
-            if (beds.length > 0) {
-              setSelectedBed(beds[0].ma_giuong);
-            } else {
-              setSelectedBed("");
-            }
-          } else {
-            setSelectedRoom("");
-            setSelectedBed("");
-          }
+          await runAiSuggestion(detail, tree);
         }
       } catch (err) {
         console.error('Error fetching transfer request detail:', err);
@@ -132,7 +204,7 @@ export default function ProcessTransferPage({
     };
 
     fetchData();
-  }, [requestId]);
+  }, [requestId, runAiSuggestion]);
 
   // Cập nhật khi chọn Tòa khác
   const handleBuildingChange = (toaCode) => {
@@ -364,9 +436,67 @@ export default function ProcessTransferPage({
 
             {/* 3. CHUYỂN TỚI */}
             <div className="mb-8">
-              <h3 className="text-base font-bold text-slate-900 mb-3 select-none">
-                Chuyển tới
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2.5">
+                  <h3 className="text-base font-bold text-slate-900 select-none">
+                    Chuyển tới
+                  </h3>
+                  {aiRecommendation && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100/80 text-blue-700 border border-blue-200">
+                      <Sparkles className="w-3 h-3 text-blue-600" />
+                      AI Đề xuất {aiRecommendation.match_score ? `(${aiRecommendation.match_score}% phù hợp)` : ''}
+                    </span>
+                  )}
+                </div>
+
+                {/* Nút AI gợi ý xếp phòng */}
+                <button
+                  type="button"
+                  onClick={() => runAiSuggestion(requestData, buildingTree)}
+                  disabled={isAiMatching || buildingTree.length === 0}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-xs hover:shadow transition disabled:opacity-50 cursor-pointer"
+                  title="Nhờ AI tự động phân tích nguyện vọng và xếp phòng tối ưu"
+                >
+                  {isAiMatching ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Đang phân tích...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                      <span>AI gợi ý xếp phòng</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Banner hiển thị lý do & gợi ý của AI */}
+              {aiRecommendation?.ai_reason && (
+                <div className="mb-4 p-3.5 rounded-xl bg-linear-to-r from-blue-50/90 via-indigo-50/70 to-blue-50/90 border border-blue-200/90 shadow-2xs animate-in fade-in">
+                  <div className="flex items-start gap-2.5">
+                    <div className="p-1.5 bg-blue-600 text-white rounded-lg shadow-2xs shrink-0 mt-0.5">
+                      <Sparkles className="w-4 h-4 text-yellow-300" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-blue-950 uppercase tracking-wide">
+                          AI Gợi ý xếp phòng thông minh
+                        </span>
+                        {aiRecommendation?.match_score && (
+                          <span className="text-[11px] font-semibold text-blue-700 bg-white/90 px-2 py-0.5 rounded-md border border-blue-200 shadow-2xs">
+                            Độ phù hợp: {aiRecommendation.match_score}%
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-blue-900 mt-1 leading-relaxed">
+                        {aiRecommendation.ai_reason}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Dropdown Tòa */}
                 <div className="relative flex items-center bg-white border border-slate-200 rounded-lg px-4 py-2.5 shadow-2xs">

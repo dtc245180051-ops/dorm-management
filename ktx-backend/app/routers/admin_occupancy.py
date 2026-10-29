@@ -125,6 +125,49 @@ def get_request_detail(
             except Exception:
                 pass
 
+        # Đồng bộ vị trí phòng hiện tại thực tế cho đơn chuyển/trả phòng
+        is_transfer_or_checkout = stored.get("loai_don") in ("CHUYEN_PHONG", "TRA_PHONG") or stored.get("loai_yeu_cau") in ("Chuyển phòng", "Trả phòng")
+        if is_transfer_or_checkout and msv:
+            cur_location = None
+            cur_short = None
+
+            # 1. Tra cứu hợp đồng ACTIVE
+            active_c = db.query(HopDong).filter(HopDong.msv == msv, HopDong.trang_thai == "ACTIVE").first()
+            if active_c and active_c.giuong and active_c.giuong.phong:
+                p = active_c.giuong.phong
+                t = p.tang.toa_nha if p.tang else None
+                b_name = t.ten_toa if t else (f"Tòa {p.tang.ma_toa}" if p.tang and p.tang.ma_toa else "KTX")
+                g_code = active_c.giuong.ma_giuong.split("_")[-1] if active_c.giuong.ma_giuong else ""
+                cur_location = f"Phòng P{p.so_phong} - {b_name} - Giường {g_code}"
+                cur_short = f"P{p.so_phong} ({b_name})"
+            else:
+                # 2. Hoặc kiểm tra đơn chuyển phòng gần nhất đã duyệt
+                prev_transfer = (
+                    db.query(RoomRequest)
+                    .filter(
+                        RoomRequest.student_id == msv,
+                        RoomRequest.loai_don == "CHUYEN_PHONG",
+                        RoomRequest.trang_thai.in_(["DA_DUYET", "APPROVED"]),
+                        RoomRequest.id != stored.get("id"),
+                        RoomRequest.ma_yeu_cau != stored.get("ma_yeu_cau"),
+                    )
+                    .order_by(RoomRequest.id.desc())
+                    .first()
+                )
+                if prev_transfer and prev_transfer.extra_data and prev_transfer.extra_data.get("xep_phong"):
+                    xp = prev_transfer.extra_data["xep_phong"]
+                    raw_toa = str(xp.get("ma_toa", "")).replace("TOA_", "").replace("Tòa ", "").strip()
+                    raw_phong = str(xp.get("phong_id", "") or xp.get("so_phong", ""))
+                    match_num = re.search(r"\d+", raw_phong)
+                    p_clean = match_num.group(0) if match_num else raw_phong
+                    raw_giuong = str(xp.get("giuong_id", "")).split("_")[-1].replace("Giường ", "").strip()
+                    cur_location = f"Phòng P{p_clean} - Tòa {raw_toa} - Giường {raw_giuong}"
+                    cur_short = f"P{p_clean} (Tòa {raw_toa})"
+
+            if cur_location:
+                stored["vi_tri_hien_tai"] = cur_location
+                stored["phong_hien_tai"] = cur_short
+
         # Tự động cập nhật hoặc sửa gợi ý nếu gợi ý chưa khớp giới tính
         raw_gender = stored.get("gioi_tinh") or stored.get("gender") or "Nam"
         s_lower = str(raw_gender).strip().lower()
@@ -139,23 +182,49 @@ def get_request_detail(
             stored["message"] = not_found_msg
             stored["suggestion_error"] = not_found_msg
         else:
-            # Phân tích nguyện vọng tự do về tầng cao / thấp
+            # Phân tích nguyện vọng tự do về tầng cao / thấp & phòng / tòa mong muốn
             raw_wish = (
                 (stored.get("tang_mong_muon") or "") + " " +
                 (stored.get("nguyen_vong") or "") + " " +
                 (stored.get("noi_dung_nguyen_vong") or "") + " " +
-                (stored.get("nguyen_vong_label") or "")
+                (stored.get("nguyen_vong_label") or "") + " " +
+                (stored.get("phong_dich") or "") + " " +
+                (stored.get("phong_mong_muon") or "") + " " +
+                (stored.get("mo_ta") or "") + " " +
+                (stored.get("ly_do") or "")
             ).lower()
             wants_high = any(k in raw_wish for k in ["tầng cao", "trên cao", "lầu cao", "ở cao", "tầng 4", "tầng 5", "tầng trên"])
             wants_low = any(k in raw_wish for k in ["tầng thấp", "ở dưới", "tầng 1", "tầng trệt", "tầng dưới"])
 
+            # Trích xuất số phòng và tòa nếu có nguyện vọng chuyển phòng cụ thể
+            target_room_match = re.search(r"(?:phòng|p)\s*(\d+)", raw_wish)
+            target_room_digits = target_room_match.group(1) if target_room_match else None
+            target_toa_match = re.search(r"tòa\s*([a-z0-9]+)", raw_wish)
+            target_toa_code = target_toa_match.group(1).upper() if target_toa_match else None
+
+            def score_room(r):
+                score = 0
+                r_digits = re.search(r"\d+", r.so_phong or r.ma_phong or "")
+                r_num = r_digits.group(0) if r_digits else ""
+                r_toa = (r.ten_toa or r.ma_toa or "").upper()
+                
+                # Khớp đúng số phòng
+                if target_room_digits and target_room_digits == r_num:
+                    score += 50
+                # Khớp đúng tòa nhà
+                if target_toa_code and target_toa_code in r_toa:
+                    score += 50
+                
+                # Tầng cao / thấp
+                floor = r.so_tang or 1
+                if wants_high:
+                    score += floor * 2
+                elif wants_low:
+                    score += (6 - floor) * 2
+                return score
+
             sorted_rooms = list(available_rooms)
-            if wants_high:
-                # Sắp xếp tầng cao nhất lên đầu
-                sorted_rooms.sort(key=lambda r: (r.so_tang or 1), reverse=True)
-            elif wants_low:
-                # Sắp xếp tầng thấp nhất lên đầu
-                sorted_rooms.sort(key=lambda r: (r.so_tang or 1))
+            sorted_rooms.sort(key=score_room, reverse=True)
 
             # Lọc theo đúng loại phòng mong muốn (Room Type Constraint)
             pref_type = (stored.get("loai_phong") or "").strip()
@@ -189,6 +258,10 @@ def get_request_detail(
                 stored["is_room_type_mismatch"] = False
                 stored["message"] = None
                 stored["suggestion_error"] = None
+                stored["ai_reason"] = (
+                    f"Đề xuất xếp vào phòng {matched_r.so_phong or matched_r.ma_phong} ({matched_r.ten_toa or matched_r.ma_toa}) "
+                    f"vì phù hợp với nguyện vọng của sinh viên và đúng giới tính {student_gender}."
+                )
         return stored
 
     # 2. Tìm kiếm sinh viên từ CSDL theo MSV
@@ -401,6 +474,28 @@ def approve_request(
         )
         db.add(student)
         db.flush()
+    else:
+        # Cập nhật các trường còn thiếu từ đơn đăng ký cho sinh viên đã có tài khoản
+        if registration.get("cccd") and not student.cccd:
+            student.cccd = registration.get("cccd")
+        if registration.get("ngay_sinh") and not student.ngay_sinh:
+            student.ngay_sinh = registration.get("ngay_sinh")
+        if registration.get("dia_chi") and not student.dia_chi:
+            student.dia_chi = registration.get("dia_chi")
+        if registration.get("doi_tuong_uu_tien") and (not student.doi_tuong_uu_tien or student.doi_tuong_uu_tien == "Không thuộc diện ưu tiên"):
+            student.doi_tuong_uu_tien = registration.get("doi_tuong_uu_tien")
+        if registration.get("nguoi_giam_ho") and not student.nguoi_giam_ho:
+            student.nguoi_giam_ho = registration.get("nguoi_giam_ho")
+        if registration.get("sdt_nguoi_giam_ho") and not student.sdt_nguoi_giam_ho:
+            student.sdt_nguoi_giam_ho = registration.get("sdt_nguoi_giam_ho")
+        if registration.get("moi_quan_he") and not student.moi_quan_he:
+            student.moi_quan_he = registration.get("moi_quan_he")
+        if student.nguoi_dung and registration.get("so_dien_thoai") and not student.nguoi_dung.so_dien_thoai:
+            student.nguoi_dung.so_dien_thoai = registration.get("so_dien_thoai")
+        if not student.que_quan and student.dia_chi:
+            parts = [p.strip() for p in student.dia_chi.split(",") if p.strip()]
+            if parts:
+                student.que_quan = parts[-1]
 
     existing_contract = (
         db.query(HopDong)
@@ -644,14 +739,125 @@ def approve_transfer_request(
     db: Session = Depends(get_db),
 ):
     clean_id = request_id.strip()
+    req_item = occupancy_request_store.get_request_by_id(clean_id, db=db)
+    if not req_item:
+        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu chuyển phòng")
+
+    clean_msv = (payload.msv or req_item.get("msv") or "").strip().upper()
+
+    # 1. Tìm hoặc đảm bảo Tòa nhà, Tầng, Phòng, Giường mới tồn tại
+    raw_toa = (payload.ma_toa or "A1").strip().upper()
+    m_toa = re.search(r"([A-Za-z]+\d*)", raw_toa)
+    toa_code = m_toa.group(1).upper() if m_toa else raw_toa
+
+    toa = db.query(ToaNha).filter((ToaNha.ma_toa == toa_code) | (ToaNha.ten_toa.ilike(f"%{toa_code}%"))).first()
+    if not toa:
+        toa = ToaNha(ma_toa=toa_code[:20], ten_toa=f"Tòa {toa_code}"[:50], so_tang=5)
+        db.add(toa)
+        db.flush()
+
+    raw_phong = payload.phong_id.strip()
+    digits = re.findall(r"\d+", raw_phong)
+    so_p = digits[0] if digits else raw_phong.replace("Phòng ", "").replace("P", "").strip()
+    floor_num = int(so_p[0]) if (so_p and so_p[0].isdigit()) else 1
+
+    tang_code = f"{toa.ma_toa}_T{floor_num}"[:20]
+    tang = (
+        db.query(Tang).filter(Tang.ma_tang == tang_code).first()
+        or db.query(Tang).filter((Tang.ma_toa == toa.ma_toa) & (Tang.so_tang == floor_num)).first()
+    )
+    if not tang:
+        tang = Tang(ma_tang=tang_code, so_tang=floor_num, ma_toa=toa.ma_toa)
+        db.add(tang)
+        db.flush()
+
+    phong = (
+        db.query(Phong).filter(Phong.ma_phong == raw_phong).first()
+        or db.query(Phong).filter((Phong.ma_tang == tang.ma_tang) & (Phong.so_phong == so_p)).first()
+        or db.query(Phong).filter(Phong.ma_phong.endswith(f"P{so_p}")).first()
+    )
+    if not phong:
+        phong = Phong(
+            ma_phong=raw_phong[:20],
+            so_phong=so_p[:20],
+            suc_chua=4,
+            loai_phong="TIÊU CHUẨN",
+            gia_tien_nam=6600000.0,
+            ma_tang=tang.ma_tang,
+        )
+        db.add(phong)
+        db.flush()
+
+    raw_giuong = payload.giuong_id.strip()
+    giuong_code = raw_giuong[:20]
+    bed = (
+        db.query(Giuong).filter(Giuong.ma_giuong == giuong_code).first()
+        or db.query(Giuong).filter(Giuong.ma_giuong.endswith(giuong_code)).first()
+        or db.query(Giuong).filter(
+            Giuong.ma_phong == phong.ma_phong,
+            Giuong.trang_thai == "TRONG",
+        ).first()
+    )
+    if not bed:
+        bed = Giuong(
+            ma_giuong=giuong_code,
+            trang_thai="DA_CO_NGUOI",
+            ma_phong=phong.ma_phong,
+        )
+        db.add(bed)
+        db.flush()
+    else:
+        bed.trang_thai = "DA_CO_NGUOI"
+        if bed.ma_phong != phong.ma_phong:
+            bed.ma_phong = phong.ma_phong
+
+    # 2. Giải phóng giường cũ của sinh viên nếu có và cập nhật hợp đồng
+    active_contract = (
+        db.query(HopDong)
+        .filter(HopDong.msv == clean_msv, HopDong.trang_thai == "ACTIVE")
+        .first()
+    )
+    if active_contract:
+        if active_contract.ma_giuong and active_contract.ma_giuong != bed.ma_giuong:
+            old_bed = db.query(Giuong).filter(Giuong.ma_giuong == active_contract.ma_giuong).first()
+            if old_bed:
+                old_bed.trang_thai = "TRONG"
+        active_contract.ma_giuong = bed.ma_giuong
+        active_contract.updated_at = datetime.datetime.now()
+    else:
+        yy = datetime.date.today().strftime("%y")
+        clean_g = bed.ma_giuong.split("_")[-1] if "_" in bed.ma_giuong else bed.ma_giuong
+        clean_g = re.sub(r"^(?:giường\s*|g)", "", clean_g, flags=re.IGNORECASE)
+        contract_code = f"HD{yy}-{toa.ma_toa}{so_p}-G{clean_g}"[:20]
+        if db.query(HopDong).filter(HopDong.ma_hop_dong == contract_code).first():
+            contract_code = f"HD{yy}-{clean_msv[:6]}-{clean_g}"[:20]
+        new_c = HopDong(
+            ma_hop_dong=contract_code,
+            msv=clean_msv,
+            ma_giuong=bed.ma_giuong,
+            ngay_bat_dau=datetime.date.today(),
+            ngay_ket_thuc=datetime.date.today() + datetime.timedelta(days=365),
+            trang_thai="ACTIVE",
+            gia_thue=phong.gia_tien_nam / 12 if phong.gia_tien_nam else 550000.0,
+            tien_coc=1000000.0,
+        )
+        db.add(new_c)
+
+    # 3. Cập nhật RoomRequest sang DA_DUYET
+    xep_phong_dict = payload.model_dump()
+    actual_toa_code = phong.tang.toa_nha.ma_toa if (phong.tang and phong.tang.toa_nha) else toa.ma_toa
+    xep_phong_dict["ma_toa"] = actual_toa_code
+    xep_phong_dict["phong_id"] = phong.ma_phong
+    xep_phong_dict["giuong_id"] = bed.ma_giuong
+
     updated = occupancy_request_store.update_request_status(
         clean_id,
         "DA_DUYET",
-        {"xep_phong": payload.model_dump()},
+        {"xep_phong": xep_phong_dict},
         db=db,
     )
-    if not updated:
-        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu chuyển phòng")
+    db.commit()
+
     return {
         "status": "success",
         "message": "Phê duyệt yêu cầu chuyển phòng thành công",
@@ -693,13 +899,31 @@ def approve_checkout_request(
     db: Session = Depends(get_db),
 ):
     clean_id = request_id.strip()
+    req_item = occupancy_request_store.get_request_by_id(clean_id, db=db)
+    if not req_item:
+        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu trả phòng")
+
+    clean_msv = (req_item.get("msv") or "").strip().upper()
+    active_contract = (
+        db.query(HopDong)
+        .filter(HopDong.msv == clean_msv, HopDong.trang_thai == "ACTIVE")
+        .first()
+    )
+    if active_contract:
+        if active_contract.ma_giuong:
+            old_bed = db.query(Giuong).filter(Giuong.ma_giuong == active_contract.ma_giuong).first()
+            if old_bed:
+                old_bed.trang_thai = "TRONG"
+        active_contract.trang_thai = "TERMINATED"
+        active_contract.updated_at = datetime.datetime.now()
+
     updated = occupancy_request_store.update_request_status(
         clean_id,
         "DA_DUYET",
         db=db,
     )
-    if not updated:
-        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu trả phòng")
+    db.commit()
+
     return {
         "status": "success",
         "message": "Phê duyệt yêu cầu trả phòng thành công",

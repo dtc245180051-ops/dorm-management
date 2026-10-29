@@ -38,6 +38,8 @@ export default function Header({
       adminNotificationService.syncFromSystem().then(handleUpdate);
     };
     window.addEventListener("occupancy-updated", handleExternalSync);
+    window.addEventListener("ktx-violation-explanation-updated", handleExternalSync);
+    window.addEventListener("ktx-notifications-updated", handleExternalSync);
 
     const intervalId = setInterval(handleExternalSync, 30000);
 
@@ -46,6 +48,8 @@ export default function Header({
       window.removeEventListener("admin-notifications-updated", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
       window.removeEventListener("occupancy-updated", handleExternalSync);
+      window.removeEventListener("ktx-violation-explanation-updated", handleExternalSync);
+      window.removeEventListener("ktx-notifications-updated", handleExternalSync);
     };
   }, []);
 
@@ -75,7 +79,12 @@ export default function Header({
       window.history.pushState({}, "", url);
       window.dispatchEvent(new PopStateEvent("popstate"));
       window.dispatchEvent(
-        new CustomEvent("student-navigate", { detail: { path: url } })
+        new CustomEvent("student-navigate", {
+          detail: {
+            path: url,
+            entityId: item.metadata?.violationId || item.deepLink?.entityId,
+          },
+        })
       );
     }
   };
@@ -91,7 +100,12 @@ export default function Header({
       window.history.pushState({}, "", item.deepLink.targetUrl);
       window.dispatchEvent(new PopStateEvent("popstate"));
       window.dispatchEvent(
-        new CustomEvent("student-navigate", { detail: { path: item.deepLink.targetUrl } })
+        new CustomEvent("student-navigate", {
+          detail: {
+            path: item.deepLink.targetUrl,
+            entityId: item.metadata?.violationId || item.deepLink?.entityId,
+          },
+        })
       );
     }
   };

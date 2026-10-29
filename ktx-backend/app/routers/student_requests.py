@@ -559,9 +559,6 @@ def get_current_room(
     if transfer_req_dict and transfer_req_dict.get("xep_phong"):
         import re
         xp = transfer_req_dict["xep_phong"]
-        raw_toa = str(xp.get("ma_toa", ""))
-        toa_clean = raw_toa.replace("TOA_", "").replace("Tòa ", "").replace("Tòa", "").strip()
-        toa_label = f"Tòa {toa_clean}" if toa_clean else ""
         raw_phong = str(xp.get("phong_id", "") or xp.get("so_phong", ""))
         match_num = re.search(r"\d+", raw_phong)
         phong_clean = match_num.group(0) if match_num else raw_phong
@@ -579,9 +576,37 @@ def get_current_room(
         stu_lop = stu_record.lop if stu_record else (transfer_req_dict.get("lop") or "")
         stu_khoa = stu_record.khoa if stu_record else (transfer_req_dict.get("khoa") or "")
 
-        target_phong = db.query(Phong).filter(
-            (Phong.so_phong == phong_clean) | (Phong.ma_phong.ilike(f"%{phong_clean}%"))
-        ).first()
+        # Ưu tiên tìm phòng theo mã phòng chính xác (phong_id), tránh bị nhận nhầm số phòng 101 sang Tòa B
+        target_phong = None
+        raw_phong_id = str(xp.get("phong_id", "")).strip()
+        if raw_phong_id:
+            target_phong = db.query(Phong).filter(Phong.ma_phong == raw_phong_id).first()
+
+        raw_toa = str(xp.get("ma_toa", ""))
+        toa_clean = raw_toa.replace("TOA_", "").replace("Tòa ", "").replace("Tòa", "").strip()
+
+        if not target_phong and toa_clean:
+            target_phong = (
+                db.query(Phong)
+                .join(Tang, Phong.ma_tang == Tang.ma_tang)
+                .join(ToaNha, Tang.ma_toa == ToaNha.ma_toa)
+                .filter(
+                    (Phong.so_phong == phong_clean) | (Phong.ma_phong.ilike(f"%{phong_clean}%")),
+                    (ToaNha.ma_toa.ilike(f"%{toa_clean}%")) | (ToaNha.ten_toa.ilike(f"%{toa_clean}%"))
+                )
+                .first()
+            )
+
+        if not target_phong:
+            target_phong = db.query(Phong).filter(
+                (Phong.ma_phong == raw_phong) | (Phong.so_phong == phong_clean) | (Phong.ma_phong.ilike(f"%{phong_clean}%"))
+            ).first()
+
+        if target_phong and target_phong.tang and target_phong.tang.toa_nha:
+            toa_label = target_phong.tang.toa_nha.ten_toa
+            toa_clean = target_phong.tang.toa_nha.ma_toa.replace("TOA_", "").replace("Tòa ", "").replace("Tòa", "").strip()
+        else:
+            toa_label = f"Tòa {toa_clean}" if toa_clean else ""
 
         members_transfer = []
         if target_phong:

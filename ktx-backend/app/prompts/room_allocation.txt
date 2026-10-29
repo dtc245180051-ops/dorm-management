@@ -26,7 +26,19 @@ Nhiệm vụ: Phân tích kỹ nguyện vọng sinh viên và chọn ra DUY NH�
 - Ưu tiên 3: Khớp đúng Loại phòng (Phòng tiêu chuẩn / Phòng dịch vụ).
 - Ưu tiên 4: Tối ưu tỷ lệ lấp đầy phòng.
 
-Trả về kết quả ở định dạng JSON thuần túy (không kèm markdown ```json):
+5. TRƯỜNG HỢP NGOẠI LỆ:
+- Nếu danh sách phòng còn chỗ trống rỗng hoặc không tìm được bất kỳ vị trí phù hợp nào, trả về cấu trúc sau:
+{{
+  "best_room_id": null,
+  "toa": null,
+  "giuong": null,
+  "match_score": 0,
+  "ai_reason": "Hiện không còn phòng hoặc giường trống phù hợp với giới tính hoặc nguyện vọng của sinh viên."
+}}
+
+YÊU CẦU ĐỊNH DẠNG ĐẦU RA:
+- Trả về kết quả ở định dạng JSON thuần túy, bắt đầu bằng '{{' và kết thúc bằng '}}'.
+- KHÔNG bọc thẻ markdown ```json, không viết thêm văn bản ngoài JSON:
 {{
   "best_room_id": "Mã phòng hoặc Tên phòng (ví dụ: P101_A1 hoặc Phòng 101)",
   "toa": "Tên tòa (ví dụ: Tòa A1 hoặc Tòa B)",

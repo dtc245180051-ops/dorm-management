@@ -260,10 +260,12 @@ export default function RoomRegistrationPage({
 
     window.addEventListener("occupancy-updated", handleStatusSync);
     window.addEventListener("student-account-updated", handleStatusSync);
+    window.addEventListener("student-status-changed", handleStatusSync);
     window.addEventListener("storage", handleStatusSync);
     return () => {
       window.removeEventListener("occupancy-updated", handleStatusSync);
       window.removeEventListener("student-account-updated", handleStatusSync);
+      window.removeEventListener("student-status-changed", handleStatusSync);
       window.removeEventListener("storage", handleStatusSync);
     };
   }, [formData.msv, storedStudentAccount.msv]);

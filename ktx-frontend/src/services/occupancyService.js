@@ -1,5 +1,5 @@
 import api, { dormService } from "./api";
-import { getStudentAccount, saveStudentAccount } from "./studentAccountService";
+import { getStudentAccount, saveStudentAccount, terminateStudentContract } from "./studentAccountService";
 import studentNotificationService from "./studentNotificationService";
 
 const STORAGE_KEY = "dorm_registration_requests";
@@ -1130,7 +1130,23 @@ export const occupancyService = {
         `/admin/occupancy/requests/checkout/${encodeURIComponent(cleanId)}/approve`,
         payload,
       );
+      // Thu hồi ngay hợp đồng & trạng thái lưu trú của sinh viên
+      const msv = (payload.msv || result.data?.data?.msv || result.data?.data?.student_id || result.data?.msv || "").trim();
+      if (msv) {
+        try {
+          terminateStudentContract(msv);
+        } catch (_) {}
+        try {
+          localStorage.removeItem(`ktx_cached_student_status_${msv.toLowerCase()}`);
+          sessionStorage.removeItem(`ktx_cached_student_status_${msv.toLowerCase()}`);
+        } catch (_) {}
+      }
+      localStorage.removeItem("dorm_current_room_info");
+      localStorage.removeItem("dorm_current_stay");
+      sessionStorage.removeItem("ktx_cached_student_status");
       window.dispatchEvent(new Event("occupancy-updated"));
+      window.dispatchEvent(new Event("student-status-changed"));
+      window.dispatchEvent(new CustomEvent("student-account-updated", { detail: { msv } }));
       return result.data;
     } catch (err) {
       console.error("Backend PUT checkout approve failed:", err);

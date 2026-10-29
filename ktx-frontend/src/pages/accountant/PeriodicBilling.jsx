@@ -965,10 +965,10 @@ export default function PeriodicBilling({ searchTerm = '' }) {
                       ) : (
                         <>
                           <div style={{ fontSize: '14px', fontWeight: 600, color: '#d97706' }}>
-                            - VND / người
+                            {Number(item.rawAmount ?? 0).toLocaleString('vi-VN')} VND / phòng
                           </div>
                           <div style={{ fontSize: '12px', fontWeight: 500, color: '#b45309', marginTop: '2px' }}>
-                            Chưa có SV ở (Tổng phòng: {Number(item.rawAmount ?? 0).toLocaleString('vi-VN')} đ)
+                            Phòng trống (chưa có sinh viên lưu trú)
                           </div>
                         </>
                       )}

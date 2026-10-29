@@ -114,9 +114,9 @@ function getInitialStudentStatus(studentMsv) {
   } catch (_) {}
 
   return {
-    status: STUDENT_STATUS.ACTIVE_RESIDENT,
-    stage: 3,
-    studentInfo: { msv: code, trang_thai_o: "DANG_O" },
+    status: STUDENT_STATUS.NOT_REGISTERED,
+    stage: 1,
+    studentInfo: { msv: code, trang_thai_o: "CHUA_XEP" },
     activeRoom: null,
     latestRequest: null,
     account: null,
@@ -137,9 +137,9 @@ export function useStudentStatus(studentMsv) {
 
       const res = await resolveStudentStatus(code);
       const newState = {
-        status: res?.status || STUDENT_STATUS.ACTIVE_RESIDENT,
-        stage: res?.stage || getStudentStage(res?.status || STUDENT_STATUS.ACTIVE_RESIDENT),
-        studentInfo: res?.studentInfo || { msv: code, trang_thai_o: "DANG_O" },
+        status: res?.status || STUDENT_STATUS.NOT_REGISTERED,
+        stage: res?.stage || getStudentStage(res?.status || STUDENT_STATUS.NOT_REGISTERED),
+        studentInfo: res?.studentInfo || { msv: code, trang_thai_o: "CHUA_XEP" },
         activeRoom: res?.activeRoom || null,
         latestRequest: res?.latestRequest || null,
         account: res?.account || getStudentAccount(code),
@@ -167,12 +167,14 @@ export function useStudentStatus(studentMsv) {
 
     window.addEventListener("occupancy-updated", handleUpdate);
     window.addEventListener("student-account-updated", handleUpdate);
+    window.addEventListener("student-status-changed", handleUpdate);
     window.addEventListener("ktx-payment-updated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
 
     return () => {
       window.removeEventListener("occupancy-updated", handleUpdate);
       window.removeEventListener("student-account-updated", handleUpdate);
+      window.removeEventListener("student-status-changed", handleUpdate);
       window.removeEventListener("ktx-payment-updated", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
     };

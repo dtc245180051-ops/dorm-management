@@ -27,6 +27,7 @@ import StudentLayout from "../../layouts/Student";
 import studentNotificationService, {
   getNotificationTimestamp,
 } from "../../services/studentNotificationService";
+import adminNotificationService from "../../services/adminNotificationService";
 import api from "../../services/api";
 
 export default function StudentNotificationsPage({ onSelectTab, onNavigate }) {
@@ -135,34 +136,47 @@ export default function StudentNotificationsPage({ onSelectTab, onNavigate }) {
     });
 
     // 2. Lưu vào localStorage cho Admin xem được theo mã biên bản
-    if (notif.meta?.ma_bb) {
+    const ticketCode =
+      notif.meta?.ma_bb ||
+      notif.id?.replace(/^notif-violation-/, "").replace(/^violation-/, "");
+
+    if (ticketCode) {
       localStorage.setItem(
-        `ktx_violation_explanation_${notif.meta.ma_bb}`,
+        `ktx_violation_explanation_${ticketCode}`,
         explanationText.trim(),
       );
       localStorage.setItem(
-        `ktx_violation_explanation_at_${notif.meta.ma_bb}`,
+        `ktx_violation_explanation_at_${ticketCode}`,
         nowStr,
-      );
-      window.dispatchEvent(
-        new CustomEvent("ktx-violation-explanation-updated", {
-          detail: {
-            ma_bb: notif.meta.ma_bb,
-            explanation: explanationText.trim(),
-            at: nowStr,
-          },
-        }),
       );
 
       // 3. Đồng bộ trực tiếp vào CSDL backend qua API
       try {
-        await api.put(`/incidents/violations/${notif.meta.ma_bb}`, {
+        await api.put(`/incidents/violations/${ticketCode}`, {
           giai_trinh: explanationText.trim(),
           giai_trinh_at: nowStr,
         });
       } catch (err) {
         console.warn("Lỗi lưu giải trình vào API backend:", err);
       }
+
+      // 4. Phát sự kiện toàn cục để Admin nhận được ngay lập tức
+      window.dispatchEvent(
+        new CustomEvent("ktx-violation-explanation-updated", {
+          detail: {
+            ma_bb: ticketCode,
+            explanation: explanationText.trim(),
+            at: nowStr,
+            studentName: studentName || notif.meta?.ho_ten || "",
+            msv: notif.msv || notif.meta?.msv || "",
+          },
+        }),
+      );
+
+      // 5. Cập nhật trực tiếp thông báo cho Ban Quản lý KTX
+      try {
+        await adminNotificationService.syncFromSystem();
+      } catch (_) {}
     }
 
     setSelectedNotification((prev) => ({

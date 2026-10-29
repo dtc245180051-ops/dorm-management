@@ -329,6 +329,7 @@ def get_student_my_invoices(
                 invoices.append(HoaDonResponse(**inv_dict))
 
     res_list: List[HoaDonResponse] = []
+    from app.models.reconciliation import GiaoDichNganHang
     for inv in invoices:
         if isinstance(inv, HoaDonResponse):
             res_list.append(inv)
@@ -336,6 +337,15 @@ def get_student_my_invoices(
             inv_dict = {c.name: getattr(inv, c.name) for c in inv.__table__.columns}
             if not inv_dict.get("ky_thanh_toan"):
                 inv_dict["ky_thanh_toan"] = "Năm học 2026-2027" if inv_dict.get("loai_hoa_don") == "TIEN_PHONG" else "Tháng 10/2026"
+            tx = (
+                db.query(GiaoDichNganHang)
+                .filter(GiaoDichNganHang.ma_hoa_don == inv.ma_hoa_don)
+                .order_by(GiaoDichNganHang.id.desc())
+                .first()
+            )
+            if tx:
+                inv_dict["ngay_thanh_toan"] = tx.ngay_cap_nhat or tx.ngay_tao or tx.ngay_giao_dich
+                inv_dict["ma_giao_dich"] = tx.ma_giao_dich_ngan_hang
             res_list.append(HoaDonResponse(**inv_dict))
 
     return res_list

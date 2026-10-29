@@ -14,6 +14,7 @@ import {
   ExternalLink,
   ChevronRight,
   Sparkles,
+  Scale,
 } from "lucide-react";
 
 /**
@@ -91,6 +92,13 @@ function renderCategoryIcon(category, badgeColor) {
       return (
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center border shrink-0 ${colorClass}`}>
           <CreditCard className="w-4 h-4" />
+        </div>
+      );
+    case "VIOLATION_EXPLANATION":
+    case "VIOLATION_REPORT":
+      return (
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center border shrink-0 ${colorClass}`}>
+          <Scale className="w-4 h-4" />
         </div>
       );
     default:

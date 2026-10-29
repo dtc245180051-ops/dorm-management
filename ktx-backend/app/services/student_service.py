@@ -8,6 +8,7 @@ from app.core.security import get_password_hash
 from app.models.contract import HopDong, Phi
 from app.models.dorm import Giuong, Phong, Tang, ToaNha
 from app.models.incident import PhanAnh, ViPham
+from app.models.room_request import RoomRequest
 from app.models.user import NguoiDung, SinhVien, TaiKhoan, VaiTro
 from app.schemas.student import (
     SinhVienCreate,
@@ -104,6 +105,58 @@ def _build_student_response(student: SinhVien, db: Session) -> SinhVienResponse:
             trang_thai_o = "DA_TRA_PHONG"
 
     user_info = student.nguoi_dung
+
+    # Tự động đồng bộ các trường còn thiếu từ đơn đăng ký (RoomRequest) nếu có
+    dirty = False
+    clean_msv = student.msv.strip().upper()
+    latest_req = (
+        db.query(RoomRequest)
+        .filter(RoomRequest.student_id == clean_msv)
+        .order_by(RoomRequest.id.desc())
+        .first()
+    )
+    if latest_req and latest_req.extra_data:
+        ed = latest_req.extra_data
+        if not student.ngay_sinh and ed.get("ngay_sinh"):
+            student.ngay_sinh = str(ed["ngay_sinh"]).strip()
+            dirty = True
+        if not student.cccd and (ed.get("cccd") or ed.get("so_cccd")):
+            student.cccd = str(ed.get("cccd") or ed.get("so_cccd")).strip()
+            dirty = True
+        if not student.dia_chi and ed.get("dia_chi"):
+            student.dia_chi = str(ed["dia_chi"]).strip()
+            dirty = True
+        if user_info and (not user_info.so_dien_thoai or not user_info.so_dien_thoai.strip()) and (ed.get("so_dien_thoai") or ed.get("phone")):
+            user_info.so_dien_thoai = str(ed.get("so_dien_thoai") or ed.get("phone")).strip()
+            dirty = True
+        if not student.nguoi_giam_ho and ed.get("nguoi_giam_ho"):
+            student.nguoi_giam_ho = str(ed["nguoi_giam_ho"]).strip()
+            dirty = True
+        if not student.sdt_nguoi_giam_ho and ed.get("sdt_nguoi_giam_ho"):
+            student.sdt_nguoi_giam_ho = str(ed["sdt_nguoi_giam_ho"]).strip()
+            dirty = True
+        if not student.moi_quan_he and ed.get("moi_quan_he"):
+            student.moi_quan_he = str(ed["moi_quan_he"]).strip()
+            dirty = True
+        if not student.doi_tuong_uu_tien and ed.get("doi_tuong_uu_tien"):
+            student.doi_tuong_uu_tien = str(ed["doi_tuong_uu_tien"]).strip()
+            dirty = True
+
+    # Trích xuất quê quán từ địa chỉ nếu que_quan chưa có
+    if not student.que_quan and student.dia_chi:
+        parts = [p.strip() for p in student.dia_chi.split(",") if p.strip()]
+        if parts:
+            student.que_quan = parts[-1]
+            dirty = True
+
+    if dirty:
+        try:
+            db.commit()
+            db.refresh(student)
+            if user_info:
+                db.refresh(user_info)
+        except Exception:
+            db.rollback()
 
     # Lấy danh sách phản ánh của sinh viên
     phan_anh_records = (

@@ -2,10 +2,24 @@ Bạn là chuyên gia tiếp nhận sự cố ký túc xá. Đọc kỹ mô tả
 Phòng: {phong}
 Mô tả: {clean_mo_ta}
 
-Hãy trích xuất thông tin JSON chuẩn:
+Nhiệm vụ: Phân tích nội dung và trích xuất thông tin theo định dạng JSON chuẩn.
+
+QUY TẮC PHÂN LOẠI & XỬ LÝ NGOẠI LỆ:
+1. Nếu mô tả có ý nghĩa:
+   - "tieu_de": Tóm tắt cực ngắn gọn dưới 10 từ (VD: Bóng đèn hành lang bị cháy, Rò rỉ nước nhà vệ sinh).
+   - "phan_loai": Chỉ chọn 1 trong các giá trị: ['Điện nước', 'Cơ sở vật chất', 'An ninh trật tự', 'Vệ sinh', 'Khác'].
+   - "muc_do_uu_tien": Chỉ chọn 'Khẩn cấp' (nếu có chập điện, cháy nổ, ngập nước, bục ống nước, đánh nhau, nguy hiểm trực tiếp) hoặc 'Thường'.
+2. Nếu mô tả vô nghĩa, spam, chỉ chứa ký tự rác (ví dụ: "...", "alo", "123") hoặc không phải sự cố KTX:
+   - "tieu_de": "Phản ánh không rõ nội dung"
+   - "phan_loai": "Khác"
+   - "muc_do_uu_tien": "Thường"
+
+YÊU CẦU ĐỊNH DẠNG ĐẦU RA:
+- Trả về DUY NHẤT chuỗi JSON thuần, bắt đầu bằng '{{' và kết thúc bằng '}}'.
+- TUYỆT ĐỐI KHÔNG bọc trong thẻ markdown (ví dụ không dùng ```json ... ```), không thêm bất kỳ lời dẫn hay giải thích nào.
+
 {{
-  "tieu_de": "Tóm tắt cực ngắn gọn dưới 10 từ (VD: Bóng đèn hành lang bị cháy, Rò rỉ nước nhà vệ sinh)",
-  "phan_loai": "Chỉ chọn 1 trong: ['Điện nước', 'Cơ sở vật chất', 'An ninh trật tự', 'Vệ sinh', 'Khác']",
-  "muc_do_uu_tien": "Chỉ chọn 'Khẩn cấp' (nếu có chập điện, cháy nổ, ngập nước, bục ống nước, đánh nhau, nguy hiểm) hoặc 'Thường'"
+  "tieu_de": "string",
+  "phan_loai": "string",
+  "muc_do_uu_tien": "string"
 }}
-Chỉ trả về chuỗi JSON thuần, không giải thích gì thêm.

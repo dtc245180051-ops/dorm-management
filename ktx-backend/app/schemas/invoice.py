@@ -22,6 +22,8 @@ class HoaDonResponse(BaseModel):
     ghi_chu: Optional[str] = None
     nguoi_tao: Optional[str] = None
     ngay_tao: Optional[datetime.datetime] = None
+    ngay_thanh_toan: Optional[datetime.datetime] = None
+    ma_giao_dich: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

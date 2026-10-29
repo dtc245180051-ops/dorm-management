@@ -48,6 +48,33 @@ def _find_room_id(db: Session, text: Optional[str]) -> Optional[str]:
     return None
 
 
+def _generate_next_yc_code(session: Session) -> str:
+    """Tự động sinh mã yêu cầu kế tiếp dạng YC-XXXX không bao giờ trùng lặp."""
+    existing_codes = (
+        session.query(RoomRequest.ma_yeu_cau)
+        .filter(RoomRequest.ma_yeu_cau.like("YC-%"))
+        .all()
+    )
+    max_num = 230
+    for (code,) in existing_codes:
+        if code and code.startswith("YC-"):
+            clean_digits = re.findall(r"\d+", code[3:])
+            if clean_digits:
+                try:
+                    num_val = int(clean_digits[0])
+                    if num_val > max_num:
+                        max_num = num_val
+                except ValueError:
+                    pass
+
+    next_num = max_num + 1
+    candidate = f"YC-{next_num:04d}"
+    while session.query(RoomRequest).filter(RoomRequest.ma_yeu_cau == candidate).first():
+        next_num += 1
+        candidate = f"YC-{next_num:04d}"
+    return candidate
+
+
 def add_request(req_data: dict, db: Optional[Session] = None) -> dict:
     """Thêm một đơn đăng ký mới vào hệ thống quản lý MySQL."""
     with _get_session(db) as session:
@@ -220,10 +247,10 @@ def update_request_status(
 def add_transfer_request(data: dict, db: Optional[Session] = None) -> dict:
     """Thêm yêu cầu chuyển phòng vào MySQL."""
     with _get_session(db) as session:
-        count = session.query(RoomRequest).count()
-        req_num = count + 231
-        req_id = data.get("id") or f"YC-{req_num:04d}"
+        req_id = data.get("id") or _generate_next_yc_code(session)
         clean_code = req_id.replace("#", "").strip()
+        while session.query(RoomRequest).filter(RoomRequest.ma_yeu_cau == clean_code).first():
+            clean_code = _generate_next_yc_code(session)
 
         now = datetime.datetime.now()
         today_str = now.strftime("%d/%m/%Y %H:%M")
@@ -315,10 +342,10 @@ def add_transfer_request(data: dict, db: Optional[Session] = None) -> dict:
 def add_checkout_request(data: dict, db: Optional[Session] = None) -> dict:
     """Thêm yêu cầu trả phòng vào MySQL."""
     with _get_session(db) as session:
-        count = session.query(RoomRequest).count()
-        req_num = count + 231
-        req_id = data.get("id") or f"YC-{req_num:04d}"
+        req_id = data.get("id") or _generate_next_yc_code(session)
         clean_code = req_id.replace("#", "").strip()
+        while session.query(RoomRequest).filter(RoomRequest.ma_yeu_cau == clean_code).first():
+            clean_code = _generate_next_yc_code(session)
 
         now = datetime.datetime.now()
         today_str = now.strftime("%d/%m/%Y %H:%M")

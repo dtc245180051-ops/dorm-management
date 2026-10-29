@@ -7,6 +7,6 @@ Danh sách các sự cố CÒN LẠI cần làm:
 {pending_context}
 
 Nhiệm vụ: Viết DUY NHẤT 1 đến 2 câu tóm tắt cực kỳ ngắn gọn, trực diện:
-- Nêu rõ: Hôm nay có {total_count} sự cố{resolved_clause}, hiện còn {pending_count} việc cần giải quyết về vấn đề gì tại phòng nào.
-- Nếu có sự cố khẩn cấp (như chập cháy, ngập nước, an ninh), chỉ đích danh phòng và lỗi cần ưu tiên xử lý.
+- Nếu pending_count == 0: Nêu rõ toàn bộ {total_count} sự cố phát sinh trong ngày đều đã được giải quyết dứt điểm (hoặc hôm nay không phát sinh sự cố nào nếu total_count == 0).
+- Nếu pending_count > 0: Nêu rõ hôm nay có {total_count} sự cố (đã xử lý {resolved_count}), hiện còn {pending_count} việc đang tồn đọng. BẮT BUỘC chỉ đích danh phòng và nội dung lỗi khẩn cấp (như chập cháy, bục nước, an ninh) cần ưu tiên giải quyết trước mắt.
 - Tuyệt đối không dài dòng, không chào hỏi, không thêm văn phong hành chính chung chung. Trả về đúng 1-2 câu văn bản thuần.

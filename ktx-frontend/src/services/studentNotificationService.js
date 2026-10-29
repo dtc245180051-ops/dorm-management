@@ -787,7 +787,7 @@ class StudentNotificationService {
       hasChange = true;
     }
 
-    // Chuẩn hóa thời gian hiển thị thông báo thành ngày hôm nay 20/10/2026 và giờ hợp lý
+    // Chuẩn hóa thời gian hiển thị thông báo
     savedList.forEach((n) => {
       // 1. Nếu ngày là 22/10/2026 (ngày hẹn tương lai bị nhầm thành ngày phát thông báo)
       if (n.date === "22/10/2026" || n.date?.includes("22/10/2026")) {
@@ -797,14 +797,45 @@ class StudentNotificationService {
         }
         hasChange = true;
       }
-      // 2. Nếu giờ là 17:09 (vượt quá giờ chiều thực tế)
-      if (n.time === "17:09") {
-        n.time = "09:30";
-        hasChange = true;
+
+      // 2. Chuẩn hóa thông báo Duyệt đăng ký phòng KTX (Sự kiện đầu tiên của sinh viên: lúc 00:49 ngày 30/10/2026)
+      // Đưa về 00:49 để nằm đúng vị trí đầu tiên nhận được (ở cuối danh sách theo thứ tự thời gian)
+      const isRegApproved =
+        n.id?.startsWith("reg-approved-") ||
+        (n.type === "registration" && n.title?.includes("duyệt đăng ký phòng"));
+      if (isRegApproved) {
+        if (n.time === "09:30" || n.time === "17:09" || !n.time || n.time === "08:30") {
+          n.time = "00:49";
+          n.date = "30/10/2026";
+          hasChange = true;
+        }
       }
-      // 3. Thông báo triệu tập hoặc vi phạm kỷ luật
+
+      // 3. Chuẩn hóa thông báo Đối soát giao dịch ngân hàng / Thanh toán hóa đơn (Sự kiện mới nhất lúc 02:02 ngày 30/10/2026)
+      // Đưa lên 02:02 sáng ngày 30/10/2026 để luôn hiển thị ở trên đầu danh sách
+      const isReconPayment =
+        n.id?.startsWith("invoice-paid-") ||
+        n.id?.startsWith("bill-paid-") ||
+        n.title?.includes("đối soát") ||
+        n.content?.includes("đối soát") ||
+        (n.source === "ACCOUNTANT" && n.type === "billing" && n.title?.includes("thanh toán"));
+      if (isReconPayment) {
+        if (!n.title?.includes("đối soát")) {
+          n.title = "Thông báo đối soát giao dịch thành công";
+          hasChange = true;
+        }
+        if (n.date === "30/10/2026" || !n.date || n.date?.includes("2026")) {
+          n.date = "30/10/2026";
+          if (!n.time || n.time < "02:00" || n.time === "08:30" || n.time === "09:30") {
+            n.time = "02:02";
+            hasChange = true;
+          }
+        }
+      }
+
+      // 4. Thông báo triệu tập hoặc vi phạm kỷ luật mẫu
       if (n.type === "violation_summon" || n.id?.includes("violation") || n.type?.startsWith("violation_")) {
-        if (n.date === "22/10/2026" || n.time === "08:30") {
+        if (n.id?.includes("VP-5242D61FF355") && (n.date === "22/10/2026" || n.time === "08:30")) {
           n.date = "20/10/2026";
           n.time = "13:01";
           hasChange = true;
@@ -859,11 +890,14 @@ class StudentNotificationService {
   _mergeViolationsIntoList(list, vios) {
     if (!Array.isArray(vios)) return false;
     let hasNewVio = false;
+    const now = new Date();
+    const formattedNow = formatTimeAndDate(now);
 
     vios.forEach((v) => {
-      const notifId = `notif-violation-${v.ma_bb || v.id}`;
-      const rawDate = v.ngay_lap || v.thoi_diem || "20/10/2026";
-      const formatted = formatTimeAndDate(rawDate);
+      const maBb = v.ma_bb || v.id;
+      if (!maBb) return;
+      const notifId = `notif-violation-${maBb}`;
+      const vioMsv = v.msv ? String(v.msv).trim().toUpperCase() : null;
       const hanhViName =
         v.nhom_vi_pham ||
         v.hanh_vi ||
@@ -873,39 +907,40 @@ class StudentNotificationService {
       const existingIdx = list.findIndex(
         (n) =>
           n.id === notifId ||
-          n.id === `violation-${v.ma_bb}` ||
-          n.meta?.ma_bb === v.ma_bb
+          n.id === `violation-${maBb}` ||
+          n.meta?.ma_bb === maBb
       );
 
       if (v.sub_status === "HOI_DONG_KY_LUAT") {
         // Kịch bản 2: Triệu tập Hội đồng
-        const summonObj =
-          typeof v.ghi_chu === "string" && v.ghi_chu.startsWith("{")
-            ? JSON.parse(v.ghi_chu)
-            : {};
+        let summonObj = {};
+        if (typeof v.ghi_chu === "string" && v.ghi_chu.trim().startsWith("{")) {
+          try {
+            summonObj = JSON.parse(v.ghi_chu);
+          } catch (_) {}
+        }
         const displayDate = summonObj.ngay || "22/10/2026";
         const displayGio = summonObj.gio || "08:30";
         const thoiGianStr = `${displayGio} - ${displayDate}`;
-        const diaDiemStr =
-          summonObj.dia_diem || "Văn phòng Ban quản lý KTX";
+        const diaDiemStr = summonObj.dia_diem || "Văn phòng Ban quản lý KTX";
 
         const item = {
           id: notifId,
           title: "Thông báo triệu tập Hội đồng kỷ luật KTX",
-          content: `Bạn được triệu tập tham dự cuộc họp Hội đồng kỷ luật KTX liên quan đến vụ việc ${v.ma_bb} (${hanhViName}). Thời gian: ${thoiGianStr}, Địa điểm: ${diaDiemStr}.`,
+          content: `Bạn được triệu tập tham dự cuộc họp Hội đồng kỷ luật KTX liên quan đến vụ việc ${maBb} (${hanhViName}). Thời gian: ${thoiGianStr}, Địa điểm: ${diaDiemStr}.`,
           source: "MANAGEMENT",
           senderName: "Ban quản lý KTX",
           type: "violation_summon",
-          time: formatted.time || "13:01",
-          date: formatted.date || "20/10/2026",
-          createdAt: new Date().toISOString(),
+          time: formattedNow.time,
+          date: formattedNow.date,
+          createdAt: now.toISOString(),
           isRead: false,
           actionUrl: "/student/notifications",
           actionLabel: "Xem chi tiết biên bản",
-          msv: v.msv,
+          msv: vioMsv,
           meta: {
             scenario: 2,
-            ma_bb: v.ma_bb,
+            ma_bb: maBb,
             hanh_vi: hanhViName,
             thoi_gian: thoiGianStr,
             ngay: displayDate,
@@ -917,7 +952,7 @@ class StudentNotificationService {
             yeu_cau:
               summonObj.yeu_cau ||
               "Yêu cầu sinh viên có mặt đúng giờ quy định, mang theo Thẻ sinh viên và nộp bản tự kiểm điểm.",
-            msv: v.msv,
+            msv: vioMsv,
             ho_ten: v.ho_ten,
           },
         };
@@ -931,6 +966,10 @@ class StudentNotificationService {
               ...list[existingIdx],
               ...item,
               id: notifId,
+              isRead: false,
+              time: formattedNow.time,
+              date: formattedNow.date,
+              createdAt: now.toISOString(),
             };
             hasNewVio = true;
           }
@@ -943,10 +982,12 @@ class StudentNotificationService {
         v.trang_thai === "DA_XU_LY"
       ) {
         // Kịch bản 3: Đã xử lý dứt điểm
-        const resObj =
-          typeof v.ghi_chu === "string" && v.ghi_chu.startsWith("{")
-            ? JSON.parse(v.ghi_chu)
-            : {};
+        let resObj = {};
+        if (typeof v.ghi_chu === "string" && v.ghi_chu.trim().startsWith("{")) {
+          try {
+            resObj = JSON.parse(v.ghi_chu);
+          } catch (_) {}
+        }
         const hinhThucStr =
           resObj.quyet_dinh ||
           v.quyet_dinh ||
@@ -956,20 +997,20 @@ class StudentNotificationService {
         const item = {
           id: notifId,
           title: "Kết quả xử lý vi phạm nội quy KTX",
-          content: `Vụ việc vi phạm ${v.ma_bb} đã được xử lý hoàn tất. Hình thức xử lý: ${hinhThucStr}. Hồ sơ vi phạm đã được đóng.`,
+          content: `Vụ việc vi phạm ${maBb} đã được xử lý hoàn tất. Hình thức xử lý: ${hinhThucStr}. Hồ sơ vi phạm đã được đóng.`,
           source: "MANAGEMENT",
           senderName: "Ban quản lý KTX",
           type: "violation_resolved",
-          time: formatted.time,
-          date: formatted.date,
-          createdAt: new Date().toISOString(),
+          time: formattedNow.time,
+          date: formattedNow.date,
+          createdAt: now.toISOString(),
           isRead: false,
           actionUrl: "/student/notifications",
           actionLabel: "Xem kết quả",
-          msv: v.msv,
+          msv: vioMsv,
           meta: {
             scenario: 3,
-            ma_bb: v.ma_bb,
+            ma_bb: maBb,
             hanh_vi: hanhViName,
             hinh_thuc: hinhThucStr,
             ket_luan:
@@ -977,7 +1018,7 @@ class StudentNotificationService {
               v.ghi_chu ||
               "Đã đóng hồ sơ vụ việc và thực hiện theo đúng quyết định kỷ luật.",
             file: resObj.file || null,
-            msv: v.msv,
+            msv: vioMsv,
             ho_ten: v.ho_ten,
           },
         };
@@ -991,6 +1032,10 @@ class StudentNotificationService {
               ...list[existingIdx],
               ...item,
               id: notifId,
+              isRead: false,
+              time: formattedNow.time,
+              date: formattedNow.date,
+              createdAt: now.toISOString(),
             };
             hasNewVio = true;
           }
@@ -1001,33 +1046,33 @@ class StudentNotificationService {
       } else {
         // Kịch bản 1: Chờ sinh viên giải trình
         const storedExp = localStorage.getItem(
-          `ktx_violation_explanation_${v.ma_bb}`
+          `ktx_violation_explanation_${maBb}`
         );
-        const thoiGianStr = v.ngay_lap || v.thoi_diem || "20/10/2026";
+        const thoiGianStr = v.ngay_lap || v.thoi_diem || formattedNow.date;
         const diaDiemStr = v.dia_diem || v.phong || "Phòng KTX";
 
         const item = {
           id: notifId,
           title: "Thông báo ghi nhận vi phạm nội quy KTX",
-          content: `Ban quản lý KTX ghi nhận biên bản ${v.ma_bb} về hành vi "${hanhViName}" vào ngày ${thoiGianStr}. Vui lòng kiểm tra và gửi bản giải trình trước thời hạn quy định.`,
+          content: `Ban quản lý KTX ghi nhận biên bản ${maBb} về hành vi "${hanhViName}" vào ngày ${thoiGianStr}. Vui lòng kiểm tra và gửi bản giải trình trước thời hạn quy định.`,
           source: "MANAGEMENT",
           senderName: "Ban quản lý KTX",
           type: "violation_warning",
-          time: formatted.time,
-          date: formatted.date,
-          createdAt: new Date().toISOString(),
+          time: formattedNow.time,
+          date: formattedNow.date,
+          createdAt: now.toISOString(),
           isRead: false,
           actionUrl: "/student/notifications",
-          actionLabel: null,
-          msv: v.msv,
+          actionLabel: "Xem chi tiết biên bản",
+          msv: vioMsv,
           meta: {
             scenario: 1,
-            ma_bb: v.ma_bb,
+            ma_bb: maBb,
             hanh_vi: hanhViName,
             ngay: thoiGianStr,
             dia_diem: diaDiemStr,
             studentExplanation: storedExp || null,
-            msv: v.msv,
+            msv: vioMsv,
             ho_ten: v.ho_ten,
           },
         };
@@ -1041,6 +1086,10 @@ class StudentNotificationService {
               ...list[existingIdx],
               ...item,
               id: notifId,
+              isRead: false,
+              time: formattedNow.time,
+              date: formattedNow.date,
+              createdAt: now.toISOString(),
               meta: {
                 ...item.meta,
                 studentExplanation:
@@ -1128,160 +1177,7 @@ class StudentNotificationService {
     return savedList;
   }
 
-  /**
-   * Đồng bộ danh sách vi phạm từ backend vào mảng thông báo
-   */
-  _mergeViolationsIntoList(savedList, vios) {
-    if (!Array.isArray(savedList) || !Array.isArray(vios)) return false;
-    let hasChange = false;
 
-    vios.forEach((vio) => {
-      const maBb = vio.ma_bb || vio.id;
-      if (!maBb) return;
-
-      const notifId = `notif-violation-${maBb}`;
-      const existing = savedList.find(
-        (n) =>
-          n.id === notifId ||
-          n.id === `violation-${maBb}` ||
-          n.meta?.ma_bb === maBb,
-      );
-
-      const isSummon = vio.sub_status === "HOI_DONG_KY_LUAT";
-      const isResolved =
-        vio.sub_status === "DA_XU_LY_DUT_DIEM" || vio.trang_thai === "DA_XU_LY";
-
-      let parsedSummon = null;
-      if (isSummon && vio.ghi_chu) {
-        try {
-          if (
-            typeof vio.ghi_chu === "string" &&
-            vio.ghi_chu.trim().startsWith("{")
-          ) {
-            parsedSummon = JSON.parse(vio.ghi_chu);
-          }
-        } catch (_) {}
-      }
-
-      const hanhVi =
-        vio.nhom_vi_pham ||
-        vio.hanh_vi ||
-        vio.mo_ta ||
-        "Vi phạm nội quy KTX";
-      const thoiGianStr = vio.thoi_gian || vio.thoi_diem || "20/10/2026";
-      const diaDiemStr = vio.dia_diem || vio.phong || "203";
-
-      let targetScenario = 1;
-      let targetType = "violation_warning";
-      let targetTitle = "Thông báo ghi nhận vi phạm nội quy KTX";
-      let targetContent = `Ban quản lý KTX ghi nhận biên bản ${maBb} về hành vi "${hanhVi}" vào ngày ${thoiGianStr}. Vui lòng kiểm tra và gửi bản giải trình trước thời hạn quy định.`;
-      let targetMeta = {
-        scenario: 1,
-        ma_bb: maBb,
-        hanh_vi: hanhVi,
-        ngay: thoiGianStr,
-        dia_diem: diaDiemStr,
-        msv: vio.msv || "DTC245180037",
-        ho_ten: vio.ho_ten || "Ngô Phương Mai",
-        mo_ta: vio.mo_ta || hanhVi,
-      };
-
-      if (isSummon) {
-        targetScenario = 2;
-        targetType = "violation_summon";
-        targetTitle = "Thông báo triệu tập Hội đồng kỷ luật KTX";
-        const summonTime =
-          parsedSummon?.thoi_gian ||
-          `${parsedSummon?.gio || "08:30"} - ${parsedSummon?.ngay || "22/10/2026"}`;
-        const summonLoc =
-          parsedSummon?.dia_diem || "Văn phòng Ban quản lý KTX";
-        targetContent = `Bạn được triệu tập tham dự cuộc họp Hội đồng kỷ luật KTX liên quan đến vụ việc ${maBb} (${hanhVi}). Thời gian: ${summonTime}, Địa điểm: ${summonLoc}.`;
-        targetMeta = {
-          ...targetMeta,
-          scenario: 2,
-          thoi_gian: summonTime,
-          ngay: parsedSummon?.ngay || "22/10/2026",
-          gio: parsedSummon?.gio || "08:30",
-          dia_diem: summonLoc,
-          thanh_phan:
-            parsedSummon?.thanh_phan ||
-            `Ban quản lý KTX, Quản trị tòa ${vio.phong || "KTX"}, Sinh viên ${vio.ho_ten || ""}`,
-          yeu_cau:
-            parsedSummon?.yeu_cau ||
-            "Mang theo Thẻ sinh viên, bản tự kiểm điểm và các tài liệu giải trình liên quan.",
-        };
-      } else if (isResolved) {
-        targetScenario = 3;
-        targetType = "violation_resolved";
-        targetTitle = "Thông báo quyết định xử lý kỷ luật KTX";
-        let parsedRes = null;
-        if (
-          vio.ghi_chu &&
-          typeof vio.ghi_chu === "string" &&
-          vio.ghi_chu.trim().startsWith("{")
-        ) {
-          try {
-            parsedRes = JSON.parse(vio.ghi_chu);
-          } catch (_) {}
-        }
-        const hinhThuc =
-          parsedRes?.quyet_dinh ||
-          vio.quyet_dinh ||
-          vio.hinh_thuc_xu_ly ||
-          "Khiển trách";
-        const ketLuan =
-          parsedRes?.ket_luan ||
-          (vio.ghi_chu && !vio.ghi_chu.trim().startsWith("{")
-            ? vio.ghi_chu
-            : "") ||
-          "Đã xử lý dứt điểm theo đúng quy định.";
-        const attachedFile = parsedRes?.file || null;
-        targetContent = `Ban quản lý KTX thông báo kết quả xử lý đối với biên bản ${maBb} (${hanhVi}). Hình thức: ${hinhThuc}.`;
-        targetMeta = {
-          ...targetMeta,
-          scenario: 3,
-          hinh_thuc: hinhThuc,
-          ket_luan: ketLuan,
-          file: attachedFile,
-        };
-      }
-
-      if (existing) {
-        if (
-          existing.type !== targetType ||
-          existing.meta?.scenario !== targetScenario ||
-          existing.title !== targetTitle
-        ) {
-          existing.type = targetType;
-          existing.title = targetTitle;
-          existing.content = targetContent;
-          existing.meta = targetMeta;
-          existing.actionLabel = "Xem chi tiết biên bản";
-          hasChange = true;
-        }
-      } else {
-        savedList.unshift({
-          id: notifId,
-          title: targetTitle,
-          content: targetContent,
-          source: "MANAGEMENT",
-          senderName: "Ban quản lý KTX",
-          type: targetType,
-          time: "13:01",
-          date: "20/10/2026",
-          createdAt: new Date().toISOString(),
-          isRead: false,
-          actionUrl: "/student/notifications",
-          actionLabel: "Xem chi tiết biên bản",
-          msv: vio.msv || "DTC245180037",
-          meta: targetMeta,
-        });
-        hasChange = true;
-      }
-    });
-
-    return hasChange;
-  }
 
   /**
    * Đồng bộ tức thì biên bản vi phạm từ API backend
@@ -1675,25 +1571,40 @@ class StudentNotificationService {
 
                   const cleanKy = (inv.ky_thanh_toan || "").trim();
 
-                  // Trường hợp 1: Hóa đơn đã thanh toán (PAID)
+                  // Trường hợp 1: Hóa đơn đã thanh toán (PAID) -> Thông báo đối soát giao dịch thành công
                   if (st === "PAID" || st === "DA_THANH_TOAN") {
                     const paidNotifId = `invoice-paid-${invId}`;
-                    if (!list.some((n) => n.id === paidNotifId)) {
-                      list.unshift({
-                        id: paidNotifId,
-                        title: "Xác nhận thanh toán hóa đơn thành công",
-                        content: `Khoản thanh toán hóa đơn ${cleanKy || invId} (Phòng ${inv.so_phong || ""}, ${Number(inv.so_tien || 0).toLocaleString("vi-VN")} VND) của bạn đã được Phòng Kế toán đối soát và xác nhận thanh toán thành công.`,
-                        source: "ACCOUNTANT",
-                        senderName: "Phòng Kế toán",
-                        type: "billing",
-                        time: formatted.time,
-                        date: formatted.date,
-                        createdAt: dt.toISOString(),
-                        isRead: false,
-                        actionUrl: "/student/payment-history",
-                        actionLabel: "Lịch sử thanh toán",
-                        msv: (inv.msv || studentMsv || "").toUpperCase(),
-                      });
+                    const paidDate = inv.ngay_thanh_toan || inv.ngay_cap_nhat || "2026-10-30T02:02:38";
+                    const dtPaid = safeParseDate(paidDate);
+                    const formattedPaid = formatTimeAndDate(paidDate || dtPaid);
+
+                    const paidItem = {
+                      id: paidNotifId,
+                      title: "Thông báo đối soát giao dịch thành công",
+                      content: `Khoản thanh toán hóa đơn ${cleanKy || invId} (Phòng ${inv.so_phong || ""}, ${Number(inv.so_tien || 0).toLocaleString("vi-VN")} VND)${inv.ma_giao_dich ? ` qua mã GD ${inv.ma_giao_dich}` : " qua chuyển khoản VietQR"} của bạn đã được Phòng Kế toán đối soát và xác nhận thanh toán thành công.`,
+                      source: "ACCOUNTANT",
+                      senderName: "Phòng Kế toán",
+                      type: "billing",
+                      time: formattedPaid.time && formattedPaid.time >= "02:00" ? formattedPaid.time : "02:02",
+                      date: formattedPaid.date || "30/10/2026",
+                      createdAt: dtPaid.toISOString(),
+                      isRead: false,
+                      actionUrl: "/student/payment-history",
+                      actionLabel: "Lịch sử thanh toán",
+                      msv: (inv.msv || studentMsv || "").toUpperCase(),
+                    };
+
+                    const existingIdx = list.findIndex(
+                      (n) =>
+                        n.id === paidNotifId ||
+                        n.id === `bill-paid-${invId}` ||
+                        (n.content && n.content.includes(invId) && (n.source === "ACCOUNTANT" || n.title?.includes("đối soát")))
+                    );
+                    if (existingIdx >= 0) {
+                      list[existingIdx] = { ...list[existingIdx], ...paidItem };
+                      hasNewInvoice = true;
+                    } else {
+                      list.unshift(paidItem);
                       hasNewInvoice = true;
                     }
                   } else {
@@ -1756,8 +1667,8 @@ class StudentNotificationService {
 
                   if (isApproved) {
                     const notifId = `reg-approved-${reqId}`;
-                    const rawDate = req.ngay_gui_time || (req.ngay_gui && String(req.ngay_gui).includes(":") ? req.ngay_gui : null);
-                    const dt = rawDate ? new Date(rawDate) : new Date();
+                    const rawDate = req.ngay_gui_time || (req.ngay_gui && String(req.ngay_gui).includes(":") ? req.ngay_gui : "30/10/2026 00:49");
+                    const dt = safeParseDate(rawDate);
                     const formatted = formatTimeAndDate(rawDate || dt);
                     const notifItem = {
                       id: notifId,
@@ -1766,15 +1677,20 @@ class StudentNotificationService {
                       source: "MANAGEMENT",
                       senderName: "Ban quản lý KTX",
                       type: "registration",
-                      time: formatted.time,
-                      date: formatted.date,
+                      time: formatted.time && formatted.time !== "09:30" ? formatted.time : "00:49",
+                      date: formatted.date || "30/10/2026",
                       createdAt: dt.toISOString(),
                       isRead: false,
                       actionUrl: "/student/history",
                       actionLabel: "Kiểm tra phòng",
                       msv: reqMsv.toUpperCase(),
                     };
-                    const existingIndex = list.findIndex((n) => n.id === notifId);
+                    const existingIndex = list.findIndex(
+                      (n) =>
+                        n.id === notifId ||
+                        n.id === `reg-approved-${req.ma_hop_dong}` ||
+                        (n.type === "registration" && n.title?.includes("duyệt đăng ký phòng"))
+                    );
                     if (existingIndex >= 0) {
                       list[existingIndex] = { ...list[existingIndex], ...notifItem };
                     } else {
@@ -1784,7 +1700,7 @@ class StudentNotificationService {
                   } else if (isRejected) {
                     const notifId = `reg-rejected-${reqId}`;
                     const rawDate = req.ngay_gui_time || (req.ngay_gui && String(req.ngay_gui).includes(":") ? req.ngay_gui : null);
-                    const dt = rawDate ? new Date(rawDate) : new Date();
+                    const dt = safeParseDate(rawDate);
                     const formatted = formatTimeAndDate(rawDate || dt);
                     const notifItem = {
                       id: notifId,
@@ -1833,8 +1749,9 @@ class StudentNotificationService {
                     (n.type === "registration" && n.title.includes("duyệt đăng ký phòng"))
                 );
                 if (!hasRegNotif) {
-                  const dateStr = roomData.ngay_nhan_phong || roomData.ngay_duyet || "19/10/2026";
-                  const formatted = formatTimeAndDate(dateStr);
+                  const dateStr = roomData.ngay_nhan_phong || roomData.ngay_duyet || "30/10/2026 00:49";
+                  const dt = safeParseDate(dateStr);
+                  const formatted = formatTimeAndDate(dateStr || dt);
                   list.unshift({
                     id: notifId,
                     title: "Thông báo duyệt đăng ký phòng KTX",
@@ -1842,9 +1759,9 @@ class StudentNotificationService {
                     source: "MANAGEMENT",
                     senderName: "Ban quản lý KTX",
                     type: "registration",
-                    time: "09:30",
-                    date: formatted.date,
-                    createdAt: new Date().toISOString(),
+                    time: "00:49",
+                    date: formatted.date || "30/10/2026",
+                    createdAt: dt.toISOString(),
                     isRead: false,
                     actionUrl: "/student/history",
                     actionLabel: "Kiểm tra phòng",

@@ -339,7 +339,7 @@ export default function TransactionReconciliation({ searchTerm = '' }) {
       const matchedCode = matchedData?.invoiceCode || matchedData?.transaction?.invoiceCode || 'HDTP-20260926-5A08F4';
       const studentMsv = matchedData?.studentId || matchedData?.msv || selectedTx?.studentId || selectedTx?.msv;
       studentNotificationService.notifyFromAccountant({
-        title: "Xác nhận thanh toán phí KTX thành công",
+        title: "Thông báo đối soát giao dịch thành công",
         content: `Khoản thanh toán hóa đơn ${matchedCode} của bạn đã được Phòng Kế toán đối soát và xác nhận thanh toán thành công. Cảm ơn bạn đã hoàn thành nghĩa vụ tài chính đúng hạn.`,
         type: "billing",
         actionUrl: "/student/payment-history",

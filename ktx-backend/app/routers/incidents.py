@@ -17,14 +17,17 @@ router = APIRouter(prefix="/incidents", tags=["Phản ánh và Báo hỏng KTX"]
 
 @router.get(
     "/violations",
-    dependencies=[Depends(RoleChecker(["QuanLy", "Admin"]))],
-    summary="[Quản lý] Lấy danh sách biên bản vi phạm",
+    summary="Lấy danh sách biên bản vi phạm",
 )
 def list_violations(
-    current_user: TaiKhoan = Depends(RoleChecker(["QuanLy", "Admin"])),
+    current_user: TaiKhoan = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    records = db.query(ViPham).order_by(ViPham.ngay_vi_pham.desc()).all()
+    query = db.query(ViPham)
+    if current_user.vai_tro == VaiTro.SINH_VIEN:
+        student = get_current_student(current_user=current_user, db=db)
+        query = query.filter(ViPham.msv.ilike(student.msv))
+    records = query.order_by(ViPham.ngay_vi_pham.desc()).all()
     results = []
     for item in records:
         phong_str = ""
@@ -157,31 +160,41 @@ class UpdateViolationStatusRequest(BaseModel):
 
 @router.put(
     "/violations/{ma_vi_pham}",
-    dependencies=[Depends(RoleChecker(["QuanLy", "Admin"]))],
-    summary="[Quản lý] Cập nhật biên bản vi phạm",
+    summary="Cập nhật biên bản vi phạm",
 )
 def update_violation(
     ma_vi_pham: str,
     req: UpdateViolationStatusRequest,
-    current_user: TaiKhoan = Depends(RoleChecker(["QuanLy", "Admin"])),
+    current_user: TaiKhoan = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     item = db.query(ViPham).filter(ViPham.ma_vi_pham == ma_vi_pham).first()
     if not item:
         raise HTTPException(status_code=404, detail="Không tìm thấy biên bản vi phạm")
-    if req.trang_thai:
-        item.trang_thai = req.trang_thai
-    if req.sub_status:
-        item.sub_status = req.sub_status
-    if req.hinh_thuc_xu_ly or req.quyet_dinh:
-        item.hinh_thuc_xu_ly = req.hinh_thuc_xu_ly or req.quyet_dinh
-        item.quyet_dinh = req.quyet_dinh or req.hinh_thuc_xu_ly
-    if req.ghi_chu is not None:
-        item.ghi_chu = req.ghi_chu
-    if req.giai_trinh is not None:
-        item.giai_trinh = req.giai_trinh
-    if req.giai_trinh_at is not None:
-        item.giai_trinh_at = req.giai_trinh_at
+
+    if current_user.vai_tro == VaiTro.SINH_VIEN:
+        student = get_current_student(current_user=current_user, db=db)
+        if item.msv.lower() != student.msv.lower():
+            raise HTTPException(status_code=403, detail="Không có quyền cập nhật biên bản vi phạm này")
+        if req.giai_trinh is not None:
+            item.giai_trinh = req.giai_trinh
+        if req.giai_trinh_at is not None:
+            item.giai_trinh_at = req.giai_trinh_at
+    else:
+        if req.trang_thai:
+            item.trang_thai = req.trang_thai
+        if req.sub_status:
+            item.sub_status = req.sub_status
+        if req.hinh_thuc_xu_ly or req.quyet_dinh:
+            item.hinh_thuc_xu_ly = req.hinh_thuc_xu_ly or req.quyet_dinh
+            item.quyet_dinh = req.quyet_dinh or req.hinh_thuc_xu_ly
+        if req.ghi_chu is not None:
+            item.ghi_chu = req.ghi_chu
+        if req.giai_trinh is not None:
+            item.giai_trinh = req.giai_trinh
+        if req.giai_trinh_at is not None:
+            item.giai_trinh_at = req.giai_trinh_at
+
     db.commit()
     db.refresh(item)
     return {

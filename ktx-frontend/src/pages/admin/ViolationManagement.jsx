@@ -232,13 +232,45 @@ export default function ViolationManagement({ searchTerm = "" }) {
   const [studentExplanation, setStudentExplanation] = useState("");
   const [studentExplanationAt, setStudentExplanationAt] = useState("");
 
+  const fetchViolations = () => {
+    api
+      .get("/incidents/violations")
+      .then(({ data }) => {
+        if (Array.isArray(data)) {
+          setViolations(data);
+          setSelectedViolation((prev) => {
+            if (!prev) return prev;
+            const found = data.find(
+              (x) => x.id === prev.id || x.ma_bb === prev.ma_bb,
+            );
+            return found ? { ...prev, ...found } : prev;
+          });
+
+          // Tự động mở biên bản nếu có param ?id= trên URL
+          const searchParams = new URLSearchParams(window.location.search);
+          const targetId = searchParams.get("id");
+          if (targetId) {
+            const matched = data.find((x) => x.id === targetId || x.ma_bb === targetId);
+            if (matched) {
+              setSelectedViolation(matched);
+              setViewMode("detail");
+            }
+          }
+        }
+      })
+      .catch((error) => {
+        console.error("Không thể tải biên bản vi phạm:", error);
+      });
+  };
+
   useEffect(() => {
-    if (selectedViolation?.ma_bb) {
+    const targetCode = selectedViolation?.ma_bb || selectedViolation?.id;
+    if (targetCode) {
       const stored = localStorage.getItem(
-        `ktx_violation_explanation_${selectedViolation.ma_bb}`,
+        `ktx_violation_explanation_${targetCode}`,
       );
       const storedAt = localStorage.getItem(
-        `ktx_violation_explanation_at_${selectedViolation.ma_bb}`,
+        `ktx_violation_explanation_at_${targetCode}`,
       );
       setStudentExplanation(stored || selectedViolation.giai_trinh || "");
       setStudentExplanationAt(storedAt || selectedViolation.giai_trinh_at || "");
@@ -250,7 +282,10 @@ export default function ViolationManagement({ searchTerm = "" }) {
 
   useEffect(() => {
     const handleExpUpdated = (e) => {
-      if (e.detail?.ma_bb && selectedViolation?.ma_bb === e.detail.ma_bb) {
+      fetchViolations();
+
+      const targetCode = selectedViolation?.ma_bb || selectedViolation?.id;
+      if (e.detail?.ma_bb && targetCode === e.detail.ma_bb) {
         setStudentExplanation(e.detail.explanation || "");
         setStudentExplanationAt(
           e.detail.at ||
@@ -262,16 +297,25 @@ export default function ViolationManagement({ searchTerm = "" }) {
               new Date().toLocaleDateString("vi-VN"),
         );
       }
+
+      showToast(
+        `Sinh viên ${e.detail?.studentName || ""} (${e.detail?.msv || ""}) vừa gửi bản giải trình cho biên bản ${e.detail?.ma_bb}!`,
+        "success",
+      );
     };
 
     const handleStorage = (e) => {
-      if (selectedViolation?.ma_bb) {
-        if (e.key === `ktx_violation_explanation_${selectedViolation.ma_bb}`) {
+      const targetCode = selectedViolation?.ma_bb || selectedViolation?.id;
+      if (targetCode) {
+        if (e.key === `ktx_violation_explanation_${targetCode}`) {
           setStudentExplanation(e.newValue || "");
         }
-        if (e.key === `ktx_violation_explanation_at_${selectedViolation.ma_bb}`) {
+        if (e.key === `ktx_violation_explanation_at_${targetCode}`) {
           setStudentExplanationAt(e.newValue || "");
         }
+      }
+      if (e.key?.startsWith("ktx_violation_explanation_")) {
+        fetchViolations();
       }
     };
 
@@ -291,29 +335,31 @@ export default function ViolationManagement({ searchTerm = "" }) {
   }, [selectedViolation]);
 
   useEffect(() => {
-    const fetchViolations = () => {
-      api
-        .get("/incidents/violations")
-        .then(({ data }) => {
-          if (Array.isArray(data)) {
-            setViolations(data);
-            setSelectedViolation((prev) => {
-              if (!prev) return prev;
-              const found = data.find(
-                (x) => x.id === prev.id || x.ma_bb === prev.ma_bb,
-              );
-              return found ? { ...prev, ...found } : prev;
-            });
-          }
-        })
-        .catch((error) => {
-          console.error("Không thể tải biên bản vi phạm:", error);
-        });
-    };
-
     fetchViolations();
     const interval = setInterval(fetchViolations, 30000);
-    return () => clearInterval(interval);
+
+    const handleNavigate = (e) => {
+      const targetId = e.detail?.entityId || e.detail?.path?.match(/id=([^&]+)/)?.[1];
+      if (targetId) {
+        api.get("/incidents/violations").then(({ data }) => {
+          if (Array.isArray(data)) {
+            const found = data.find((x) => x.id === targetId || x.ma_bb === targetId);
+            if (found) {
+              setSelectedViolation(found);
+              setViewMode("detail");
+            }
+          }
+        });
+      }
+    };
+    window.addEventListener("student-navigate", handleNavigate);
+    window.addEventListener("popstate", handleNavigate);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("student-navigate", handleNavigate);
+      window.removeEventListener("popstate", handleNavigate);
+    };
   }, []);
 
   // Thống kê nhanh
@@ -479,17 +525,18 @@ export default function ViolationManagement({ searchTerm = "" }) {
           selectedViolation.phong ||
           "Phòng KTX";
 
+        const ticketCode = selectedViolation.ma_bb || selectedViolation.id;
         studentNotificationService.notifyFromManagement({
-          id: `notif-violation-${selectedViolation.ma_bb}`,
+          id: `notif-violation-${ticketCode}`,
           title: "Thông báo ghi nhận vi phạm nội quy KTX",
-          content: `Ban quản lý KTX ghi nhận biên bản ${selectedViolation.ma_bb} về hành vi "${hanhViName}" vào ngày ${thoiGianStr}. Vui lòng kiểm tra và gửi bản giải trình trước thời hạn quy định.`,
+          content: `Ban quản lý KTX ghi nhận biên bản ${ticketCode} về hành vi "${hanhViName}" vào ngày ${thoiGianStr}. Vui lòng kiểm tra và gửi bản giải trình trước thời hạn quy định.`,
           type: "violation_warning",
           msv: selectedViolation.msv,
           actionUrl: "/student/notifications",
           actionLabel: "Xem chi tiết biên bản",
           meta: {
             scenario: 1,
-            ma_bb: selectedViolation.ma_bb,
+            ma_bb: ticketCode,
             hanh_vi: hanhViName,
             ngay: thoiGianStr,
             dia_diem: diaDiemStr,
@@ -497,6 +544,21 @@ export default function ViolationManagement({ searchTerm = "" }) {
             mo_ta: selectedViolation.mo_ta,
           },
         });
+
+        // Đồng bộ ktx_active_violations
+        try {
+          const rawActive = localStorage.getItem("ktx_active_violations");
+          const activeList = rawActive ? JSON.parse(rawActive) : [];
+          const activeIdx = activeList.findIndex((x) => x.id === selectedViolation.id || x.ma_bb === ticketCode);
+          if (activeIdx >= 0) {
+            activeList[activeIdx] = { ...activeList[activeIdx], ...updated };
+          } else {
+            activeList.unshift(updated);
+          }
+          localStorage.setItem("ktx_active_violations", JSON.stringify(activeList));
+        } catch (_) {}
+
+        window.dispatchEvent(new CustomEvent("ktx-notifications-updated"));
       } catch (notifErr) {
         console.warn("Lỗi gửi thông báo cho sinh viên:", notifErr);
       }
@@ -618,17 +680,18 @@ export default function ViolationManagement({ searchTerm = "" }) {
         selectedViolation.mo_ta ||
         "Dùng đồ có công suất lớn trong phòng";
 
+      const ticketCode = selectedViolation.ma_bb || selectedViolation.id;
       studentNotificationService.notifyFromManagement({
-        id: `notif-violation-${selectedViolation.ma_bb}`,
+        id: `notif-violation-${ticketCode}`,
         title: "Thông báo triệu tập Hội đồng kỷ luật KTX",
-        content: `Bạn được triệu tập tham dự cuộc họp Hội đồng kỷ luật KTX liên quan đến vụ việc ${selectedViolation.ma_bb} (${hanhViName}). Thời gian: ${summonForm.gio} - ${displayDate}, Địa điểm: ${structuredData.dia_diem}.`,
+        content: `Bạn được triệu tập tham dự cuộc họp Hội đồng kỷ luật KTX liên quan đến vụ việc ${ticketCode} (${hanhViName}). Thời gian: ${summonForm.gio} - ${displayDate}, Địa điểm: ${structuredData.dia_diem}.`,
         type: "violation_summon",
         msv: selectedViolation.msv,
         actionUrl: "/student/notifications",
         actionLabel: "Xem chi tiết biên bản",
         meta: {
           scenario: 2,
-          ma_bb: selectedViolation.ma_bb,
+          ma_bb: ticketCode,
           hanh_vi: hanhViName,
           thoi_gian: `${summonForm.gio} - ${displayDate}`,
           dia_diem: structuredData.dia_diem,
@@ -638,6 +701,21 @@ export default function ViolationManagement({ searchTerm = "" }) {
           gio: summonForm.gio,
         },
       });
+
+      // Đồng bộ ktx_active_violations
+      try {
+        const rawActive = localStorage.getItem("ktx_active_violations");
+        const activeList = rawActive ? JSON.parse(rawActive) : [];
+        const activeIdx = activeList.findIndex((x) => x.id === selectedViolation.id || x.ma_bb === ticketCode);
+        if (activeIdx >= 0) {
+          activeList[activeIdx] = { ...activeList[activeIdx], ...updated };
+        } else {
+          activeList.unshift(updated);
+        }
+        localStorage.setItem("ktx_active_violations", JSON.stringify(activeList));
+      } catch (_) {}
+
+      window.dispatchEvent(new CustomEvent("ktx-notifications-updated"));
     } catch (notifErr) {
       console.warn("Lỗi gửi thông báo cho sinh viên:", notifErr);
     }
@@ -709,17 +787,18 @@ export default function ViolationManagement({ searchTerm = "" }) {
         selectedViolation.mo_ta ||
         "Dùng đồ có công suất lớn trong phòng";
 
+      const ticketCode = selectedViolation.ma_bb || selectedViolation.id;
       studentNotificationService.notifyFromManagement({
-        id: `notif-violation-${selectedViolation.ma_bb}`,
+        id: `notif-violation-${ticketCode}`,
         title: "Kết quả xử lý vi phạm nội quy KTX",
-        content: `Vụ việc vi phạm ${selectedViolation.ma_bb} đã được xử lý hoàn tất. Hình thức xử lý: ${resolveForm.hinh_thuc}. Hồ sơ vi phạm đã được đóng.`,
+        content: `Vụ việc vi phạm ${ticketCode} đã được xử lý hoàn tất. Hình thức xử lý: ${resolveForm.hinh_thuc}. Hồ sơ vi phạm đã được đóng.`,
         type: "violation_resolved",
         msv: selectedViolation.msv,
         actionUrl: "/student/notifications",
         actionLabel: "Xem kết quả",
         meta: {
           scenario: 3,
-          ma_bb: selectedViolation.ma_bb,
+          ma_bb: ticketCode,
           hanh_vi: hanhViName,
           hinh_thuc: resolveForm.hinh_thuc,
           ket_luan: structuredData.ket_luan,
@@ -727,6 +806,21 @@ export default function ViolationManagement({ searchTerm = "" }) {
           ngay_chot: structuredData.ngay_chot,
         },
       });
+
+      // Đồng bộ ktx_active_violations
+      try {
+        const rawActive = localStorage.getItem("ktx_active_violations");
+        const activeList = rawActive ? JSON.parse(rawActive) : [];
+        const activeIdx = activeList.findIndex((x) => x.id === selectedViolation.id || x.ma_bb === ticketCode);
+        if (activeIdx >= 0) {
+          activeList[activeIdx] = { ...activeList[activeIdx], ...updated };
+        } else {
+          activeList.unshift(updated);
+        }
+        localStorage.setItem("ktx_active_violations", JSON.stringify(activeList));
+      } catch (_) {}
+
+      window.dispatchEvent(new CustomEvent("ktx-notifications-updated"));
     } catch (notifErr) {
       console.warn("Lỗi gửi thông báo cho sinh viên:", notifErr);
     }

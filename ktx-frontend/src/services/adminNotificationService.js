@@ -240,6 +240,79 @@ class AdminNotificationService {
         console.warn("Lỗi đồng bộ sự cố thực tế cho admin:", e);
       }
 
+      // 3. Quét giải trình vi phạm từ Backend API & localStorage
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+        const token =
+          localStorage.getItem("ktx_token") ||
+          localStorage.getItem("access_token") ||
+          localStorage.getItem("token") ||
+          "";
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const vioRes = await fetch(`${API_URL}/incidents/violations`, { headers });
+        if (vioRes.ok) {
+          const vios = await vioRes.json();
+          if (Array.isArray(vios)) {
+            vios.forEach((vio) => {
+              const rawVioId = String(vio.ma_bb || vio.id || "").replace(/^#/, "").trim();
+              if (!rawVioId) return;
+
+              const localExp = localStorage.getItem(`ktx_violation_explanation_${rawVioId}`);
+              const localExpAt = localStorage.getItem(`ktx_violation_explanation_at_${rawVioId}`);
+              const explanationText = (vio.giai_trinh || localExp || "").trim();
+              if (!explanationText) return;
+
+              const isResolved =
+                vio.sub_status === "DA_XU_LY_DUT_DIEM" ||
+                vio.trang_thai === "DA_XU_LY";
+
+              const notifId = `NOTIF_VIO_EXP_${rawVioId}`;
+              const existing = storedMap.get(notifId);
+
+              realNotifs.push({
+                id: notifId,
+                recipientRole: "DORM_MANAGER",
+                category: "VIOLATION_EXPLANATION",
+                priority: isResolved ? "NORMAL" : "HIGH",
+                status: existing
+                  ? existing.status
+                  : !isResolved
+                  ? "ACTION_REQUIRED"
+                  : "ACTION_RESOLVED",
+                isRead: existing ? existing.isRead : false,
+                title: `Sinh viên nộp giải trình: #${rawVioId}`,
+                previewText: `Sinh viên ${vio.ho_ten || vio.msv} (${vio.msv}) đã gửi giải trình: "${explanationText}".`,
+                avatarOrIcon: {
+                  type: "ICON",
+                  name: "Scale",
+                  badgeColor: "amber",
+                },
+                metadata: {
+                  violationId: rawVioId,
+                  studentId: vio.msv,
+                  studentName: vio.ho_ten,
+                  roomCode: vio.phong,
+                  explanation: explanationText,
+                  explanationAt: vio.giai_trinh_at || localExpAt,
+                },
+                deepLink: {
+                  targetUrl: `/admin?tab=violations&id=${encodeURIComponent(rawVioId)}`,
+                  openMode: "NAVIGATE",
+                  entityId: rawVioId,
+                },
+                quickActions: [
+                  { actionKey: "VIEW_DETAIL", label: "Xem biên bản", variant: "secondary" },
+                ],
+                createdAt: existing?.createdAt || vio.giai_trinh_at || localExpAt || new Date().toISOString(),
+                resolvedAt: isResolved ? (existing?.resolvedAt || new Date().toISOString()) : null,
+              });
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("Lỗi đồng bộ giải trình vi phạm cho admin:", e);
+      }
+
       // Sắp xếp ổn định (Stable Sort): Ưu tiên URGENT lên đầu, sau đó ACTION_REQUIRED, rồi thời gian giảm dần
       realNotifs.sort((a, b) => {
         if (a.priority === "URGENT" && b.priority !== "URGENT") return -1;
