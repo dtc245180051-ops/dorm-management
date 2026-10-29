@@ -154,7 +154,7 @@ export default function StudentRoomDetailModal({
   const handleRegisterClick = () => {
     if (isFull) return;
     if (onRegisterRoom) {
-      onRegisterRoom(room);
+      onRegisterRoom();
     }
   };
 
@@ -548,9 +548,9 @@ export default function StudentRoomDetailModal({
               type="button"
               onClick={handleRegisterClick}
               className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition flex items-center gap-2 cursor-pointer hover:shadow-lg active:scale-98"
-              title="Đăng ký ngay phòng này"
+              title="Đăng ký ngay"
             >
-              <span>Đăng ký phòng này</span>
+              <span>Đăng ký ngay</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           )}

@@ -68,6 +68,32 @@ function getSmartFallbackMatching(studentInfo, candidateRooms = []) {
     .join(" ")
     .toLowerCase();
 
+  const targetType = String(studentInfo.loai_phong || (rawWish.includes("dịch vụ") ? "Phòng dịch vụ" : "")).trim();
+
+  // Ràng buộc cứng loại phòng: Nếu sinh viên yêu cầu loại phòng cụ thể
+  if (targetType) {
+    const typeMatched = eligibleRooms.filter((r) =>
+      String(r.loai_phong || "").trim().toLowerCase() === targetType.toLowerCase()
+    );
+    if (typeMatched.length === 0) {
+      const altType = eligibleRooms[0]?.loai_phong || "Phòng tiêu chuẩn";
+      const mismatchMsg = `⚠️ KTX hiện đã hết (hoặc chưa có) ${targetType} dành cho ${genderLabel}. Đang hiển thị các phòng ${altType.toLowerCase()} còn trống để Quản lý cân nhắc thỏa thuận với sinh viên.`;
+      return {
+        best_room_id: "",
+        toa: eligibleRooms[0]?.toa || "",
+        giuong: "",
+        match_score: 0,
+        is_room_type_mismatch: true,
+        requested_room_type: targetType,
+        available_alternative_type: altType,
+        ai_reason: mismatchMsg,
+        suggestion: null,
+        message: mismatchMsg,
+      };
+    }
+    eligibleRooms = typeMatched;
+  }
+
   const wishesToaA1 = /tòa\s*a1\b|toa\s*a1\b|\ba1\b/i.test(rawWish) || String(studentInfo.ma_toa_mong_muon || "").toLowerCase().includes("a1");
   const wishesToaA = !wishesToaA1 && (/tòa\s*a\b|toa\s*a\b|\ba\b/i.test(rawWish) || String(studentInfo.ma_toa_mong_muon || "").toLowerCase().startsWith("a"));
   const wishesToaB = /tòa\s*b\b|toa\s*b\b|\bb\b/i.test(rawWish) || String(studentInfo.ma_toa_mong_muon || "").toLowerCase().startsWith("b");
@@ -198,9 +224,12 @@ export async function matchRoomWithGemini(studentInfo, candidateRooms = []) {
       if (!res.data.best_room_id && !res.data.suggestion) {
         return {
           best_room_id: "",
-          toa: "",
+          toa: res.data.toa ?? "",
           giuong: "",
           match_score: 0,
+          is_room_type_mismatch: res.data.is_room_type_mismatch || false,
+          requested_room_type: res.data.requested_room_type || "",
+          available_alternative_type: res.data.available_alternative_type || "",
           ai_reason: res.data.message || res.data.ai_reason || notFoundMessage,
           suggestion: null,
           message: res.data.message || notFoundMessage,
@@ -211,6 +240,7 @@ export async function matchRoomWithGemini(studentInfo, candidateRooms = []) {
         toa: res.data.toa ?? "",
         giuong: res.data.giuong ?? "",
         match_score: Number(res.data.match_score) || 90,
+        is_room_type_mismatch: false,
         ai_reason: res.data.ai_reason || "Gợi ý tự động từ hệ thống AI",
         suggestion: res.data.suggestion || {
           ma_toa: res.data.toa ?? "",

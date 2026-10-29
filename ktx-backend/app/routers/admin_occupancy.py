@@ -157,24 +157,38 @@ def get_request_detail(
                 # Sắp xếp tầng thấp nhất lên đầu
                 sorted_rooms.sort(key=lambda r: (r.so_tang or 1))
 
-            # Ưu tiên phòng khớp loại phòng mong muốn
-            pref_type = stored.get("loai_phong")
-            matched_r = next(
-                (r for r in sorted_rooms if pref_type and r.loai_phong and r.loai_phong.strip().lower() == pref_type.strip().lower()),
-                sorted_rooms[0]
-            )
-            first_empty_bed = "G01"
-            if matched_r.danh_sach_giuong_trong:
-                first_empty_bed = matched_r.danh_sach_giuong_trong[0].ma_giuong
+            # Lọc theo đúng loại phòng mong muốn (Room Type Constraint)
+            pref_type = (stored.get("loai_phong") or "").strip()
+            type_matched_rooms = [
+                r for r in sorted_rooms
+                if pref_type and r.loai_phong and r.loai_phong.strip().lower() == pref_type.lower()
+            ]
 
-            stored["goi_y"] = {
-                "ma_toa": matched_r.ma_toa,
-                "ma_phong": matched_r.ma_phong,
-                "ma_giuong": first_empty_bed,
-            }
-            stored["suggestion"] = stored["goi_y"]
-            stored["message"] = None
-            stored["suggestion_error"] = None
+            if pref_type and not type_matched_rooms:
+                alt_type = sorted_rooms[0].loai_phong or "Phòng tiêu chuẩn"
+                mismatch_msg = f"⚠️ KTX hiện đã hết (hoặc chưa có) {pref_type} dành cho {student_gender}. Đang hiển thị các phòng {alt_type.lower()} còn trống để Quản lý cân nhắc thỏa thuận với sinh viên."
+                stored["goi_y"] = None
+                stored["suggestion"] = None
+                stored["is_room_type_mismatch"] = True
+                stored["requested_room_type"] = pref_type
+                stored["available_alternative_type"] = alt_type
+                stored["message"] = mismatch_msg
+                stored["suggestion_error"] = mismatch_msg
+            else:
+                matched_r = type_matched_rooms[0] if type_matched_rooms else sorted_rooms[0]
+                first_empty_bed = "G01"
+                if matched_r.danh_sach_giuong_trong:
+                    first_empty_bed = matched_r.danh_sach_giuong_trong[0].ma_giuong
+
+                stored["goi_y"] = {
+                    "ma_toa": matched_r.ma_toa,
+                    "ma_phong": matched_r.ma_phong,
+                    "ma_giuong": first_empty_bed,
+                }
+                stored["suggestion"] = stored["goi_y"]
+                stored["is_room_type_mismatch"] = False
+                stored["message"] = None
+                stored["suggestion_error"] = None
         return stored
 
     # 2. Tìm kiếm sinh viên từ CSDL theo MSV

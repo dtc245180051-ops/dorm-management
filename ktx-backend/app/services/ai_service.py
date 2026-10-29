@@ -165,6 +165,30 @@ def _heuristic_room_matching(student_info: dict, eligible_rooms: list) -> dict:
         str(student_info.get("tang_mong_muon") or ""),
     ]).lower()
 
+    target_type = str(student_info.get("loai_phong") or "").strip()
+    if not target_type and "dịch vụ" in raw_wish:
+        target_type = "Phòng dịch vụ"
+
+    # Ràng buộc cứng loại phòng: Nếu sinh viên chỉ định loại phòng, lọc chính xác loại phòng đó
+    if target_type:
+        type_matched = [r for r in eligible_rooms if str(r.get("loai_phong") or "").strip().lower() == target_type.lower()]
+        if not type_matched:
+            alt_type = eligible_rooms[0].get("loai_phong") or "Phòng tiêu chuẩn"
+            mismatch_msg = f"⚠️ KTX hiện đã hết (hoặc chưa có) {target_type} dành cho {gender_label}. Đang hiển thị các phòng {alt_type.lower()} còn trống để Quản lý cân nhắc thỏa thuận với sinh viên."
+            return {
+                "best_room_id": "",
+                "toa": eligible_rooms[0].get("toa") or "",
+                "giuong": "",
+                "match_score": 0,
+                "is_room_type_mismatch": True,
+                "requested_room_type": target_type,
+                "available_alternative_type": alt_type,
+                "ai_reason": mismatch_msg,
+                "suggestion": None,
+                "message": mismatch_msg,
+            }
+        eligible_rooms = type_matched
+
     wishes_toa_a1 = bool(re.search(r"tòa\s*a1\b|toa\s*a1\b|\ba1\b", raw_wish)) or "a1" in str(student_info.get("ma_toa_mong_muon") or "").lower()
     wishes_toa_a = not wishes_toa_a1 and (bool(re.search(r"tòa\s*a\b|toa\s*a\b|\ba\b", raw_wish)) or str(student_info.get("ma_toa_mong_muon") or "").lower().startswith("a"))
     wishes_toa_b = bool(re.search(r"tòa\s*b\b|toa\s*b\b|\bb\b", raw_wish)) or str(student_info.get("ma_toa_mong_muon") or "").lower().startswith("b")
@@ -195,8 +219,7 @@ def _heuristic_room_matching(student_info: dict, eligible_rooms: list) -> dict:
             else:
                 score -= 35
 
-        target_type = student_info.get("loai_phong") or ("Phòng dịch vụ" if "dịch vụ" in raw_wish else "Phòng tiêu chuẩn")
-        if str(room.get("loai_phong") or "").lower() == str(target_type).lower():
+        if target_type and str(room.get("loai_phong") or "").lower() == str(target_type).lower():
             score += 20
             reasons.append(f"loại phòng {room.get('loai_phong')}")
 
@@ -223,6 +246,7 @@ def _heuristic_room_matching(student_info: dict, eligible_rooms: list) -> dict:
         "toa": b_toa,
         "giuong": b_bed,
         "match_score": best.get("score") or 85,
+        "is_room_type_mismatch": False,
         "ai_reason": best.get("reason"),
         "suggestion": {
             "ma_toa": b_toa,
@@ -262,10 +286,41 @@ def recommend_room_with_ai(student_info: dict, candidate_rooms: list) -> dict:
             "toa": "",
             "giuong": "",
             "match_score": 0,
+            "is_room_type_mismatch": False,
             "ai_reason": not_found_msg,
             "suggestion": None,
             "message": not_found_msg,
         }
+
+    # Ràng buộc cứng loại phòng (Room Type Constraint)
+    raw_wish = (
+        str(student_info.get("nguyen_vong") or "") + " " +
+        str(student_info.get("noi_dung_nguyen_vong") or "") + " " +
+        str(student_info.get("nguyen_vong_label") or "") + " " +
+        str(student_info.get("chi_tiet_nguyen_vong") or "")
+    ).lower()
+    target_type = str(student_info.get("loai_phong") or "").strip()
+    if not target_type and "dịch vụ" in raw_wish:
+        target_type = "Phòng dịch vụ"
+
+    if target_type:
+        type_matched = [r for r in eligible_rooms if str(r.get("loai_phong") or "").strip().lower() == target_type.lower()]
+        if not type_matched:
+            alt_type = eligible_rooms[0].get("loai_phong") or "Phòng tiêu chuẩn"
+            mismatch_msg = f"⚠️ KTX hiện đã hết (hoặc chưa có) {target_type} dành cho {gender_label}. Đang hiển thị các phòng {alt_type.lower()} còn trống để Quản lý cân nhắc thỏa thuận với sinh viên."
+            return {
+                "best_room_id": "",
+                "toa": eligible_rooms[0].get("toa") or "",
+                "giuong": "",
+                "match_score": 0,
+                "is_room_type_mismatch": True,
+                "requested_room_type": target_type,
+                "available_alternative_type": alt_type,
+                "ai_reason": mismatch_msg,
+                "suggestion": None,
+                "message": mismatch_msg,
+            }
+        eligible_rooms = type_matched
 
     try:
         simplified_rooms = []

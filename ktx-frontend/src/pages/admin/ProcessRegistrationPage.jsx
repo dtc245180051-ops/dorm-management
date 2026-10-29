@@ -136,22 +136,38 @@ export default function ProcessRegistrationPage({
           if (targetBuilding) {
             setSelectedBuilding(targetBuilding.ma_toa);
             const rooms = targetBuilding.rooms || [];
-            if (rooms.length > 0) {
-              const targetRoom =
-                rooms.find((r) => r.ma_phong === detail?.goi_y?.ma_phong) ||
-                rooms[0];
-              setSelectedRoom(targetRoom.ma_phong);
+            const hasTypeMismatch = Boolean(detail?.is_room_type_mismatch);
+            const prefType =
+              detail?.loai_phong ||
+              detail?.preferred_room_type ||
+              detail?.loai_phong_mong_muon ||
+              "";
 
-              const beds = targetRoom.beds || [];
-              if (beds.length > 0) {
-                const targetBed =
-                  beds.find((b) => b.ma_giuong === detail?.goi_y?.ma_giuong) ||
-                  beds[0];
-                setSelectedBed(targetBed.ma_giuong);
+            // Chỉ tự động chọn phòng khi KHÔNG có cảnh báo hết loại phòng và phòng gợi ý khớp nguyện vọng
+            if (!hasTypeMismatch && detail?.goi_y?.ma_phong && rooms.length > 0) {
+              const targetRoom = rooms.find((r) => r.ma_phong === detail.goi_y.ma_phong);
+              if (
+                targetRoom &&
+                (!prefType ||
+                  !targetRoom.loai_phong ||
+                  targetRoom.loai_phong.trim().toLowerCase() === prefType.trim().toLowerCase())
+              ) {
+                setSelectedRoom(targetRoom.ma_phong);
+                const beds = targetRoom.beds || [];
+                if (beds.length > 0) {
+                  const targetBed =
+                    beds.find((b) => b.ma_giuong === detail?.goi_y?.ma_giuong) ||
+                    beds[0];
+                  setSelectedBed(targetBed.ma_giuong);
+                } else {
+                  setSelectedBed("");
+                }
               } else {
+                setSelectedRoom("");
                 setSelectedBed("");
               }
             } else {
+              // Hết loại phòng yêu cầu -> KHÔNG tự động chọn bừa phòng tiêu chuẩn
               setSelectedRoom("");
               setSelectedBed("");
             }
@@ -207,11 +223,36 @@ export default function ProcessRegistrationPage({
         if (!isCurrent) return;
         setAiRecommendation(recommendation);
 
-        if (!recommendation?.best_room_id || !recommendation?.suggestion) {
-          // Không có phòng hợp lệ phù hợp giới tính -> ĐỂ TRỐNG
-          setSelectedBuilding("");
+        if (
+          !recommendation?.best_room_id ||
+          !recommendation?.suggestion ||
+          recommendation?.is_room_type_mismatch
+        ) {
+          // Hết loại phòng yêu cầu hoặc Không có phòng hợp lệ phù hợp giới tính -> ĐỂ TRỐNG PHÒNG VÀ GIƯỜNG
           setSelectedRoom("");
           setSelectedBed("");
+
+          // Vẫn giữ Tòa hợp lệ để Quản lý nhìn thấy danh sách phòng tiêu chuẩn còn trống để cân nhắc
+          const compatibleBuildings = buildingTree.filter((b) =>
+            isGenderCompatible(requestData?.gioi_tinh, b.gioi_tinh),
+          );
+          if (compatibleBuildings.length > 0) {
+            const recToa = String(recommendation?.toa || "").trim().toLowerCase();
+            const matchedBuilding =
+              compatibleBuildings.find((building) => {
+                const bMa = String(building.ma_toa || "").toLowerCase();
+                const bTen = String(building.ten_toa || "").toLowerCase();
+                return (
+                  recToa === bMa ||
+                  recToa === bTen ||
+                  recToa.includes(bMa) ||
+                  bTen.includes(recToa)
+                );
+              }) || compatibleBuildings[0];
+            setSelectedBuilding(matchedBuilding.ma_toa);
+          } else {
+            setSelectedBuilding("");
+          }
           return;
         }
 
@@ -323,17 +364,39 @@ export default function ProcessRegistrationPage({
   );
   const availableBeds = currentRoomObj?.beds || [];
 
-  // Khi đổi Tòa -> tự động chọn phòng đầu tiên
+  // Khi đổi Tòa -> ưu tiên tìm phòng khớp loại phòng, nếu không có để trống để quản lý tự chọn
   const handleBuildingChange = (e) => {
     const newBld = e.target.value;
     setSelectedBuilding(newBld);
+    if (!newBld) {
+      setSelectedRoom("");
+      setSelectedBed("");
+      return;
+    }
     const bldObj = buildingTree.find((b) => b.ma_toa === newBld);
     if (bldObj && bldObj.rooms && bldObj.rooms.length > 0) {
-      const firstRoom = bldObj.rooms[0];
-      setSelectedRoom(firstRoom.ma_phong);
-      if (firstRoom.beds && firstRoom.beds.length > 0) {
-        setSelectedBed(firstRoom.beds[0].ma_giuong);
+      const prefType =
+        requestData?.loai_phong ||
+        requestData?.preferred_room_type ||
+        requestData?.loai_phong_mong_muon ||
+        "";
+      const matchedTypeRoom = prefType
+        ? bldObj.rooms.find(
+            (r) =>
+              r.loai_phong &&
+              r.loai_phong.trim().toLowerCase() === prefType.trim().toLowerCase(),
+          )
+        : bldObj.rooms[0];
+
+      if (matchedTypeRoom) {
+        setSelectedRoom(matchedTypeRoom.ma_phong);
+        if (matchedTypeRoom.beds && matchedTypeRoom.beds.length > 0) {
+          setSelectedBed(matchedTypeRoom.beds[0].ma_giuong);
+        } else {
+          setSelectedBed("");
+        }
       } else {
+        setSelectedRoom("");
         setSelectedBed("");
       }
     } else {
@@ -346,6 +409,10 @@ export default function ProcessRegistrationPage({
   const handleRoomChange = (e) => {
     const newRoom = e.target.value;
     setSelectedRoom(newRoom);
+    if (!newRoom) {
+      setSelectedBed("");
+      return;
+    }
     const roomObj = availableRooms.find((r) => r.ma_phong === newRoom);
     if (roomObj && roomObj.beds && roomObj.beds.length > 0) {
       setSelectedBed(roomObj.beds[0].ma_giuong);
@@ -504,11 +571,35 @@ export default function ProcessRegistrationPage({
   const sNorm = normalizeGender(studentGender);
   const studentGenderLabel = sNorm === "FEMALE" ? "Nữ" : (sNorm === "MALE" ? "Nam" : (studentGender || "sinh viên"));
 
+  const requestedRoomType =
+    requestData?.loai_phong ||
+    requestData?.preferred_room_type ||
+    requestData?.loai_phong_mong_muon ||
+    "";
+
   const compatibleBuildings = buildingTree.filter((b) =>
     isGenderCompatible(studentGender, b.gioi_tinh),
   );
   const hasCompatibleRooms = compatibleBuildings.some(
     (b) => (b.rooms || []).length > 0,
+  );
+
+  // Kiểm tra xem có phòng nào vừa hợp giới tính vừa đúng loại phòng yêu cầu hay không
+  const hasMatchedRoomType = requestedRoomType
+    ? compatibleBuildings.some((b) =>
+        (b.rooms || []).some(
+          (r) =>
+            r.loai_phong &&
+            r.loai_phong.trim().toLowerCase() === requestedRoomType.trim().toLowerCase() &&
+            ((r.beds || []).length > 0 || (r.available_beds || 0) > 0),
+        ),
+      )
+    : true;
+
+  const isRoomTypeMismatch = Boolean(
+    aiRecommendation?.is_room_type_mismatch ||
+      requestData?.is_room_type_mismatch ||
+      (requestedRoomType && !hasMatchedRoomType),
   );
 
   const isCurrentSelectionCompatible = selectedBuilding
@@ -784,6 +875,19 @@ export default function ProcessRegistrationPage({
                     </p>
                   </div>
                 </div>
+              ) : isRoomTypeMismatch ? (
+                /* THÔNG BÁO CẢNH BÁO KHI HẾT HOẶC CHƯA CÓ LOẠI PHÒNG YÊU CẦU */
+                <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 flex items-start gap-3 shadow-2xs mb-4 animate-in fade-in">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-bold text-amber-950">
+                      ⚠️ KTX hiện đã hết (hoặc chưa có) {requestedRoomType || "Phòng dịch vụ"} dành cho {studentGenderLabel}. Đang hiển thị các phòng tiêu chuẩn còn trống để Quản lý cân nhắc thỏa thuận với sinh viên.
+                    </p>
+                    <p className="text-amber-800 text-xs mt-1 leading-relaxed">
+                      Hệ thống không tự động chọn phòng tiêu chuẩn. Quản lý vui lòng tự chọn phòng trong danh sách bên dưới hoặc thỏa thuận với sinh viên.
+                    </p>
+                  </div>
+                </div>
               ) : null}
 
               {/* CẢNH BÁO NẾU QUẢN LÝ CHỌN NHẦM TÒA KHÁC GIỚI TÍNH */}
@@ -801,8 +905,8 @@ export default function ProcessRegistrationPage({
                 </div>
               ) : null}
 
-              {/* LÝ DO GỢI Ý CỦA AI NẾU CÓ */}
-              {aiRecommendation?.ai_reason && hasCompatibleRooms && selectedBuilding && (
+              {/* LÝ DO GỢI Ý CỦA AI NẾU CÓ VÀ KHÔNG BỊ MISMATCH */}
+              {aiRecommendation?.ai_reason && hasCompatibleRooms && !isRoomTypeMismatch && selectedBuilding && (
                 <div className="flex items-center gap-2 text-xs text-blue-700 bg-blue-50/80 px-3 py-2 rounded-lg border border-blue-200 mb-4 shadow-2xs animate-in fade-in">
                   <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />
                   <span>{aiRecommendation.ai_reason}</span>
@@ -853,7 +957,7 @@ export default function ProcessRegistrationPage({
                       <option value="">-- Chọn phòng --</option>
                       {availableRooms.map((r) => (
                         <option key={r.ma_phong} value={r.ma_phong}>
-                          {r.label || `Phòng ${r.so_phong}`}
+                          {r.label || `Phòng ${r.so_phong || r.ma_phong}`} {r.loai_phong ? `(${r.loai_phong})` : ""}
                         </option>
                       ))}
                     </select>

@@ -130,21 +130,12 @@ export default function RoomSearchPage({
     setIsModalOpen(true);
   };
 
-  // Xử lý chuyển sang trang Đăng ký phòng và tự điền mã phòng vào Nguyện vọng
-  const handleRegisterRoom = (room) => {
+  // Xử lý chuyển sang trang Đăng ký phòng
+  const handleRegisterRoom = () => {
     try {
-      const preferredData = {
-        ma_phong: room.so_phong || room.ma_phong,
-        so_phong: room.so_phong || room.ma_phong,
-        toa: room.toa,
-        ma_toa: room.ma_toa,
-        tang: room.tang,
-        loai_phong: room.loai_phong,
-        gia_thue: room.gia_thue,
-      };
-      sessionStorage.setItem('preferred_room_registration', JSON.stringify(preferredData));
-    } catch (e) {
-      console.warn('Không thể lưu preferred room vào sessionStorage:', e);
+      sessionStorage.removeItem('preferred_room_registration');
+    } catch {
+      // ignore
     }
 
     setIsModalOpen(false);

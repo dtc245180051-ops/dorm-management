@@ -116,8 +116,6 @@ export default function RoomRegistrationPage({
     // Nguyện vọng
     loai_phong: "",
     nguyen_vong: "",
-    nguyen_vong_phong: "",
-    ma_toa_mong_muon: "",
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -270,27 +268,12 @@ export default function RoomRegistrationPage({
     };
   }, [formData.msv, storedStudentAccount.msv]);
 
-  // Tự động điền thông tin phòng nếu sinh viên bấm "Đăng ký phòng này" từ Tra cứu phòng
+  // Đảm bảo xóa dữ liệu phòng tạm để luôn mở form đăng ký ở trạng thái rỗng
   useEffect(() => {
     try {
-      const preferredStr = sessionStorage.getItem(
-        "preferred_room_registration",
-      );
-      if (preferredStr) {
-        const pref = JSON.parse(preferredStr);
-        if (pref && (pref.so_phong || pref.ma_phong)) {
-          const roomCode = pref.so_phong || pref.ma_phong;
-          setFormData((prev) => ({
-            ...prev,
-            nguyen_vong_phong: roomCode,
-            loai_phong:
-              pref.loai_phong || prev.loai_phong || "Phòng tiêu chuẩn",
-            ma_toa_mong_muon: pref.toa || pref.ma_toa || "",
-          }));
-        }
-      }
-    } catch (e) {
-      console.warn("Error loading preferred room:", e);
+      sessionStorage.removeItem("preferred_room_registration");
+    } catch {
+      // ignore
     }
   }, []);
 
@@ -386,16 +369,8 @@ export default function RoomRegistrationPage({
 
     setIsSubmitting(true);
     try {
-      const wishText = formData.nguyen_vong.trim();
-      const wishLabel =
-        [
-          formData.nguyen_vong_phong
-            ? `Phòng ${formData.nguyen_vong_phong}`
-            : null,
-          formData.loai_phong,
-        ]
-          .filter(Boolean)
-          .join(" - ") || wishText;
+      const wishText = (formData.nguyen_vong || "").trim();
+      const wishLabel = formData.loai_phong || wishText || "Phòng tiêu chuẩn";
 
       const payload = {
         ...formData,
@@ -405,9 +380,13 @@ export default function RoomRegistrationPage({
         loai_phong: formData.loai_phong,
         nguyen_vong: wishText,
         nguyen_vong_label: wishLabel,
-        nguyen_vong_phong: formData.nguyen_vong_phong,
         xac_nhan: true,
       };
+      // Đảm bảo không gán cứng room_id / bed_id để Quản lý và AI xét duyệt xếp phòng
+      delete payload.room_id;
+      delete payload.bed_id;
+      delete payload.nguyen_vong_phong;
+      delete payload.ma_toa_mong_muon;
 
       const result = await occupancyService.registerRoom(payload);
       setStudentStatusInfo({
@@ -1068,48 +1047,9 @@ export default function RoomRegistrationPage({
                   <div>
                     <div className="text-xs font-bold text-blue-700 tracking-wider uppercase mb-5 flex items-center justify-between">
                       <span>NGUYỆN VỌNG</span>
-                      {formData.nguyen_vong_phong && (
-                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/90 px-2.5 py-0.5 rounded-full border border-emerald-300">
-                          Đã chọn phòng: {formData.nguyen_vong_phong}
-                        </span>
-                      )}
                     </div>
 
                     <div className="space-y-4">
-                      {/* Báo hiệu phòng đã chọn trước từ Tra cứu phòng */}
-                      {formData.nguyen_vong_phong && (
-                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-3 text-xs">
-                          <div>
-                            <span className="text-[10px] uppercase font-bold text-blue-600 block">
-                              Phòng đã chọn từ mục Tra cứu:
-                            </span>
-                            <span className="font-extrabold text-slate-800 text-sm">
-                              Phòng {formData.nguyen_vong_phong}{" "}
-                              {formData.ma_toa_mong_muon
-                                ? `- ${formData.ma_toa_mong_muon}`
-                                : ""}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              sessionStorage.removeItem(
-                                "preferred_room_registration",
-                              );
-                              setFormData((prev) => ({
-                                ...prev,
-                                nguyen_vong_phong: "",
-                                ma_toa_mong_muon: "",
-                              }));
-                            }}
-                            className="text-xs text-rose-600 hover:text-rose-800 font-semibold cursor-pointer underline"
-                            title="Bỏ chọn phòng này để chọn tự do"
-                          >
-                            Bỏ chọn
-                          </button>
-                        </div>
-                      )}
-
                       {/* Chọn loại phòng mong muốn */}
                       <div>
                         <label className="block text-xs font-semibold text-slate-600 mb-1.5">
@@ -1136,20 +1076,6 @@ export default function RoomRegistrationPage({
                           </div>
                         </div>
                       </div>
-
-                      {/* <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                        Tòa nhà mong muốn (không bắt buộc)
-                      </label>
-                      <input
-                        type="text"
-                        name="ma_toa_mong_muon"
-                        value={formData.ma_toa_mong_muon}
-                        onChange={handleChange}
-                        placeholder="Ví dụ: Tòa A1"
-                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition"
-                      />
-                    </div> */}
 
                       {/* Chi tiết nguyện vọng */}
                       <div>
