@@ -95,13 +95,13 @@ class RoomRequest(Base):
     # 7. Thời gian tạo và cập nhật
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime,
-        default=datetime.datetime.utcnow,
+        default=datetime.datetime.now,
         nullable=False,
     )
     updated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime,
-        default=datetime.datetime.utcnow,
-        onupdate=datetime.datetime.utcnow,
+        default=datetime.datetime.now,
+        onupdate=datetime.datetime.now,
         nullable=False,
     )
 

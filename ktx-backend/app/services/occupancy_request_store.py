@@ -51,7 +51,7 @@ def _find_room_id(db: Session, text: Optional[str]) -> Optional[str]:
 def add_request(req_data: dict, db: Optional[Session] = None) -> dict:
     """Thêm một đơn đăng ký mới vào hệ thống quản lý MySQL."""
     with _get_session(db) as session:
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now()
         date_str = now.strftime("%d/%m/%Y")
         time_str = now.strftime("%H:%M")
 
@@ -209,7 +209,7 @@ def update_request_status(
                             req.phong_mong_muon_id = room_id
 
             req.extra_data = data
-            req.updated_at = datetime.datetime.utcnow()
+            req.updated_at = datetime.datetime.now()
             session.commit()
             session.refresh(req)
             return req.to_dict()
@@ -225,7 +225,7 @@ def add_transfer_request(data: dict, db: Optional[Session] = None) -> dict:
         req_id = data.get("id") or f"YC-{req_num:04d}"
         clean_code = req_id.replace("#", "").strip()
 
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now()
         today_str = now.strftime("%d/%m/%Y %H:%M")
 
         phong_hien_tai = data.get("phong_hien_tai", "")
@@ -245,7 +245,14 @@ def add_transfer_request(data: dict, db: Optional[Session] = None) -> dict:
 
         if " - " in phong_mong_muon:
             p_parts = phong_mong_muon.split(" - ")
-            to_label = f"{p_parts[0].strip()} ({p_parts[1].strip()})"
+            r_part = p_parts[0].strip()
+            # Tìm phần chứa chữ "Tòa" (ví dụ: "Tòa A1") thay vì lấy "Tầng 2"
+            toa_part = next((p.strip() for p in p_parts if "tòa" in p.lower()), None)
+            if not toa_part and len(p_parts) > 1:
+                toa_part = p_parts[-1].strip()
+            if toa_part and "(" in toa_part:
+                toa_part = toa_part.split("(")[0].strip()
+            to_label = f"{r_part} ({toa_part})" if toa_part else r_part
         else:
             to_label = phong_mong_muon.strip()
 
@@ -313,7 +320,7 @@ def add_checkout_request(data: dict, db: Optional[Session] = None) -> dict:
         req_id = data.get("id") or f"YC-{req_num:04d}"
         clean_code = req_id.replace("#", "").strip()
 
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now()
         today_str = now.strftime("%d/%m/%Y %H:%M")
 
         phong_hien_tai = data.get("phong_hien_tai", "")

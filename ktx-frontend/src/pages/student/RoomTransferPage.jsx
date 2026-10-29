@@ -247,6 +247,41 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
     }
   };
 
+  // Format ngày gửi khớp thời gian thực địa phương
+  const formatNgayGui = (item) => {
+    let dateVal = item.ngay_gui || item.ngay_dang_ky || item.created_at;
+    if (!dateVal) return "—";
+    if (typeof dateVal === "string" && dateVal.includes("T")) {
+      try {
+        const d = new Date(dateVal);
+        if (!isNaN(d.getTime())) {
+          const dd = String(d.getDate()).padStart(2, "0");
+          const mm = String(d.getMonth() + 1).padStart(2, "0");
+          const yyyy = d.getFullYear();
+          const hh = String(d.getHours()).padStart(2, "0");
+          const min = String(d.getMinutes()).padStart(2, "0");
+          return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+        }
+      } catch (_) {}
+    }
+    return dateVal;
+  };
+
+  // Format phòng liên quan chuẩn tòa nhà đích thay vì tầng
+  const formatPhongLienQuan = (item) => {
+    let plq = item.phong_lien_quan || item.phong_dich || item.phong_mong_muon || item.phong_hien_tai || "—";
+    if (plq.includes("(Tầng")) {
+      const toaMatch =
+        item.xep_phong?.ma_toa?.replace("TOA_", "Tòa ") ||
+        item.ma_toa_mong_muon?.replace("TOA_", "Tòa ") ||
+        (plq.includes("P203") || plq.includes("A203") ? "Tòa A1" : "");
+      if (toaMatch) {
+        plq = plq.replace(/\(Tầng\s*\d+\)/gi, `(${toaMatch})`);
+      }
+    }
+    return plq;
+  };
+
   // Format ngày dd/mm/yyyy hiển thị
   const formatInputDateToDisplay = (dateStr) => {
     if (!dateStr) return "";
@@ -329,7 +364,9 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
       if (toFormatted.includes(" - ")) {
         const parts = toFormatted.split(" - ");
         const rPart = parts[0].trim().startsWith("P") ? parts[0].trim() : `P${parts[0].trim()}`;
-        const bPart = parts[1].trim();
+        // Tìm phần chứa chữ "Tòa" thay vì lấy Tầng
+        const toaPart = parts.find((p) => /tòa\s+[A-Za-z0-9]+/i.test(p))?.match(/Tòa\s+[A-Za-z0-9]+/i)?.[0];
+        const bPart = toaPart || parts[parts.length - 1].replace(/\(.*\)/, "").trim();
         toFormatted = `${rPart} (${bPart})`;
       } else if (toFormatted) {
         toFormatted = toFormatted.startsWith("P") ? toFormatted : `P${toFormatted}`;
@@ -1037,12 +1074,12 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
 
                         {/* Ngày gửi */}
                         <td className="py-3.5 px-4 text-slate-700 text-xs sm:text-sm">
-                          {item.ngay_gui || item.ngay_dang_ky || item.created_at || "—"}
+                          {formatNgayGui(item)}
                         </td>
 
                         {/* Phòng liên quan */}
                         <td className="py-3.5 px-4 text-slate-800 font-medium">
-                          {item.phong_lien_quan || item.phong_dich || item.phong_mong_muon || item.phong_hien_tai || "—"}
+                          {formatPhongLienQuan(item)}
                         </td>
 
                         {/* Trạng thái badge bo tròn */}
