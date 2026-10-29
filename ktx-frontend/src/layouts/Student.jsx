@@ -24,6 +24,8 @@ import { askGeminiChatbot } from "../services/geminiService";
 import AppFooter from "../components/AppFooter";
 import { useStudentStatus } from "../hooks/useStudentStatus";
 import studentNotificationService from "../services/studentNotificationService";
+import { authService } from "../services/authService";
+import LogoutConfirmModal from "../components/common/LogoutConfirmModal";
 
 const STUDENT_AVATAR_STORAGE_KEY = "ktx_student_avatar";
 const STUDENT_ANNOUNCEMENTS_KEY = "ktx_announcements";
@@ -141,6 +143,7 @@ export default function StudentLayout({
   userName,
   userRole = "Sinh viên",
   user,
+  onLogout,
 }) {
   const displayUserName =
     user?.ho_ten ||
@@ -156,6 +159,8 @@ export default function StudentLayout({
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [showAnnouncements, setShowAnnouncements] = useState(false);
   const [announcements, setAnnouncements] = useState(getAnnouncements);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [unreadNotifCount, setUnreadNotifCount] = useState(() => {
     try {
       return studentNotificationService.getUnreadCount();
@@ -706,18 +711,7 @@ export default function StudentLayout({
                 {/* Đăng xuất */}
                 <button
                   type="button"
-                  onClick={() => {
-                    if (
-                      window.confirm("Bạn có chắc chắn muốn đăng xuất không?")
-                    ) {
-                      const savedAvatar = localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY);
-                      localStorage.clear();
-                      if (savedAvatar) {
-                        localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, savedAvatar);
-                      }
-                      window.location.href = "/";
-                    }
-                  }}
+                  onClick={() => setIsLogoutModalOpen(true)}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition text-left cursor-pointer"
                 >
                   <LogOut className="w-4 h-4 shrink-0 text-slate-400 hover:text-red-500" />
@@ -845,6 +839,38 @@ export default function StudentLayout({
           </div>
         )}
       </div>
+
+      {/* Modal Xác nhận Đăng xuất Sinh viên */}
+      <LogoutConfirmModal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirm={() => {
+          setIsLoggingOut(true);
+          try {
+            const savedAvatar = localStorage.getItem(STUDENT_AVATAR_STORAGE_KEY);
+            authService.logout();
+            localStorage.clear();
+            if (savedAvatar) {
+              localStorage.setItem(STUDENT_AVATAR_STORAGE_KEY, savedAvatar);
+            }
+            setIsLogoutModalOpen(false);
+            if (onLogout) {
+              onLogout();
+            } else {
+              window.history.pushState({}, "", "/login");
+              window.dispatchEvent(new PopStateEvent("popstate"));
+              window.dispatchEvent(
+                new CustomEvent("student-navigate", { detail: { path: "/login" } })
+              );
+            }
+          } finally {
+            setIsLoggingOut(false);
+          }
+        }}
+        isLoading={isLoggingOut}
+        userName={displayUserName}
+        userRole={userRole}
+      />
     </div>
   );
 }

@@ -22,7 +22,7 @@ class UserRegister(BaseModel):
     ten_dang_nhap: Optional[str] = Field(default=None, max_length=50, description="Tên đăng nhập")
     password: Optional[str] = Field(default=None, min_length=6, description="Mật khẩu")
     mat_khau: Optional[str] = Field(default=None, min_length=6, description="Mật khẩu")
-    role: str = Field(default="SinhVien", description="Vai trò: QuanLy, KeToan, SinhVien")
+    role: Optional[str] = Field(default="SinhVien", description="Vai trò (luôn mặc định SinhVien khi đăng ký)")
     full_name: Optional[str] = Field(default=None, max_length=100, description="Họ và tên")
     ho_ten: Optional[str] = Field(default=None, max_length=100, description="Họ và tên")
     email: Optional[str] = Field(default=None, max_length=100, description="Địa chỉ email")

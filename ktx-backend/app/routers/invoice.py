@@ -46,7 +46,7 @@ def get_room_candidates(
         None,
         description="Phạm vi áp dụng (Tất cả hoặc sinh viên tòa A1 đến A11)",
     ),
-    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
+    current_user: TaiKhoan = Depends(require_ke_toan),
     db: Session = Depends(get_db),
 ):
     """
@@ -70,7 +70,7 @@ def get_room_candidates(
 )
 def publish_room_invoices(
     payload: RoomInvoicePublishRequest,
-    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
+    current_user: TaiKhoan = Depends(require_ke_toan),
     db: Session = Depends(get_db),
 ):
     """
@@ -96,7 +96,7 @@ def get_utility_candidates(
         "Tháng 09/2026",
         description="Tháng cần lập hóa đơn điện nước",
     ),
-    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
+    current_user: TaiKhoan = Depends(require_ke_toan),
     db: Session = Depends(get_db),
 ):
     """
@@ -117,7 +117,7 @@ def get_utility_candidates(
 )
 def publish_utility_invoices(
     payload: UtilityInvoicePublishRequest,
-    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
+    current_user: TaiKhoan = Depends(require_ke_toan),
     db: Session = Depends(get_db),
 ):
     """
@@ -143,7 +143,7 @@ async def upload_utility_readings(
     thang: str = Form("Tháng 09/2026"),
     don_gia_dien: float = Form(3000.0),
     don_gia_nuoc: float = Form(15000.0),
-    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
+    current_user: TaiKhoan = Depends(require_ke_toan),
     db: Session = Depends(get_db),
 ):
     """
@@ -168,7 +168,9 @@ async def upload_utility_readings(
     "/utility/template",
     summary="[Kế toán] Tải file Excel mẫu nhập chỉ số điện nước",
 )
-def download_utility_template():
+def download_utility_template(
+    current_user: TaiKhoan = Depends(require_ke_toan),
+):
     """
     Dành riêng cho Kế toán.
     Tải file Excel mẫu gồm các cột: STT, Phòng, Chỉ số điện cũ, Chỉ số điện mới, Chỉ số nước cũ, Chỉ số nước mới.
@@ -192,7 +194,7 @@ def get_all_invoices(
     trang_thai: Optional[str] = Query(None, description="Lọc theo trạng thái thanh toán"),
     msv: Optional[str] = Query(None, description="Lọc theo mã sinh viên"),
     ma_phong: Optional[str] = Query(None, description="Lọc theo mã phòng"),
-    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
+    current_user: TaiKhoan = Depends(require_ke_toan),
     db: Session = Depends(get_db),
 ):
     """
@@ -215,17 +217,25 @@ def get_all_invoices(
     summary="[Sinh viên] Lấy danh sách hóa đơn của sinh viên đang đăng nhập",
 )
 def get_student_my_invoices(
-    msv: Optional[str] = Query(None, description="Mã sinh viên"),
-    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
+    msv: Optional[str] = Query(None, description="Mã sinh viên (tùy chọn cho Quản lý)"),
+    current_user: TaiKhoan = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     from app.models.contract import HopDong
     from app.models.dorm import Giuong
     from app.models.invoice import HoaDon
-    from app.models.user import NguoiDung, SinhVien
+    from app.models.user import NguoiDung, SinhVien, VaiTro
     from app.services.student_helper import resolve_student_msv
 
-    raw_code = (msv or (current_user.ten_dang_nhap if current_user else "") or "").strip()
+    # Chống IDOR: Nếu là sinh viên, chỉ được xem hóa đơn của chính mình
+    if current_user.vai_tro == VaiTro.SINH_VIEN:
+        raw_code = (
+            current_user.nguoi_dung.sinh_vien.msv
+            if (current_user.nguoi_dung and current_user.nguoi_dung.sinh_vien)
+            else current_user.ten_dang_nhap
+        )
+    else:
+        raw_code = (msv or current_user.ten_dang_nhap or "").strip()
     if not raw_code:
         return []
 
@@ -410,7 +420,7 @@ def confirm_invoice_transfer(
 )
 def mark_invoice_paid(
     ma_hoa_don: str,
-    current_user: Optional[TaiKhoan] = Depends(get_current_user_optional),
+    current_user: TaiKhoan = Depends(require_ke_toan),
     db: Session = Depends(get_db),
 ):
     """

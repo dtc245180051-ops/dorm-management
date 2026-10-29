@@ -68,13 +68,9 @@ def register(
             detail="Vui lòng nhập họ và tên",
         )
 
-    # 1. Kiểm tra tính hợp lệ của vai trò
-    valid_roles = {vt.value: vt for vt in VaiTro}
-    if user_in.role not in valid_roles:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Vai trò '{user_in.role}' không hợp lệ. Các vai trò hợp lệ: {', '.join(valid_roles.keys())}",
-        )
+    # 1. Bảo mật: Mặc định gán cứng vai trò SinhVien cho đăng ký công khai
+    # Quyền Quản lý / Kế toán / Admin chỉ được cấp qua tài khoản nội bộ (seed data)
+    assigned_role = VaiTro.SINH_VIEN
 
     # 2. Kiểm tra tên đăng nhập đã tồn tại chưa
     existing_username = (
@@ -90,13 +86,12 @@ def register(
 
     # 3. Kiểm tra email đã tồn tại chưa nếu có cung cấp
     if email:
-        if user_in.role == "SinhVien":
-            import re
-            if not re.match(r"^[^@\s]+@ictu\.edu\.vn$", email.strip(), re.IGNORECASE):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Email sinh viên phải có định dạng @ictu.edu.vn",
-                )
+        import re
+        if not re.match(r"^[^@\s]+@ictu\.edu\.vn$", email.strip(), re.IGNORECASE):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email sinh viên phải có định dạng @ictu.edu.vn",
+            )
 
         existing_email = (
             db.query(NguoiDung)
@@ -125,11 +120,11 @@ def register(
     # 5. Băm mật khẩu bằng bcrypt
     hashed_password = get_password_hash(password_raw)
 
-    # 6. Khởi tạo thực thể TaiKhoan
+    # 6. Khởi tạo thực thể TaiKhoan với vai trò SinhVien
     new_account = TaiKhoan(
         ten_dang_nhap=username,
         mat_khau=hashed_password,
-        vai_tro=valid_roles[user_in.role],
+        vai_tro=assigned_role,
     )
     db.add(new_account)
     db.flush()  # Sinh ma_tai_khoan trước khi tạo NguoiDung
@@ -144,7 +139,7 @@ def register(
     db.add(new_user)
     db.flush()
 
-    # 8. Tự động liên kết vào bảng sinh_vien nếu là vai trò SinhVien
+    # 8. Tự động liên kết vào bảng sinh_vien
     if new_account.vai_tro == VaiTro.SINH_VIEN:
         from app.models.user import SinhVien
         existing_sv = db.query(SinhVien).filter(SinhVien.msv == msv_val).first()

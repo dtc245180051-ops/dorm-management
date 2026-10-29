@@ -203,16 +203,11 @@ export const financeService = {
         const data = await res.json();
         return { success: true, data: data.items || [] };
       }
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.detail || 'Không thể tải danh sách báo cáo định kỳ từ máy chủ');
     } catch (err) {
-      console.warn('Lỗi gọi GET /finance/periodic-reports:', err);
-    }
-
-    // Fallback: LocalStorage
-    try {
-      const cached = JSON.parse(localStorage.getItem('ktx_saved_periodic_reports') || '[]');
-      return { success: true, data: cached };
-    } catch (_) {
-      return { success: true, data: [] };
+      console.error('Lỗi gọi GET /finance/periodic-reports:', err);
+      throw err;
     }
   },
 
@@ -220,71 +215,33 @@ export const financeService = {
    * Lưu biên bản báo cáo định kỳ mới
    */
   async createPeriodicReport(payload) {
-    try {
-      const headers = await this.getAuthHeaders();
-      const res = await fetch(`${API_BASE_URL}/finance/periodic-reports`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        // Đồng bộ thêm vào cache
-        try {
-          const cached = JSON.parse(localStorage.getItem('ktx_saved_periodic_reports') || '[]');
-          localStorage.setItem('ktx_saved_periodic_reports', JSON.stringify([data, ...cached]));
-        } catch (_) {}
-        return { success: true, data };
-      }
-    } catch (err) {
-      console.warn('Lỗi gọi POST /finance/periodic-reports:', err);
+    const headers = await this.getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/finance/periodic-reports`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.detail || 'Không thể lưu biên bản báo cáo định kỳ lên máy chủ');
     }
-
-    // Fallback nếu mạng lỗi
-    const newRecord = {
-      id: Date.now(),
-      reportCode: payload.reportCode || `BC-TC/${new Date().getFullYear()}/${Date.now().toString().slice(-3)}`,
-      title: payload.title,
-      period: payload.period,
-      reportType: payload.reportType || 'THANG',
-      creatorName: payload.creatorName,
-      approverName: payload.approverName || 'Trưởng ban QL KTX',
-      createdDate: payload.createdDate || new Date().toLocaleDateString('vi-VN'),
-      totalInvoiced: payload.summary?.totalInvoiced || 0,
-      totalCollected: payload.summary?.totalCollected || 0,
-      collectionRate: payload.summary?.collectionRate || 0,
-      totalOutstanding: payload.summary?.totalOutstanding || 0,
-      unpaidStudentsCount: payload.summary?.unpaidStudentsCount || 0,
-      totalOverdue: payload.summary?.totalOverdue || 0,
-      notes: payload.notes || '',
-      recommendations: payload.recommendations || '',
-      createdAt: new Date().toLocaleString('vi-VN'),
-    };
-    try {
-      const cached = JSON.parse(localStorage.getItem('ktx_saved_periodic_reports') || '[]');
-      localStorage.setItem('ktx_saved_periodic_reports', JSON.stringify([newRecord, ...cached]));
-    } catch (_) {}
-    return { success: true, data: newRecord };
+    const data = await res.json();
+    return { success: true, data };
   },
 
   /**
    * Xóa biên bản báo cáo định kỳ
    */
   async deletePeriodicReport(reportId) {
-    try {
-      const headers = await this.getAuthHeaders();
-      await fetch(`${API_BASE_URL}/finance/periodic-reports/${reportId}`, {
-        method: 'DELETE',
-        headers,
-      });
-    } catch (err) {
-      console.warn('Lỗi gọi DELETE /finance/periodic-reports:', err);
+    const headers = await this.getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/finance/periodic-reports/${reportId}`, {
+      method: 'DELETE',
+      headers,
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.detail || 'Không thể xóa biên bản báo cáo định kỳ trên máy chủ');
     }
-    try {
-      const cached = JSON.parse(localStorage.getItem('ktx_saved_periodic_reports') || '[]');
-      const filtered = cached.filter((r) => r.id !== reportId);
-      localStorage.setItem('ktx_saved_periodic_reports', JSON.stringify(filtered));
-    } catch (_) {}
     return { success: true };
   },
 };

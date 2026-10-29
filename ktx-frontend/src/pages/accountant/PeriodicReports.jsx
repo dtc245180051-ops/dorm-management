@@ -200,8 +200,12 @@ export default function PeriodicReports({ searchTerm: parentSearch = '' }) {
   // Xóa báo cáo đã lưu
   const handleDeleteReport = async (id) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa bản ghi báo cáo này khỏi lịch sử?')) {
-      await financeService.deletePeriodicReport(id);
-      loadSavedReports();
+      try {
+        await financeService.deletePeriodicReport(id);
+        loadSavedReports();
+      } catch (err) {
+        alert(err.message || 'Có lỗi xảy ra khi xóa báo cáo');
+      }
     }
   };
 
@@ -1316,18 +1320,26 @@ export default function PeriodicReports({ searchTerm: parentSearch = '' }) {
             </tr>
           </thead>
           <tbody>
-            {reportData.items.slice(0, 10).map((row) => (
-              <tr key={row.invoiceId}>
-                <td>{row.invoiceId}</td>
-                <td>{row.studentName} ({row.studentId || '--'})</td>
-                <td>{row.room}</td>
-                <td>{row.feeType}</td>
-                <td style={{ textAlign: 'right' }}>{formatVND(row.amount)}</td>
-                <td style={{ textAlign: 'right' }}>{formatVND(row.paid)}</td>
-                <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatVND(row.remaining)}</td>
-                <td>{row.dueDate}</td>
+            {(!reportData.items || reportData.items.length === 0) ? (
+              <tr>
+                <td colSpan="8" style={{ textAlign: 'center', fontStyle: 'italic', padding: '12px' }}>
+                  Không có chứng từ công nợ phát sinh trong kỳ
+                </td>
               </tr>
-            ))}
+            ) : (
+              (reportData.items || []).slice(0, 15).map((row, idx) => (
+                <tr key={row.invoiceId || idx}>
+                  <td>{row.invoiceId}</td>
+                  <td>{row.studentName} ({row.studentId || '--'})</td>
+                  <td>{row.room}</td>
+                  <td>{row.feeType}</td>
+                  <td style={{ textAlign: 'right' }}>{formatVND(row.amount)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatVND(row.paid)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatVND(row.remaining)}</td>
+                  <td>{row.dueDate}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
 

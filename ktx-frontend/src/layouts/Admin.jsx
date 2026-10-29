@@ -9,11 +9,17 @@ export default function AdminLayout({
   searchTerm = '',
   onSearchChange,
   userName = 'QL_Minh',
+  onLogout,
 }) {
   return (
     <div className="min-h-screen bg-white font-sans text-slate-800 antialiased p-3.5 flex gap-3.5 box-border">
       {/* Khối 1: Sidebar Admin (Bo tròn, nền xám) */}
-      <Sidebar activeTab={activeTab} onSelectTab={onSelectTab} />
+      <Sidebar
+        activeTab={activeTab}
+        onSelectTab={onSelectTab}
+        onLogout={onLogout}
+        userName={userName}
+      />
 
       {/* Cột bên phải chứa Khối 2 và Khối 3 */}
       <div className="flex-1 flex flex-col gap-3.5 min-w-0">

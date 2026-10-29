@@ -79,10 +79,12 @@ export const invoiceService = {
   /**
    * Lấy danh sách phòng phục vụ lập hóa đơn tiền điện nước
    */
-  async getUtilityCandidates(month = 'Tháng 09/2026') {
+  async getUtilityCandidates(month = '') {
     try {
+      const now = new Date();
+      const defaultMonth = `Tháng ${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
       const params = new URLSearchParams({
-        thang: month,
+        thang: month || defaultMonth,
       });
 
       const headers = await this.getAuthHeaders();
@@ -259,13 +261,20 @@ export const invoiceService = {
       });
 
       if (!response.ok) {
-        throw new Error(`Lỗi confirmTransfer: ${response.status}`);
+        let detailMsg = `Máy chủ không phản hồi thành công (mã ${response.status})`;
+        try {
+          const errData = await response.json();
+          if (errData?.detail) detailMsg = errData.detail;
+        } catch (_) {}
+        const error = new Error(detailMsg);
+        error.status = response.status;
+        throw error;
       }
 
       return await response.json();
     } catch (error) {
-      console.warn('Lỗi confirmTransfer:', error);
-      return { success: false };
+      console.error('Lỗi confirmTransfer:', error);
+      throw error;
     }
   },
 

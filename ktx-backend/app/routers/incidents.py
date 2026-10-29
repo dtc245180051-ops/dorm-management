@@ -4,20 +4,26 @@ import uuid
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-
 from app.core.database import get_db
+from app.core.deps import RoleChecker, get_current_user, get_current_student
+from app.core.security import get_password_hash
 from app.models.incident import PhanAnh, ViPham
-from app.models.user import SinhVien
-from app.services import incident_store
+from app.models.user import NguoiDung, SinhVien, TaiKhoan, VaiTro
 from app.services.incident_ai import analyze_incident_with_ai, generate_daily_incident_summary
+from sqlalchemy.orm import Session, joinedload
 
 router = APIRouter(prefix="/incidents", tags=["Phản ánh và Báo hỏng KTX"])
 
 
-@router.get("/violations")
-def list_violations(db: Session = Depends(get_db)):
+@router.get(
+    "/violations",
+    dependencies=[Depends(RoleChecker(["QuanLy", "Admin"]))],
+    summary="[Quản lý] Lấy danh sách biên bản vi phạm",
+)
+def list_violations(
+    current_user: TaiKhoan = Depends(RoleChecker(["QuanLy", "Admin"])),
+    db: Session = Depends(get_db)
+):
     records = db.query(ViPham).order_by(ViPham.ngay_vi_pham.desc()).all()
     results = []
     for item in records:
@@ -95,8 +101,17 @@ class CreateViolationRequest(BaseModel):
     nguoi_lap: Optional[str] = "Ban quản lý KTX"
 
 
-@router.post("/violations", status_code=status.HTTP_201_CREATED)
-def create_violation(req: CreateViolationRequest, db: Session = Depends(get_db)):
+@router.post(
+    "/violations",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(RoleChecker(["QuanLy", "Admin"]))],
+    summary="[Quản lý] Lập biên bản vi phạm",
+)
+def create_violation(
+    req: CreateViolationRequest,
+    current_user: TaiKhoan = Depends(RoleChecker(["QuanLy", "Admin"])),
+    db: Session = Depends(get_db)
+):
     student = db.query(SinhVien).filter(SinhVien.msv == req.msv).first()
     if not student:
         raise HTTPException(status_code=404, detail="Không tìm thấy sinh viên trong cơ sở dữ liệu")
@@ -140,8 +155,17 @@ class UpdateViolationStatusRequest(BaseModel):
     giai_trinh_at: Optional[str] = None
 
 
-@router.put("/violations/{ma_vi_pham}")
-def update_violation(ma_vi_pham: str, req: UpdateViolationStatusRequest, db: Session = Depends(get_db)):
+@router.put(
+    "/violations/{ma_vi_pham}",
+    dependencies=[Depends(RoleChecker(["QuanLy", "Admin"]))],
+    summary="[Quản lý] Cập nhật biên bản vi phạm",
+)
+def update_violation(
+    ma_vi_pham: str,
+    req: UpdateViolationStatusRequest,
+    current_user: TaiKhoan = Depends(RoleChecker(["QuanLy", "Admin"])),
+    db: Session = Depends(get_db)
+):
     item = db.query(ViPham).filter(ViPham.ma_vi_pham == ma_vi_pham).first()
     if not item:
         raise HTTPException(status_code=404, detail="Không tìm thấy biên bản vi phạm")
@@ -189,20 +213,112 @@ class UpdateIncidentStatusRequest(BaseModel):
     ghi_chu_xu_ly: Optional[str] = None
 
 
+def ensure_student_exists_for_incident(db: Session, msv: Optional[str], ho_ten: Optional[str] = None) -> str:
+    """Đảm bảo sinh viên tồn tại trong MySQL để đảm bảo tính toàn vẹn quan hệ (Foreign Key)."""
+    clean_msv = (msv or "").strip()
+    if not clean_msv:
+        first_sv = db.query(SinhVien).first()
+        return first_sv.msv if first_sv else "DTC245180037"
+
+    student = db.query(SinhVien).filter(SinhVien.msv.ilike(clean_msv)).first()
+    if student:
+        return student.msv
+
+    # Tự động tạo tài khoản và sinh viên nếu chưa có để đảm bảo toàn vẹn dữ liệu
+    normalized_msv = clean_msv.upper()
+    full_name = ho_ten or f"Sinh viên {normalized_msv}"
+    email = f"{normalized_msv.lower()}@ictu.edu.vn"
+
+    user = db.query(NguoiDung).filter(NguoiDung.email == email).first()
+    if not user:
+        tai_khoan = TaiKhoan(
+            ten_dang_nhap=normalized_msv.lower(),
+            mat_khau=get_password_hash("123456"),
+            vai_tro=VaiTro.SINH_VIEN,
+        )
+        db.add(tai_khoan)
+        db.flush()
+
+        user = NguoiDung(
+            ma_tai_khoan=tai_khoan.ma_tai_khoan,
+            ho_ten=full_name,
+            email=email,
+            so_dien_thoai="",
+        )
+        db.add(user)
+        db.flush()
+
+    student = SinhVien(
+        msv=normalized_msv,
+        ma_nguoi_dung=user.ma_nguoi_dung,
+        lop="Chưa phân lớp",
+        gioi_tinh="Nam",
+        khoa="Công nghệ Thông tin",
+        dia_chi="",
+        cccd="",
+        ngay_sinh="2000-01-01",
+        doi_tuong_uu_tien="Không",
+    )
+    db.add(student)
+    db.flush()
+    return student.msv
+
+
+def serialize_incident(item: PhanAnh, ho_ten_fallback: Optional[str] = None) -> dict:
+    """Serialize model PhanAnh sang dictionary tương thích với giao diện và API."""
+    ho_ten = (
+        ho_ten_fallback
+        or (
+            item.sinh_vien.nguoi_dung.ho_ten
+            if (item.sinh_vien and item.sinh_vien.nguoi_dung)
+            else item.msv
+        )
+    )
+    status_map = {
+        "CHO_XU_LY": "Chờ xử lý",
+        "DANG_XU_LY": "Đang xử lý",
+        "DA_XU_LY": "Đã xử lý",
+        "HOAN_THANH": "Đã xử lý",
+        "TU_CHOI": "Từ chối",
+    }
+    return {
+        "id": item.ma_phan_anh,
+        "ma_phan_anh": item.ma_phan_anh,
+        "msv": item.msv,
+        "ho_ten": ho_ten,
+        "phong": item.phong or "",
+        "loai_phan_anh": item.phan_loai or "Cơ sở vật chất",
+        "phan_loai": item.phan_loai or "Cơ sở vật chất",
+        "tieu_de": item.tieu_de or item.tom_tat or (item.noi_dung[:40] if item.noi_dung else "Sự cố"),
+        "mo_ta": item.mo_ta or item.noi_dung or "",
+        "hinh_anh": item.hinh_anh,
+        "muc_do_uu_tien": item.muc_do_uu_tien or "Thường",
+        "trang_thai": item.trang_thai or "CHO_XU_LY",
+        "trang_thai_label": status_map.get(item.trang_thai, "Chờ xử lý"),
+        "ngay_gui": item.ngay_gui.isoformat() if item.ngay_gui else None,
+        "ngay_tao": item.ngay_tao.isoformat() if item.ngay_tao else (item.ngay_gui.isoformat() if item.ngay_gui else None),
+        "ghi_chu_xu_ly": item.ghi_chu_xu_ly or "",
+        "is_ai_processed": getattr(item, "is_ai_processed", False),
+        "ai_error_reason": getattr(item, "ai_error_reason", None),
+    }
+
+
 @router.post(
     "",
-    summary="Sinh viên gửi phản ánh sự cố - Tích hợp AI tự động phân loại, tạo tiêu đề và xác định ưu tiên",
+    summary="Sinh viên gửi phản ánh sự cố - Tích hợp AI tự động phân loại (Chống IDOR)",
     status_code=status.HTTP_201_CREATED,
 )
 def create_incident(
     req: CreateIncidentRequest,
+    current_user: TaiKhoan = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
     Tiếp nhận phản ánh từ sinh viên:
-    - AI tự động trích xuất: tieu_de (< 10 từ), phan_loai (1 trong 5 nhóm), muc_do_uu_tien ('Thường' / 'Khẩn cấp')
-    - Lưu đầy đủ các trường vào CSDL MySQL (bảng phan_anh)
-    - Đồng bộ ngay lập tức vào Incident Store phục vụ Ban Quản lý KTX
+    - Chống IDOR: Ràng buộc danh tính sinh viên từ Token đã xác thực
+    - AI tự động trích xuất: tieu_de, phan_loai, muc_do_uu_tien
+    - Quản lý Transaction trong MySQL để đảm bảo tính toàn vẹn (ACID):
+      Mọi thay đổi được commit vào MySQL; nếu có ngoại lệ sẽ rollback toàn bộ và trả về HTTP 500.
     """
     clean_mo_ta = req.mo_ta.strip() if req.mo_ta else ""
     if not clean_mo_ta:
@@ -211,77 +327,61 @@ def create_incident(
             detail="Vui lòng nhập mô tả chi tiết sự cố bạn gặp phải.",
         )
 
-    # 1. AI tự động phân tích mô tả của sinh viên
+    # 1. Xác thực và chống IDOR
+    if current_user.vai_tro == VaiTro.SINH_VIEN:
+        student = get_current_student(current_user=current_user, db=db)
+        db_msv = student.msv
+        sender_name = student.nguoi_dung.ho_ten if student.nguoi_dung else student.msv
+    else:
+        # Ban Quản trị / Quản lý có thể ghi nhận hộ sinh viên nếu cần
+        db_msv = ensure_student_exists_for_incident(db, req.msv, req.ho_ten)
+        sender_name = req.ho_ten or f"Quản trị viên ({current_user.ten_dang_nhap})"
+
+    # 2. AI tự động phân tích mô tả của sinh viên
     ai_result = analyze_incident_with_ai(clean_mo_ta, req.phong)
 
-    # Ưu tiên dữ liệu AI phân tích
     tieu_de = req.tieu_de.strip() if (req.tieu_de and req.tieu_de.strip()) else ai_result["tieu_de"]
     phan_loai = req.loai_phan_anh.strip() if (req.loai_phan_anh and req.loai_phan_anh.strip()) else ai_result["phan_loai"]
     muc_do_uu_tien = ai_result["muc_do_uu_tien"]
     is_ai_processed = bool(ai_result.get("is_ai_processed", False))
     ai_error_reason = ai_result.get("ai_error_reason")
 
-    # Sinh mã phản ánh duy nhất PA-xxxxxx
     incident_code = f"PA-{uuid.uuid4().hex[:6].upper()}"
 
-    # 2. Lưu vào CSDL bảng phan_anh
-    original_msv = (req.msv or "dtc245180137").strip()
-    target_msv = original_msv
+    # 3. Xử lý Transaction ACID vào CSDL MySQL
     try:
-        student_check = db.execute(
-            text("SELECT msv FROM sinh_vien WHERE UPPER(msv) = UPPER(:msv)"),
-            {"msv": target_msv},
-        ).fetchone()
+        now_dt = datetime.datetime.now()
+        today_d = datetime.date.today()
 
-        if student_check:
-            db_msv = student_check[0]
-        else:
-            first_sv = db.execute(text("SELECT msv FROM sinh_vien LIMIT 1")).fetchone()
-            db_msv = first_sv[0] if first_sv else target_msv
-
-        new_db_incident = PhanAnh(
+        new_incident = PhanAnh(
             ma_phan_anh=incident_code,
             msv=db_msv,
             noi_dung=clean_mo_ta,
             trang_thai="CHO_XU_LY",
-            ngay_gui=datetime.date.today(),
+            ngay_gui=today_d,
             phan_loai=phan_loai,
             tom_tat=tieu_de[:200],
             tieu_de=tieu_de,
             muc_do_uu_tien=muc_do_uu_tien,
             phong=req.phong or "",
             mo_ta=clean_mo_ta,
-            ngay_tao=datetime.datetime.now(),
+            hinh_anh=req.hinh_anh,
+            ghi_chu_xu_ly="",
+            ngay_tao=now_dt,
             is_ai_processed=is_ai_processed,
             ai_error_reason=ai_error_reason,
         )
-        db.add(new_db_incident)
+        db.add(new_incident)
         db.commit()
+        db.refresh(new_incident)
     except Exception as db_err:
         db.rollback()
-        print(f"Warning: Could not save to DB table phan_anh ({db_err}), saving to store.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi cơ sở dữ liệu khi tạo phản ánh (Transaction rolled back): {str(db_err)}",
+        )
 
-    # 3. Lưu vào incident_store trung tâm phục vụ Ban Quản lý KTX và Sinh viên
-    payload = {
-        "id": incident_code,
-        "ma_phan_anh": incident_code,
-        "msv": original_msv,
-        "ho_ten": req.ho_ten or "Sinh viên",
-        "phong": req.phong or "",
-        "loai_phan_anh": phan_loai,
-        "phan_loai": phan_loai,
-        "tieu_de": tieu_de,
-        "mo_ta": clean_mo_ta,
-        "hinh_anh": req.hinh_anh,
-        "muc_do_uu_tien": muc_do_uu_tien,
-        "trang_thai": "CHO_XU_LY",
-        "trang_thai_label": "Chờ xử lý",
-        "ngay_gui": datetime.datetime.now().isoformat(),
-        "ngay_tao": datetime.datetime.now().isoformat(),
-        "is_ai_processed": is_ai_processed,
-        "ai_error_reason": ai_error_reason,
-    }
-    created = incident_store.add_incident(payload)
+    created_data = serialize_incident(new_incident, ho_ten_fallback=sender_name)
 
     if is_ai_processed:
         resp_msg = "Gửi phản ánh thành công! AI đã tiếp nhận và phân tích sự cố."
@@ -293,47 +393,34 @@ def create_incident(
         "message": resp_msg,
         "is_ai_processed": is_ai_processed,
         "ai_error_reason": ai_error_reason,
-        "data": created,
+        "data": created_data,
     }
 
 
 @router.get(
     "/daily-summary",
+    dependencies=[Depends(RoleChecker(["QuanLy", "Admin"]))],
     summary="AI Tóm tắt sự cố trong ngày hôm nay cho Ban Quản lý KTX",
 )
-def get_daily_summary(db: Session = Depends(get_db)):
+def get_daily_summary(
+    current_user: TaiKhoan = Depends(RoleChecker(["QuanLy", "Admin"])),
+    db: Session = Depends(get_db)
+):
     """
-    Tự động đọc toàn bộ các phản ánh được tạo trong ngày hôm nay và sinh tóm tắt thông minh.
-    - Nếu có phản ánh mới: "Hôm nay ghi nhận X sự cố, chủ yếu về [Điện nước/Cơ sở vật chất] tại các phòng... Cần ưu tiên xử lý: [Sự cố khẩn cấp nếu có]"
-    - Nếu chưa có phản ánh: "Chưa ghi nhận phản ánh cần ưu tiên xử lý trong hôm nay."
+    Tự động đọc toàn bộ các phản ánh được tạo trong ngày hôm nay trực tiếp từ MySQL và sinh tóm tắt thông minh.
+    - Nếu có phản ánh mới: Tóm tắt số lượng, nhóm lỗi chính, sự cố khẩn cấp.
+    - Nếu chưa có phản ánh: Thông báo chưa ghi nhận phản ánh cần ưu tiên.
     """
-    today_incidents = incident_store.get_today_incidents()
-    seen_ids = {item.get("ma_phan_anh") for item in today_incidents}
+    today_date = datetime.date.today()
+    records = (
+        db.query(PhanAnh)
+        .options(joinedload(PhanAnh.sinh_vien).joinedload(SinhVien.nguoi_dung))
+        .filter(PhanAnh.ngay_gui == today_date)
+        .order_by(PhanAnh.ngay_tao.desc(), PhanAnh.ma_phan_anh.desc())
+        .all()
+    )
 
-    # Đọc thêm từ database MySQL để đồng bộ
-    try:
-        today_date = datetime.date.today()
-        db_today = db.query(PhanAnh).filter(PhanAnh.ngay_gui == today_date).all()
-        for item in db_today:
-            if item.ma_phan_anh not in seen_ids:
-                mapped = {
-                    "id": item.ma_phan_anh,
-                    "ma_phan_anh": item.ma_phan_anh,
-                    "msv": item.msv,
-                    "phong": item.phong or "",
-                    "loai_phan_anh": item.phan_loai or "Cơ sở vật chất",
-                    "phan_loai": item.phan_loai or "Cơ sở vật chất",
-                    "tieu_de": item.tieu_de or item.tom_tat or "",
-                    "mo_ta": item.mo_ta or item.noi_dung or "",
-                    "muc_do_uu_tien": item.muc_do_uu_tien or "Thường",
-                    "ngay_gui": item.ngay_gui.isoformat() if item.ngay_gui else today_date.isoformat(),
-                    "trang_thai": item.trang_thai or "CHO_XU_LY",
-                }
-                today_incidents.append(mapped)
-                seen_ids.add(item.ma_phan_anh)
-    except Exception as e:
-        print(f"Warning reading today DB incidents: {e}")
-
+    today_incidents = [serialize_incident(item) for item in records]
     summary_text = generate_daily_incident_summary(today_incidents)
 
     return {
@@ -355,73 +442,30 @@ def get_daily_summary(db: Session = Depends(get_db)):
 def get_incidents(
     msv: Optional[str] = Query(None, description="Lọc theo mã sinh viên"),
     trang_thai: Optional[str] = Query(None, description="Lọc theo trạng thái"),
+    current_user: TaiKhoan = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Trả về danh sách phản ánh.
-    Ban quản lý xem toàn bộ danh sách, sinh viên có thể lọc theo MSV của mình.
+    Trả về danh sách phản ánh truy vấn trực tiếp từ cơ sở dữ liệu MySQL.
+    Chống IDOR: Nếu là sinh viên, chỉ được xem danh sách phản ánh của chính mình.
     """
-    if msv:
-        items = incident_store.get_incidents_by_student(msv)
-        # Đồng bộ thêm từ MySQL nếu có
-        try:
-            db_records = db.query(PhanAnh).filter(PhanAnh.msv.ilike(f"%{msv.strip()}%")).all()
-            existing_ids = {it.get("id") or it.get("ma_phan_anh") for it in items}
-            for rec in db_records:
-                rec_id = rec.ma_phan_anh
-                if rec_id not in existing_ids:
-                    mapped = {
-                        "id": rec_id,
-                        "ma_phan_anh": rec_id,
-                        "msv": rec.msv,
-                        "ho_ten": rec.sinh_vien.nguoi_dung.ho_ten if (rec.sinh_vien and rec.sinh_vien.nguoi_dung) else rec.msv,
-                        "phong": rec.phong or "",
-                        "loai_phan_anh": rec.phan_loai or "Cơ sở vật chất",
-                        "phan_loai": rec.phan_loai or "Cơ sở vật chất",
-                        "tieu_de": rec.tieu_de or rec.tom_tat or (rec.noi_dung[:40] if rec.noi_dung else "Sự cố"),
-                        "mo_ta": rec.mo_ta or rec.noi_dung or "",
-                        "muc_do_uu_tien": rec.muc_do_uu_tien or "Thường",
-                        "trang_thai": rec.trang_thai or "CHO_XU_LY",
-                        "trang_thai_label": "Đang xử lý" if rec.trang_thai == "DANG_XU_LY" else ("Đã xử lý" if rec.trang_thai in ("DA_XU_LY", "HOAN_THANH") else "Chờ xử lý"),
-                        "ngay_gui": rec.ngay_gui.isoformat() if rec.ngay_gui else None,
-                        "ghi_chu_xu_ly": rec.ghi_chu_xu_ly or "",
-                        "is_ai_processed": getattr(rec, "is_ai_processed", False),
-                        "ai_error_reason": getattr(rec, "ai_error_reason", None),
-                    }
-                    items.append(mapped)
-                    incident_store.add_incident(mapped)
-        except Exception as e:
-            print(f"Warning querying DB for student incidents: {e}")
+    query = db.query(PhanAnh).options(
+        joinedload(PhanAnh.sinh_vien).joinedload(SinhVien.nguoi_dung)
+    )
+
+    if current_user.vai_tro == VaiTro.SINH_VIEN:
+        student = get_current_student(current_user=current_user, db=db)
+        query = query.filter(PhanAnh.msv.ilike(student.msv))
     else:
-        items = incident_store.get_all_incidents()
-        # Đồng bộ từ MySQL nếu in-memory store đang trống
-        if len(items) == 0:
-            try:
-                db_records = db.query(PhanAnh).order_by(PhanAnh.ngay_gui.desc()).all()
-                for rec in db_records:
-                    incident_store.add_incident({
-                        "id": rec.ma_phan_anh,
-                        "ma_phan_anh": rec.ma_phan_anh,
-                        "msv": rec.msv,
-                        "ho_ten": rec.sinh_vien.nguoi_dung.ho_ten if (rec.sinh_vien and rec.sinh_vien.nguoi_dung) else rec.msv,
-                        "phong": rec.phong or "",
-                        "loai_phan_anh": rec.phan_loai or "Cơ sở vật chất",
-                        "phan_loai": rec.phan_loai or "Cơ sở vật chất",
-                        "tieu_de": rec.tieu_de or rec.tom_tat or (rec.noi_dung[:40] if rec.noi_dung else "Sự cố"),
-                        "mo_ta": rec.mo_ta or rec.noi_dung or "",
-                        "muc_do_uu_tien": rec.muc_do_uu_tien or "Thường",
-                        "trang_thai": rec.trang_thai or "CHO_XU_LY",
-                        "ngay_gui": rec.ngay_gui.isoformat() if rec.ngay_gui else None,
-                        "ghi_chu_xu_ly": rec.ghi_chu_xu_ly or "",
-                        "is_ai_processed": getattr(rec, "is_ai_processed", False),
-                        "ai_error_reason": getattr(rec, "ai_error_reason", None),
-                    })
-                items = incident_store.get_all_incidents()
-            except Exception as e:
-                print(f"Warning syncing incidents from DB: {e}")
+        if msv and msv.strip():
+            clean_msv = msv.strip()
+            query = query.filter(PhanAnh.msv.ilike(f"%{clean_msv}%"))
 
     if trang_thai and trang_thai != "ALL":
-        items = [item for item in items if item.get("trang_thai") == trang_thai]
+        query = query.filter(PhanAnh.trang_thai == trang_thai)
+
+    records = query.order_by(PhanAnh.ngay_tao.desc(), PhanAnh.ngay_gui.desc()).all()
+    items = [serialize_incident(rec) for rec in records]
 
     return {
         "status": "success",
@@ -434,8 +478,15 @@ def get_incidents(
     "/{incident_id}",
     summary="Xem chi tiết một phản ánh",
 )
-def get_incident_detail(incident_id: str):
-    item = incident_store.get_incident_by_id(incident_id)
+def get_incident_detail(incident_id: str, db: Session = Depends(get_db)):
+    """Xem chi tiết một phản ánh từ MySQL."""
+    clean_id = incident_id.strip()
+    item = (
+        db.query(PhanAnh)
+        .options(joinedload(PhanAnh.sinh_vien).joinedload(SinhVien.nguoi_dung))
+        .filter(PhanAnh.ma_phan_anh.ilike(clean_id))
+        .first()
+    )
     if not item:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -443,68 +494,53 @@ def get_incident_detail(incident_id: str):
         )
     return {
         "status": "success",
-        "data": item,
+        "data": serialize_incident(item),
     }
 
 
 @router.patch(
     "/{incident_id}/status",
+    dependencies=[Depends(RoleChecker(["QuanLy", "Admin"]))],
     summary="Ban Quản lý KTX cập nhật trạng thái phản ánh",
 )
 def update_status(
     incident_id: str,
     req: UpdateIncidentStatusRequest,
+    current_user: TaiKhoan = Depends(RoleChecker(["QuanLy", "Admin"])),
     db: Session = Depends(get_db),
 ):
     """
-    Ban Quản lý cập nhật tiến trình xử lý (DANG_XU_LY, DA_XU_LY, TU_CHOI).
+    Ban Quản lý cập nhật tiến trình xử lý (DANG_XU_LY, DA_XU_LY, TU_CHOI) trực tiếp vào MySQL với transaction.
     """
-    updated = incident_store.update_incident_status(
-        incident_id, req.trang_thai, req.ghi_chu_xu_ly
+    clean_id = incident_id.strip()
+    db_pa = (
+        db.query(PhanAnh)
+        .options(joinedload(PhanAnh.sinh_vien).joinedload(SinhVien.nguoi_dung))
+        .filter(PhanAnh.ma_phan_anh.ilike(clean_id))
+        .first()
     )
-
-    # Cập nhật trong CSDL nếu có
-    db_pa = None
-    try:
-        db_pa = db.query(PhanAnh).filter(PhanAnh.ma_phan_anh == incident_id).first()
-        if db_pa:
-            db_pa.trang_thai = req.trang_thai
-            if req.ghi_chu_xu_ly is not None:
-                db_pa.ghi_chu_xu_ly = req.ghi_chu_xu_ly
-            db.commit()
-            db.refresh(db_pa)
-    except Exception as e:
-        db.rollback()
-        print(f"Warning: Failed to update DB phan_anh: {e}")
-
-    if not updated and db_pa:
-        mapped = {
-            "id": db_pa.ma_phan_anh,
-            "ma_phan_anh": db_pa.ma_phan_anh,
-            "msv": db_pa.msv,
-            "ho_ten": db_pa.sinh_vien.nguoi_dung.ho_ten if (db_pa.sinh_vien and db_pa.sinh_vien.nguoi_dung) else db_pa.msv,
-            "phong": db_pa.phong or "",
-            "loai_phan_anh": db_pa.phan_loai or "Cơ sở vật chất",
-            "phan_loai": db_pa.phan_loai or "Cơ sở vật chất",
-            "tieu_de": db_pa.tieu_de or db_pa.tom_tat or (db_pa.noi_dung[:40] if db_pa.noi_dung else "Sự cố"),
-            "mo_ta": db_pa.mo_ta or db_pa.noi_dung or "",
-            "muc_do_uu_tien": db_pa.muc_do_uu_tien or "Thường",
-            "trang_thai": db_pa.trang_thai,
-            "trang_thai_label": "Đang xử lý" if db_pa.trang_thai == "DANG_XU_LY" else ("Đã xử lý" if db_pa.trang_thai in ("DA_XU_LY", "HOAN_THANH") else "Chờ xử lý"),
-            "ngay_gui": db_pa.ngay_gui.isoformat() if db_pa.ngay_gui else None,
-            "ghi_chu_xu_ly": db_pa.ghi_chu_xu_ly or "",
-        }
-        incident_store.add_incident(mapped)
-        updated = mapped
-
-    if not updated and not db_pa:
+    if not db_pa:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Không tìm thấy phản ánh để cập nhật.",
         )
 
+    try:
+        db_pa.trang_thai = req.trang_thai
+        if req.ghi_chu_xu_ly is not None:
+            db_pa.ghi_chu_xu_ly = req.ghi_chu_xu_ly
+        db.commit()
+        db.refresh(db_pa)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi cơ sở dữ liệu khi cập nhật trạng thái phản ánh: {str(e)}",
+        )
+
     return {
         "status": "success",
         "message": "Cập nhật trạng thái phản ánh thành công!",
-        "data": updated,
+        "data": serialize_incident(db_pa),
     }
+

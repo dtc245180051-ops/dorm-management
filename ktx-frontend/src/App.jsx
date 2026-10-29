@@ -24,6 +24,7 @@ import PeriodicReports from './pages/accountant/PeriodicReports';
 import occupancyService from './services/occupancyService';
 import { API_BASE_URL } from './services/authService';
 import { getStudentAccount } from './services/studentAccountService';
+import { cleanupObsoleteStorage } from './utils/storageCleanup';
 import StudentProfilePage from "./pages/student/StudentProfilePage";
 import RoomSearchPage from "./pages/student/RoomSearchPage";
 import PaymentPage from "./pages/student/PaymentPage";
@@ -106,6 +107,21 @@ export default function App() {
       window.removeEventListener("popstate", handleLocationChange);
       window.removeEventListener("student-navigate", handleCustomNavigate);
     };
+  }, []);
+
+  // Dọn dẹp triệt để các key lưu tạm phantom data cũ trong localStorage
+  useEffect(() => {
+    const phantomKeys = [
+      'dorm_student_incidents',
+      'dorm_registration_requests',
+      'dorm_transfer_checkout_requests',
+      'ktx_saved_periodic_reports',
+    ];
+    phantomKeys.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch (_) {}
+    });
   }, []);
 
   useEffect(() => {
@@ -196,6 +212,7 @@ export default function App() {
   // Tự động dọn dẹp dữ liệu mẫu / test cũ nếu còn lưu trong LocalStorage
   useEffect(() => {
     try {
+      cleanupObsoleteStorage();
       if (localStorage.getItem("ktx_test_data_cleaned_v5") !== "true") {
         const studentAcc = localStorage.getItem("ktx_student_account");
         if (studentAcc && (studentAcc.includes("REG-01") || studentAcc.includes("RES-01") || studentAcc.includes("BILL-10-2026"))) {
@@ -413,6 +430,68 @@ export default function App() {
   }
 
   // =========================================================================
+  // ROUTE GUARD ĐỒNG BỘ (Bảo vệ giao diện Quản lý, Kế toán và Sinh viên)
+  // Ngăn chặn render giao diện trái phép khi chưa có token hoặc sai vai trò
+  // =========================================================================
+  const token = localStorage.getItem("ktx_token");
+  const roleStr = (localStorage.getItem("ktx_user_role") || "").toUpperCase();
+
+  // 1. Chưa đăng nhập: Tuyệt đối không cho render bất kỳ giao diện nội bộ nào
+  if (!token) {
+    return (
+      <main className="w-full min-h-screen flex items-center justify-center bg-slate-100">
+        <Login
+          initialTab="login"
+          onTabChange={(tab) => {
+            const nextPath = tab === "register" ? "/register" : "/login";
+            window.history.replaceState({}, "", nextPath);
+            setCurrentPath(nextPath);
+          }}
+          onLoginSuccess={(role) => {
+            const r = String(role || "").toUpperCase();
+            if (r.includes("KE_TOAN") || r.includes("KETOAN")) {
+              navigateTo("/accountant/dashboard");
+            } else if (
+              r.includes("ADMIN") ||
+              r.includes("QUAN_LY") ||
+              r.includes("QUANLY")
+            ) {
+              navigateTo("/admin");
+            } else {
+              navigateTo("/student/dashboard");
+            }
+          }}
+        />
+      </main>
+    );
+  }
+
+  // 2. Phân quyền theo vai trò: Chặn truy cập trái vai trò
+  if (roleStr.includes("SINH_VIEN") || roleStr.includes("SINHVIEN")) {
+    const isForbiddenForStudent =
+      currentPath.startsWith("/admin") ||
+      currentPath.startsWith("/accountant") ||
+      currentPath === "/doi-soat" ||
+      currentPath === "/lap-hoa-don" ||
+      currentPath === "/so-cong-no" ||
+      currentPath === "/bao-cao";
+    if (isForbiddenForStudent) {
+      navigateTo("/student/dashboard");
+      return null;
+    }
+  } else if (roleStr.includes("KE_TOAN") || roleStr.includes("KETOAN")) {
+    if (currentPath.startsWith("/admin") || currentPath.startsWith("/student")) {
+      navigateTo("/accountant/dashboard");
+      return null;
+    }
+  } else if (roleStr.includes("QUAN_LY") || roleStr.includes("QUANLY") || roleStr.includes("ADMIN")) {
+    if (currentPath.startsWith("/student")) {
+      navigateTo("/admin");
+      return null;
+    }
+  }
+
+  // =========================================================================
   // PHÂN HỆ KẾ TOÁN (Accountant)
   // =========================================================================
   if (
@@ -429,7 +508,7 @@ export default function App() {
           }}
           onLogout={() => {
             localStorage.clear();
-            navigateTo("/");
+            navigateTo("/login");
           }}
           activeMenu="dashboard"
           onMenuChange={handleAccountantMenuChange}
@@ -457,7 +536,7 @@ export default function App() {
           }}
           onLogout={() => {
             localStorage.clear();
-            navigateTo("/");
+            navigateTo("/login");
           }}
           activeMenu="reconciliation"
           onMenuChange={handleAccountantMenuChange}
@@ -485,7 +564,7 @@ export default function App() {
           }}
           onLogout={() => {
             localStorage.clear();
-            navigateTo("/");
+            navigateTo("/login");
           }}
           activeMenu="billing"
           onMenuChange={handleAccountantMenuChange}
@@ -513,7 +592,7 @@ export default function App() {
           }}
           onLogout={() => {
             localStorage.clear();
-            navigateTo("/");
+            navigateTo("/login");
           }}
           activeMenu="debt-book"
           onMenuChange={handleAccountantMenuChange}
@@ -541,7 +620,7 @@ export default function App() {
           }}
           onLogout={() => {
             localStorage.clear();
-            navigateTo("/");
+            navigateTo("/login");
           }}
           activeMenu="reports"
           onMenuChange={handleAccountantMenuChange}
@@ -568,7 +647,7 @@ export default function App() {
           }}
           onLogout={() => {
             localStorage.clear();
-            navigateTo("/");
+            navigateTo("/login");
           }}
           activeMenu="notifications"
           onMenuChange={handleAccountantMenuChange}
@@ -988,7 +1067,7 @@ export default function App() {
             if (savedAvatar) {
               localStorage.setItem("ktx_student_avatar", savedAvatar);
             }
-            navigateTo("/");
+            navigateTo("/login");
           }}
         />
         <RoleSwitcher
@@ -1133,6 +1212,10 @@ export default function App() {
         searchTerm={adminSearchTerm}
         onSearchChange={setAdminSearchTerm}
         userName={localStorage.getItem("ktx_fullname") || localStorage.getItem("ktx_username") || "Ban Quản Lý KTX"}
+        onLogout={() => {
+          localStorage.clear();
+          navigateTo("/login");
+        }}
       >
         {adminActiveTab === "dashboard" && (
           <Dashboard

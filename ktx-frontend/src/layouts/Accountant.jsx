@@ -3,6 +3,7 @@ import './Accountant.css';
 import { authService } from '../services/authService';
 import NotificationPopover from '../components/NotificationPopover';
 import accountantNotificationService from '../services/accountantNotificationService';
+import LogoutConfirmModal from '../components/common/LogoutConfirmModal';
 
 /**
  * Layout cho phân hệ Kế toán (Chuẩn 100% theo bản thiết kế Figma iDORM)
@@ -45,6 +46,9 @@ export default function AccountantLayout({
   const [actionRequiredCount, setActionRequiredCount] = useState(() =>
     accountantNotificationService.getActionRequiredCount()
   );
+
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -134,9 +138,26 @@ export default function AccountantLayout({
   };
 
   const handleLogoutClick = () => {
-    authService.logout();
-    if (onLogout) {
-      onLogout();
+    setIsLogoutModalOpen(true);
+  };
+
+  const handleConfirmLogout = () => {
+    setIsLoggingOut(true);
+    try {
+      authService.logout();
+      localStorage.clear();
+      setIsLogoutModalOpen(false);
+      if (onLogout) {
+        onLogout();
+      } else {
+        window.history.pushState({}, '', '/login');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+        window.dispatchEvent(
+          new CustomEvent('student-navigate', { detail: { path: '/login' } })
+        );
+      }
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
@@ -369,6 +390,16 @@ export default function AccountantLayout({
           {children}
         </main>
       </div>
+
+      {/* Modal Xác nhận Đăng xuất Kế toán */}
+      <LogoutConfirmModal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirm={handleConfirmLogout}
+        isLoading={isLoggingOut}
+        userName={displayName}
+        userRole="Kế toán"
+      />
     </div>
   );
 }

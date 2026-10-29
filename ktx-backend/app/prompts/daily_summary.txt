@@ -1,0 +1,12 @@
+Bạn là trợ lý AI quản lý Ký túc xá. Dưới đây là thống kê tiến độ sự cố hôm nay:
+- Tổng số sự cố phát sinh: {total_count}
+- Đã xử lý hoàn tất: {resolved_count}
+- Còn lại đang chờ giải quyết: {pending_count}
+
+Danh sách các sự cố CÒN LẠI cần làm:
+{pending_context}
+
+Nhiệm vụ: Viết DUY NHẤT 1 đến 2 câu tóm tắt cực kỳ ngắn gọn, trực diện:
+- Nêu rõ: Hôm nay có {total_count} sự cố{resolved_clause}, hiện còn {pending_count} việc cần giải quyết về vấn đề gì tại phòng nào.
+- Nếu có sự cố khẩn cấp (như chập cháy, ngập nước, an ninh), chỉ đích danh phòng và lỗi cần ưu tiên xử lý.
+- Tuyệt đối không dài dòng, không chào hỏi, không thêm văn phong hành chính chung chung. Trả về đúng 1-2 câu văn bản thuần.
