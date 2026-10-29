@@ -246,9 +246,9 @@ export default function NotificationPopover({
             <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-2.5">
               <Sparkles className="w-6 h-6" />
             </div>
-            <p className="text-sm font-semibold text-slate-700">Tuyệt vời! Không có việc tồn đọng</p>
+            <p className="text-sm font-semibold text-slate-700">Không có thông báo mới</p>
             <p className="text-xs text-slate-400 mt-0.5">
-              Tất cả thông báo trong mục này đã được xử lý xong.
+              Hiện tại không có thông báo hay công việc tồn đọng nào cần xử lý.
             </p>
           </div>
         ) : (

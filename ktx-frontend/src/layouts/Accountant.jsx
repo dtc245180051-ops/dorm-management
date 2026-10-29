@@ -304,30 +304,28 @@ export default function AccountantLayout({
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                     <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                   </svg>
-                  {unreadCount > 0 && (
-                    <span
-                      style={{
-                        position: 'absolute',
-                        top: '-8px',
-                        right: '-8px',
-                        backgroundColor: '#ef4444',
-                        color: '#fff',
-                        fontSize: '10px',
-                        fontWeight: '800',
-                        borderRadius: '9999px',
-                        minWidth: '16px',
-                        height: '16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '0 3px',
-                        border: '2px solid #fff',
-                        lineHeight: 1,
-                      }}
-                    >
-                      {unreadCount > 99 ? '99+' : unreadCount}
-                    </span>
-                  )}
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '-8px',
+                      right: '-8px',
+                      backgroundColor: unreadCount > 0 ? '#ef4444' : '#94a3b8',
+                      color: '#fff',
+                      fontSize: '10px',
+                      fontWeight: '800',
+                      borderRadius: '9999px',
+                      minWidth: '16px',
+                      height: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0 3px',
+                      border: '2px solid #fff',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
                 </div>
                 <span>Thông báo</span>
                 {actionRequiredCount > 0 && (

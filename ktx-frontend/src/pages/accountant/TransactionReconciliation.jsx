@@ -14,7 +14,13 @@ import Pagination from '../../components/reconciliation/Pagination';
 const getCachedStatement = () => {
   try {
     const raw = sessionStorage.getItem('ktx_statement_upload') || localStorage.getItem('ktx_statement_upload');
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    if (raw.includes('FT2625501977') || raw.includes('FT2625501980') || raw.includes('sao_ke_tien_phong_t9_tpbank')) {
+      sessionStorage.removeItem('ktx_statement_upload');
+      localStorage.removeItem('ktx_statement_upload');
+      return null;
+    }
+    return JSON.parse(raw);
   } catch {
     return null;
   }

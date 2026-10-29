@@ -43,12 +43,58 @@ class AccountantNotificationService {
     this._isSyncing = false;
   }
 
+  _purgeMockAndStaleKeys() {
+    try {
+      // 1. Dọn dẹp cache đối soát cũ nếu chứa 2 giao dịch mẫu hoặc trạng thái upload cũ
+      const reconCache = localStorage.getItem("reconciliation_cache_data");
+      if (reconCache && (reconCache.includes("FT2625501977") || reconCache.includes("FT2625501980"))) {
+        localStorage.removeItem("reconciliation_cache_data");
+      }
+      const stmUpload = localStorage.getItem("ktx_statement_upload") || sessionStorage.getItem("ktx_statement_upload");
+      if (stmUpload && (stmUpload.includes("FT2625501977") || stmUpload.includes("FT2625501980"))) {
+        localStorage.removeItem("ktx_statement_upload");
+        sessionStorage.removeItem("ktx_statement_upload");
+      }
+      // 2. Dọn dẹp key thông báo kế toán cũ
+      const legacyKey = localStorage.getItem("ktx_accountant_notifications");
+      if (legacyKey && (legacyKey.includes("FT2625501977") || legacyKey.includes("FT2625501980") || legacyKey.includes("350.000"))) {
+        localStorage.removeItem("ktx_accountant_notifications");
+      }
+    } catch (_) {}
+  }
+
   _getStoredList() {
     try {
+      this._purgeMockAndStaleKeys();
       const raw = localStorage.getItem(ACCOUNTANT_NOTIFS_STORAGE_KEY);
       if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) return [];
+      // Lọc sạch bất kỳ thông báo mock hay giao dịch mẫu tồn đọng
+      const cleaned = parsed.filter((n) => {
+        const id = String(n.id || "");
+        const title = String(n.title || "");
+        const preview = String(n.previewText || "");
+        const createdAt = String(n.createdAt || "");
+        if (
+          id.includes("FT2625501977") ||
+          id.includes("FT2625501980") ||
+          title.includes("FT2625501977") ||
+          title.includes("FT2625501980") ||
+          preview.includes("FT2625501977") ||
+          preview.includes("FT2625501980") ||
+          preview.includes("TP DTC245180037") ||
+          preview.includes("Ngo Phuong Mai nop tien phong KTX") ||
+          createdAt.includes("2001")
+        ) {
+          return false;
+        }
+        return true;
+      });
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem(ACCOUNTANT_NOTIFS_STORAGE_KEY, JSON.stringify(cleaned));
+      }
+      return cleaned;
     } catch {
       return [];
     }

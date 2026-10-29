@@ -5,7 +5,12 @@ const CACHE_KEY = 'reconciliation_cache_data';
 function getCachedData() {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    if (raw.includes('FT2625501977') || raw.includes('FT2625501980')) {
+      localStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+    return JSON.parse(raw);
   } catch (e) {
     return null;
   }

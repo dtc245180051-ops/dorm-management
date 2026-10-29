@@ -28,7 +28,11 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import financeService from '../../services/financeService';
+import ExcelJS from 'exceljs';
+import fileSaver from 'file-saver';
 import './PeriodicReports.css';
+
+const saveAs = fileSaver.saveAs || fileSaver;
 
 /**
  * Định dạng tiền VND đẹp
@@ -201,48 +205,223 @@ export default function PeriodicReports({ searchTerm: parentSearch = '' }) {
     }
   };
 
-  // Xuất file Excel (.csv UTF-8 BOM chuẩn tiếng Việt có dấu)
-  const handleExportExcel = () => {
-    const summary = reportData.summary;
-    const items = reportData.items;
+  // Xuất file Excel (.xlsx) chuẩn chuyên nghiệp với ExcelJS
+  const handleExportExcel = async () => {
+    try {
+      const items = reportData.items || [];
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = formData.creatorName || 'Phòng Kế Toán KTX iDORM';
+      workbook.created = new Date();
 
-    let csvContent = '\uFEFF'; // UTF-8 BOM để Excel hiển thị đúng tiếng Việt
+      const worksheet = workbook.addWorksheet('Báo cáo thống kê KTX', {
+        views: [{ showGridLines: true }],
+      });
 
-    // Tiêu đề & Thông tin chung
-    csvContent += 'BÁO CÁO THỐNG KÊ QUYẾT TOÁN THU PHÍ & CÔNG NỢ KÝ TÚC XÁ iDORM\n';
-    csvContent += `Kỳ báo cáo:,"${selectedPeriod}"\n`;
-    csvContent += `Ngày xuất báo cáo:,"${new Date().toLocaleDateString('vi-VN')} ${new Date().toLocaleTimeString('vi-VN')}"\n`;
-    csvContent += `Người xuất:,"${formData.creatorName}"\n\n`;
+      // 1. Dòng 1: Tên đơn vị (In hoa, cỡ 11, in nghiêng)
+      worksheet.mergeCells('A1:H1');
+      const row1Cell = worksheet.getCell('A1');
+      row1Cell.value = 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN & TRUYỀN THÔNG - KTX iDORM';
+      row1Cell.font = { name: 'Times New Roman', size: 11, italic: true };
+      row1Cell.alignment = { vertical: 'middle', horizontal: 'left' };
+      worksheet.getRow(1).height = 20;
 
-    // Phần tổng hợp số liệu KPI
-    csvContent += 'I. TỔNG HỢP SỐ LIỆU TÀI CHÍNH\n';
-    csvContent += 'Chỉ tiêu,Số tiền (VNĐ),Ghi chú\n';
-    csvContent += `Tổng doanh thu phát hành,${summary.totalInvoiced},Tổng tất cả hóa đơn\n`;
-    csvContent += `Đã thực thu quỹ,${summary.totalCollected},Tỷ lệ đạt ${summary.collectionRate}%\n`;
-    csvContent += `Công nợ tồn đọng,${summary.totalOutstanding},${summary.unpaidStudentsCount} sinh viên chưa nộp\n`;
-    csvContent += `Tổng nợ quá hạn cảnh báo,${summary.totalOverdue},Cần đôn đốc khẩn cấp\n`;
-    csvContent += `Thu tiền phòng tiêu chuẩn (350k),${summary.roomRevenueStandard},\n`;
-    csvContent += `Thu tiền phòng dịch vụ (650k),${summary.roomRevenueService},\n`;
-    csvContent += `Thu tiền điện nước sinh hoạt,${summary.utilityRevenue},\n\n`;
+      // 2. Dòng 2: Tiêu đề báo cáo (Merge ô, in hoa đậm, cỡ 15, màu xanh đậm #1F497D)
+      worksheet.mergeCells('A2:H2');
+      const row2Cell = worksheet.getCell('A2');
+      row2Cell.value = 'BÁO CÁO THỐNG KÊ TÀI CHÍNH & THU PHÍ KÝ TÚC XÁ';
+      row2Cell.font = { name: 'Times New Roman', size: 15, bold: true, color: { argb: 'FF1F497D' } };
+      row2Cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      worksheet.getRow(2).height = 30;
 
-    // Phần bảng kê chi tiết chứng từ
-    csvContent += 'II. BẢNG KÊ CHI TIẾT CHỨNG TỪ THU VÀ CÔNG NỢ\n';
-    csvContent += 'STT,Mã hóa đơn,Mã sinh viên,Họ và tên,Phòng,Loại phòng,Khoản mục,Kỳ thu,Số tiền,Đã thu,Còn nợ,Trạng thái,Ngày phát hành,Hạn thanh toán\n';
+      // 3. Dòng 3: Ghi kỳ báo cáo (Tháng/Năm) và ngày giờ xuất báo cáo
+      worksheet.mergeCells('A3:H3');
+      const row3Cell = worksheet.getCell('A3');
+      const now = new Date();
+      const exportTimeStr = `${now.toLocaleDateString('vi-VN')} ${now.toLocaleTimeString('vi-VN')}`;
+      row3Cell.value = `Kỳ báo cáo: ${selectedPeriod === 'ALL' ? 'Toàn bộ các kỳ' : selectedPeriod} | Ngày xuất: ${exportTimeStr}`;
+      row3Cell.font = { name: 'Times New Roman', size: 11, italic: true, color: { argb: 'FF333333' } };
+      row3Cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      worksheet.getRow(3).height = 22;
 
-    items.forEach((item, index) => {
-      csvContent += `${index + 1},"${item.invoiceId}","${item.studentId || ''}","${item.studentName || ''}","${item.room || ''}","${item.roomType || ''}","${item.feeType || ''}","${item.period || ''}",${item.amount},${item.paid},${item.remaining},"${item.statusText || ''}","${item.issueDate || ''}","${item.dueDate || ''}"\n`;
-    });
+      // Dòng 4: Dòng trống
+      worksheet.getRow(4).height = 12;
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const safePeriod = selectedPeriod.replace(/[^a-zA-Z0-9]/g, '_');
-    link.download = `BaoCao_ThongKe_KTX_${safePeriod}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      // 4. Dòng 5 (Header bảng): Mã SV, Họ và tên, Phòng/Giường, Loại phí, Số tiền phải thu, Đã đóng, Còn nợ, Trạng thái
+      const headerRow = worksheet.getRow(5);
+      headerRow.values = [
+        'Mã SV',
+        'Họ và tên',
+        'Phòng/Giường',
+        'Loại phí',
+        'Số tiền phải thu',
+        'Đã đóng',
+        'Còn nợ',
+        'Trạng thái',
+      ];
+      headerRow.height = 28;
+
+      for (let col = 1; col <= 8; col++) {
+        const cell = headerRow.getCell(col);
+        cell.font = { name: 'Times New Roman', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF1F497D' },
+        };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+          left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+          bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+          right: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+        };
+      }
+
+      // 5. Dữ liệu chi tiết:
+      const thinBorder = {
+        top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+        left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+        bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+        right: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+      };
+
+      let currentRowIndex = 6;
+      items.forEach((item) => {
+        const row = worksheet.getRow(currentRowIndex);
+        row.height = 22;
+
+        let statusText = item.statusText || '';
+        if (!statusText) {
+          if (item.status === 'PAID') statusText = 'Đã thanh toán';
+          else if (item.status === 'OVERDUE') statusText = 'Quá hạn';
+          else statusText = 'Chưa thanh toán';
+        }
+
+        row.getCell(1).value = item.studentId || item.msv || '';
+        row.getCell(2).value = item.studentName || item.ho_ten || '';
+        row.getCell(3).value = item.room || item.so_phong || '';
+        row.getCell(4).value = item.feeType || item.loai_phi || 'Tiền phòng';
+        row.getCell(5).value = Number(item.amount) || 0;
+        row.getCell(6).value = Number(item.paid) || 0;
+        row.getCell(7).value = Number(item.remaining) || 0;
+        row.getCell(8).value = statusText;
+
+        for (let c = 1; c <= 8; c++) {
+          const cell = row.getCell(c);
+          cell.font = { name: 'Times New Roman', size: 11 };
+          cell.border = thinBorder;
+          cell.alignment = { vertical: 'middle' };
+        }
+
+        // Căn giữa: Mã SV (1), Phòng (3), Trạng thái (8)
+        row.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+        row.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' };
+        row.getCell(8).alignment = { vertical: 'middle', horizontal: 'center' };
+
+        // Căn trái: Họ và tên (2), Loại phí (4)
+        row.getCell(2).alignment = { vertical: 'middle', horizontal: 'left' };
+        row.getCell(4).alignment = { vertical: 'middle', horizontal: 'left' };
+
+        // Căn phải & format tiền tệ (#,##0): Số tiền (5), Đã đóng (6), Còn nợ (7)
+        [5, 6, 7].forEach((colIdx) => {
+          const cell = row.getCell(colIdx);
+          cell.alignment = { vertical: 'middle', horizontal: 'right' };
+          cell.numFmt = '#,##0';
+        });
+
+        currentRowIndex++;
+      });
+
+      // 6. Dòng Tổng cộng ở cuối: In đậm, nền xám nhạt (#F2F2F2), dùng công thức SUM
+      const totalRowIndex = currentRowIndex;
+      const totalRow = worksheet.getRow(totalRowIndex);
+      totalRow.height = 25;
+
+      worksheet.mergeCells(`A${totalRowIndex}:D${totalRowIndex}`);
+      const totalLabel = totalRow.getCell(1);
+      totalLabel.value = 'TỔNG CỘNG';
+      totalLabel.font = { name: 'Times New Roman', size: 11, bold: true };
+      totalLabel.alignment = { vertical: 'middle', horizontal: 'center' };
+
+      const startRow = 6;
+      const endRow = Math.max(startRow, totalRowIndex - 1);
+
+      if (items.length > 0) {
+        totalRow.getCell(5).value = { formula: `SUM(E${startRow}:E${endRow})` };
+        totalRow.getCell(6).value = { formula: `SUM(F${startRow}:F${endRow})` };
+        totalRow.getCell(7).value = { formula: `SUM(G${startRow}:G${endRow})` };
+      } else {
+        totalRow.getCell(5).value = 0;
+        totalRow.getCell(6).value = 0;
+        totalRow.getCell(7).value = 0;
+      }
+      totalRow.getCell(8).value = '';
+
+      for (let c = 1; c <= 8; c++) {
+        const cell = totalRow.getCell(c);
+        cell.font = { name: 'Times New Roman', size: 11, bold: true };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF2F2F2' },
+        };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+          left: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+          bottom: { style: 'double', color: { argb: 'FF000000' } },
+          right: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+        };
+      }
+
+      [5, 6, 7].forEach((colIdx) => {
+        const cell = totalRow.getCell(colIdx);
+        cell.alignment = { vertical: 'middle', horizontal: 'right' };
+        cell.numFmt = '#,##0';
+      });
+
+      // 7. Tự động điều chỉnh độ rộng cột (Auto-fit column width)
+      const defaultWidths = [16, 26, 16, 18, 18, 16, 16, 18];
+      worksheet.columns.forEach((column, index) => {
+        let maxLength = defaultWidths[index] || 15;
+        column.eachCell({ includeEmpty: false }, (cell, rowNumber) => {
+          if (rowNumber >= 5 && cell.value) {
+            let cellText = '';
+            if (typeof cell.value === 'object' && cell.value.formula) {
+              cellText = '999,999,999';
+            } else {
+              cellText = String(cell.value);
+            }
+            if (cellText.length + 4 > maxLength) {
+              maxLength = cellText.length + 4;
+            }
+          }
+        });
+        column.width = Math.min(Math.max(maxLength, defaultWidths[index] || 15), 45);
+      });
+
+      // 8. Tên file xuất ra: BaoCao_ThongKe_KTX_Thang_MM_YYYY.xlsx
+      let monthStr = '';
+      let yearStr = '';
+      const match = String(selectedPeriod).match(/(\d{1,2})[\/\-_](\d{4})/);
+      if (match) {
+        monthStr = match[1].padStart(2, '0');
+        yearStr = match[2];
+      } else {
+        monthStr = (now.getMonth() + 1).toString().padStart(2, '0');
+        yearStr = now.getFullYear().toString();
+      }
+      const fileName = `BaoCao_ThongKe_KTX_Thang_${monthStr}_${yearStr}.xlsx`;
+
+      // 9. Lưu file qua file-saver
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      saveAs(blob, fileName);
+    } catch (err) {
+      console.error('Lỗi khi xuất file Excel:', err);
+      alert('Đã xảy ra lỗi khi tạo file Excel. Vui lòng thử lại!');
+    }
   };
 
   // In báo cáo (Window.print)

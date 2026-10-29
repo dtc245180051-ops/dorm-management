@@ -301,9 +301,9 @@ export default function AccountantNotificationsPage({ onNavigate }) {
             <div className="w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-4">
               <Inbox className="w-8 h-8" />
             </div>
-            <h3 className="text-base font-bold text-slate-700">Không có giao dịch tài chính nào chờ</h3>
+            <h3 className="text-base font-bold text-slate-700">Không có thông báo mới</h3>
             <p className="text-xs text-slate-400 mt-1 max-w-sm">
-              Mọi hóa đơn và giao dịch đối soát ngân hàng đã được giải quyết đầy đủ.
+              Hiện tại không có thông báo hay công việc tồn đọng nào cần xử lý.
             </p>
           </div>
         ) : (

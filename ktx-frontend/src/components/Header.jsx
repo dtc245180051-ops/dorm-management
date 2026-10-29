@@ -137,11 +137,9 @@ export default function Header({
           >
             <div className="relative flex items-center justify-center">
               <Bell className={`w-4 h-4 ${isPopoverOpen ? "text-white" : "text-sky-600"}`} />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 bg-rose-500 text-white text-[10px] font-extrabold rounded-full flex items-center justify-center ring-2 ring-white">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              )}
+              <span className={`absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 ${unreadCount > 0 ? "bg-rose-500" : "bg-slate-400"} text-white text-[10px] font-extrabold rounded-full flex items-center justify-center ring-2 ring-white`}>
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
             </div>
             <span>Thông báo</span>
             {actionRequiredCount > 0 && (

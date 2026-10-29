@@ -268,10 +268,12 @@ export default function TransactionDetailModal({
                     <div className="tx-info-row">
                       <span className="tx-info-label">Sinh viên:</span>
                       <span className="tx-info-val">
-                        <strong>{tx.studentName || student?.studentName || 'Ngô Phương Mai'}</strong>
-                        <span style={{ color: '#64748b', marginLeft: '6px', fontSize: '12.5px' }}>
-                          ({tx.studentCode || student?.studentCode || 'DTC245180037'})
-                        </span>
+                        <strong>{tx.studentName || student?.studentName || '--'}</strong>
+                        {(tx.studentCode || student?.studentCode) ? (
+                          <span style={{ color: '#64748b', marginLeft: '6px', fontSize: '12.5px' }}>
+                            ({tx.studentCode || student?.studentCode})
+                          </span>
+                        ) : null}
                       </span>
                     </div>
 

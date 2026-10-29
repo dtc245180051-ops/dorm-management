@@ -40,11 +40,14 @@ def reset_test_data():
         db.execute(text("SET FOREIGN_KEY_CHECKS = 0;"))
 
         # 1. Xóa sạch toàn bộ dữ liệu giao dịch và lịch sử
+        db.execute(text("DELETE FROM giao_dich_ngan_hang;"))
         db.execute(text("DELETE FROM thanh_toan;"))
         db.execute(text("DELETE FROM phi;"))
         db.execute(text("DELETE FROM so_cong_no;"))
         db.execute(text("DELETE FROM hoa_don;"))
+        db.execute(text("DELETE FROM bao_cao_dinh_ky;"))
         db.execute(text("DELETE FROM yeu_cau_chuyen_tra_phong;"))
+        db.execute(text("DELETE FROM room_requests;"))
         db.execute(text("DELETE FROM hop_dong;"))
         db.execute(text("DELETE FROM phan_anh;"))
         db.execute(text("DELETE FROM vi_pham;"))
@@ -95,25 +98,20 @@ def reset_test_data():
         db.execute(text("SET FOREIGN_KEY_CHECKS = 1;"))
         db.commit()
 
-        # 5. Dọn dẹp các file JSON store (đơn đăng ký, phản ánh) nếu có
+        # 5. Dọn dẹp các file JSON store về mảng rỗng []
         app_dir = os.path.join(BASE_DIR, "app")
-        requests_json = os.path.join(app_dir, "data_store_requests.json")
-        if os.path.exists(requests_json):
+        json_files_to_clean = [
+            "data_store_requests.json",
+            "data_store_incidents.json",
+            "data_store_transactions.json",
+            "data_store_bank.json",
+            "data_store_notifications.json",
+            "bank_statements.json",
+        ]
+        for jf in json_files_to_clean:
+            target_path = os.path.join(app_dir, jf)
             try:
-                with open(requests_json, "w", encoding="utf-8") as f:
-                    json.dump(
-                        {"REGISTRATION_REQUESTS": [], "TRANSFER_CHECKOUT_REQUESTS": []},
-                        f,
-                        ensure_ascii=False,
-                        indent=2,
-                    )
-            except Exception:
-                pass
-
-        incidents_json = os.path.join(app_dir, "data_store_incidents.json")
-        if os.path.exists(incidents_json):
-            try:
-                with open(incidents_json, "w", encoding="utf-8") as f:
+                with open(target_path, "w", encoding="utf-8") as f:
                     json.dump([], f, ensure_ascii=False, indent=2)
             except Exception:
                 pass
