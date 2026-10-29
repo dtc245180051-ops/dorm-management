@@ -461,14 +461,12 @@ def get_available_beds(
                 | (ToaNha.gioi_tinh.ilike("%nu%"))
                 | (ToaNha.gioi_tinh.ilike("%nam &%"))
                 | (ToaNha.gioi_tinh.ilike("%cả hai%"))
-                | (ToaNha.gioi_tinh.is_(None))
             )
         elif "nam" in raw_g or "male" in raw_g:
             # Phòng/Tòa dành cho Nam hoặc Nam & Nữ
             query = query.filter(
                 (ToaNha.gioi_tinh.ilike("%nam%"))
                 | (ToaNha.gioi_tinh.ilike("%cả hai%"))
-                | (ToaNha.gioi_tinh.is_(None))
             )
     if building_id:
         query = query.filter(Tang.ma_toa == building_id)

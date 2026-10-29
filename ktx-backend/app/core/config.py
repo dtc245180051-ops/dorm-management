@@ -38,11 +38,31 @@ class Settings(BaseSettings):
     def get_gemini_api_key(self, required: bool = True) -> str:
         """
         Lấy Gemini API Key từ cấu hình tập trung.
+        Nạp theo thứ tự ưu tiên:
+        1. settings.GEMINI_API_KEY từ ktx-backend/.env
+        2. Biến môi trường GEMINI_API_KEY hoặc VITE_GEMINI_API_KEY
+        3. Tệp ktx-frontend/.env (nếu có)
         Ném ValueError rõ ràng nếu biến môi trường bị thiếu khi chạy chức năng AI.
         """
-        key = (self.GEMINI_API_KEY or "").strip()
+        key = (self.GEMINI_API_KEY or "").strip().strip('"').strip("'")
         if not key:
             key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("VITE_GEMINI_API_KEY", "").strip()
+            key = key.strip('"').strip("'")
+
+        if not key:
+            try:
+                fe_env = BASE_DIR.parent / "ktx-frontend" / ".env"
+                if fe_env.exists():
+                    with open(fe_env, "r", encoding="utf-8") as f:
+                        for line in f:
+                            raw_line = line.strip()
+                            if raw_line.startswith("VITE_GEMINI_API_KEY=") or raw_line.startswith("GEMINI_API_KEY="):
+                                key = raw_line.split("=", 1)[1].strip().strip('"').strip("'")
+                                if key:
+                                    break
+            except Exception:
+                pass
+
         if not key and required:
             raise ValueError(
                 "Lỗi cấu hình bảo mật: GEMINI_API_KEY chưa được thiết lập trong tệp môi trường (.env). "

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   ChevronLeft,
   ChevronDown,
@@ -6,9 +6,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   X,
-  Building2,
-  Bed,
-  DoorOpen,
   Sparkles,
 } from "lucide-react";
 import AdminLayout from "../../layouts/Admin";
@@ -16,6 +13,7 @@ import occupancyService from "../../services/occupancyService";
 import {
   matchRoomWithGemini,
   isGenderCompatible,
+  normalizeGender,
 } from "../../services/geminiService";
 import { approveStudentRoom } from "../../services/studentAccountService";
 import studentNotificationService from "../../services/studentNotificationService";
@@ -32,9 +30,9 @@ export default function ProcessRegistrationPage({
 
   // Dữ liệu Tòa - Phòng - Giường trống phục vụ 3 dropdown
   const [buildingTree, setBuildingTree] = useState([]);
-  const [selectedBuilding, setSelectedBuilding] = useState("A");
-  const [selectedRoom, setSelectedRoom] = useState("A203");
-  const [selectedBed, setSelectedBed] = useState("G04");
+  const [selectedBuilding, setSelectedBuilding] = useState("");
+  const [selectedRoom, setSelectedRoom] = useState("");
+  const [selectedBed, setSelectedBed] = useState("");
   const [aiRecommendation, setAiRecommendation] = useState(null);
   const [isMatching, setIsMatching] = useState(false);
 
@@ -85,56 +83,82 @@ export default function ProcessRegistrationPage({
         const tree = bedsData || [];
         setBuildingTree(tree);
 
-        // Khớp Tòa, Phòng, Giường với cây dữ liệu thực tế
-        if (tree.length > 0) {
-          const rawWish = [
-            detail?.nguyen_vong,
-            detail?.noi_dung_nguyen_vong,
-            detail?.nguyen_vong_label,
-            detail?.chi_tiet_nguyen_vong,
-            detail?.ma_toa_mong_muon,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
+        // Khớp Tòa, Phòng, Giường với cây dữ liệu thực tế theo ràng buộc giới tính
+        const studentGender = detail?.gioi_tinh || detail?.gender || "";
+        const compatibleBuildings = tree.filter((b) =>
+          isGenderCompatible(studentGender, b.gioi_tinh),
+        );
 
-          const wantsA1 = /tòa\s*a1\b|toa\s*a1\b|\ba1\b/i.test(rawWish) || String(detail?.ma_toa_mong_muon || "").toLowerCase().includes("a1");
-          const wantsB = /tòa\s*b\b|toa\s*b\b|\bb\b/i.test(rawWish) || String(detail?.ma_toa_mong_muon || "").toLowerCase().startsWith("b");
+        if (compatibleBuildings.length === 0) {
+          // KTX hiện không có tòa nào phù hợp giới tính sinh viên -> ĐỂ TRỐNG
+          setSelectedBuilding("");
+          setSelectedRoom("");
+          setSelectedBed("");
+        } else {
+          // Chỉ tìm trong danh sách các tòa phù hợp giới tính
+          let targetBuilding = null;
+          if (detail?.goi_y?.ma_toa) {
+            targetBuilding = compatibleBuildings.find(
+              (b) => b.ma_toa === detail.goi_y.ma_toa,
+            );
+          }
 
-          // 1. Tìm tòa khớp với nguyện vọng hoặc tòa phù hợp giới tính sinh viên
-          const targetBuilding =
-            (wantsA1 && tree.find((b) => String(b.ma_toa).toLowerCase().includes("a1") || String(b.ten_toa).toLowerCase().includes("a1"))) ||
-            (wantsB && tree.find((b) => String(b.ma_toa).toLowerCase().includes("b") || String(b.ten_toa).toLowerCase().includes("b"))) ||
-            tree.find((b) => b.ma_toa === detail?.goi_y?.ma_toa) ||
-            tree.find(
-              (b) =>
-                detail?.goi_y?.ma_toa &&
-                (b.ma_toa.startsWith(detail.goi_y.ma_toa) ||
-                  detail.goi_y.ma_toa.startsWith(b.ma_toa)),
-            ) ||
-            tree.find((b) => isGenderCompatible(detail?.gioi_tinh, b.gioi_tinh)) ||
-            tree[0];
+          if (!targetBuilding) {
+            const rawWish = [
+              detail?.nguyen_vong,
+              detail?.noi_dung_nguyen_vong,
+              detail?.nguyen_vong_label,
+              detail?.chi_tiet_nguyen_vong,
+              detail?.ma_toa_mong_muon,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase();
 
-          setSelectedBuilding(targetBuilding.ma_toa);
+            const wantsA1 = /tòa\s*a1\b|toa\s*a1\b|\ba1\b/i.test(rawWish) || String(detail?.ma_toa_mong_muon || "").toLowerCase().includes("a1");
+            const wantsB = /tòa\s*b\b|toa\s*b\b|\bb\b/i.test(rawWish) || String(detail?.ma_toa_mong_muon || "").toLowerCase().startsWith("b");
 
-          const rooms = targetBuilding.rooms || [];
-          if (rooms.length > 0) {
-            // 2. Tìm phòng khớp với gợi ý hoặc lấy phòng đầu tiên
-            const targetRoom =
-              rooms.find((r) => r.ma_phong === detail?.goi_y?.ma_phong) ||
-              rooms[0];
-
-            setSelectedRoom(targetRoom.ma_phong);
-
-            const beds = targetRoom.beds || [];
-            if (beds.length > 0) {
-              // 3. Tìm giường khớp với gợi ý hoặc lấy giường đầu tiên
-              const targetBed =
-                beds.find((b) => b.ma_giuong === detail?.goi_y?.ma_giuong) ||
-                beds[0];
-
-              setSelectedBed(targetBed.ma_giuong);
+            if (wantsA1) {
+              targetBuilding = compatibleBuildings.find(
+                (b) => String(b.ma_toa).toLowerCase().includes("a1") || String(b.ten_toa).toLowerCase().includes("a1"),
+              );
+            } else if (wantsB) {
+              targetBuilding = compatibleBuildings.find(
+                (b) => String(b.ma_toa).toLowerCase().includes("b") || String(b.ten_toa).toLowerCase().includes("b"),
+              );
             }
+          }
+
+          if (!targetBuilding && !detail?.suggestion_error) {
+            targetBuilding = compatibleBuildings[0];
+          }
+
+          if (targetBuilding) {
+            setSelectedBuilding(targetBuilding.ma_toa);
+            const rooms = targetBuilding.rooms || [];
+            if (rooms.length > 0) {
+              const targetRoom =
+                rooms.find((r) => r.ma_phong === detail?.goi_y?.ma_phong) ||
+                rooms[0];
+              setSelectedRoom(targetRoom.ma_phong);
+
+              const beds = targetRoom.beds || [];
+              if (beds.length > 0) {
+                const targetBed =
+                  beds.find((b) => b.ma_giuong === detail?.goi_y?.ma_giuong) ||
+                  beds[0];
+                setSelectedBed(targetBed.ma_giuong);
+              } else {
+                setSelectedBed("");
+              }
+            } else {
+              setSelectedRoom("");
+              setSelectedBed("");
+            }
+          } else {
+            setSelectedBuilding("");
+            setSelectedRoom("");
+            setSelectedBed("");
           }
         }
       } catch (err) {
@@ -182,12 +206,31 @@ export default function ProcessRegistrationPage({
         const recommendation = await matchRoomWithGemini(requestData, rooms);
         if (!isCurrent) return;
         setAiRecommendation(recommendation);
-        if (!recommendation?.best_room_id) return;
 
-        // 1. Tự động tìm Tòa phù hợp từ kết quả gợi ý
+        if (!recommendation?.best_room_id || !recommendation?.suggestion) {
+          // Không có phòng hợp lệ phù hợp giới tính -> ĐỂ TRỐNG
+          setSelectedBuilding("");
+          setSelectedRoom("");
+          setSelectedBed("");
+          return;
+        }
+
+        // Lọc danh sách các tòa phù hợp với giới tính sinh viên
+        const compatibleBuildings = buildingTree.filter((b) =>
+          isGenderCompatible(requestData?.gioi_tinh, b.gioi_tinh),
+        );
+
+        if (compatibleBuildings.length === 0) {
+          setSelectedBuilding("");
+          setSelectedRoom("");
+          setSelectedBed("");
+          return;
+        }
+
+        // 1. Tự động tìm Tòa phù hợp từ kết quả gợi ý trong các tòa hợp lệ
         const recToa = String(recommendation.toa || "").trim().toLowerCase();
         const matchedBuilding =
-          buildingTree.find((building) => {
+          compatibleBuildings.find((building) => {
             const bMa = String(building.ma_toa || "").toLowerCase();
             const bTen = String(building.ten_toa || "").toLowerCase();
             return (
@@ -198,13 +241,14 @@ export default function ProcessRegistrationPage({
               (recToa.includes("a1") && (bMa.includes("a1") || bTen.includes("a1"))) ||
               (recToa.includes("b") && (bMa.includes("b") || bTen.includes("b")))
             );
-          }) ||
-          buildingTree.find((b) =>
-            isGenderCompatible(requestData.gioi_tinh, b.gioi_tinh),
-          ) ||
-          buildingTree[0];
+          }) || compatibleBuildings[0];
 
-        if (!matchedBuilding) return;
+        if (!matchedBuilding) {
+          setSelectedBuilding("");
+          setSelectedRoom("");
+          setSelectedBed("");
+          return;
+        }
 
         // 2. Tự động tìm Phòng phù hợp từ kết quả gợi ý
         const recRoom = String(recommendation.best_room_id || "").trim();
@@ -222,7 +266,11 @@ export default function ProcessRegistrationPage({
             );
           }) || bldRooms[0];
 
-        if (!matchedRoom) return;
+        if (!matchedRoom) {
+          setSelectedRoom("");
+          setSelectedBed("");
+          return;
+        }
 
         // 3. Tự động tìm Giường trống phù hợp từ kết quả gợi ý
         const recBed = String(recommendation.giuong || "").trim();
@@ -241,11 +289,12 @@ export default function ProcessRegistrationPage({
             );
           }) || roomBeds[0];
 
-        // TỰ ĐỘNG NHẢY CẢ 3 MỤC: TÒA, PHÒNG, GIƯỜNG THEO GỢI Ý CỦA HỆ THỐNG
         setSelectedBuilding(matchedBuilding.ma_toa);
         setSelectedRoom(matchedRoom.ma_phong);
         if (matchedBed) {
           setSelectedBed(matchedBed.ma_giuong);
+        } else {
+          setSelectedBed("");
         }
       } catch (err) {
         console.error("Error matching room with Gemini:", err);
@@ -260,43 +309,7 @@ export default function ProcessRegistrationPage({
     };
   }, [requestData, buildingTree]);
 
-  // Tự động kiểm tra và đồng bộ Phòng, Giường khi Tòa hoặc Phòng thay đổi
-  useEffect(() => {
-    if (!buildingTree || buildingTree.length === 0) return;
 
-    // 1. Kiểm tra Tòa
-    let currentBld = buildingTree.find((b) => b.ma_toa === selectedBuilding);
-    if (!currentBld) {
-      currentBld = buildingTree[0];
-      setSelectedBuilding(currentBld.ma_toa);
-    }
-
-    const rooms = currentBld?.rooms || [];
-    if (rooms.length === 0) {
-      if (selectedRoom !== "") setSelectedRoom("");
-      if (selectedBed !== "") setSelectedBed("");
-      return;
-    }
-
-    // 2. Kiểm tra Phòng
-    let currentRoom = rooms.find((r) => r.ma_phong === selectedRoom);
-    if (!currentRoom) {
-      currentRoom = rooms[0];
-      setSelectedRoom(currentRoom.ma_phong);
-    }
-
-    const beds = currentRoom?.beds || [];
-    if (beds.length === 0) {
-      if (selectedBed !== "") setSelectedBed("");
-      return;
-    }
-
-    // 3. Kiểm tra Giường
-    const currentBed = beds.find((b) => b.ma_giuong === selectedBed);
-    if (!currentBed) {
-      setSelectedBed(beds[0].ma_giuong);
-    }
-  }, [buildingTree, selectedBuilding, selectedRoom, selectedBed]);
 
   // Danh sách phòng tương ứng với Tòa đang chọn
   const currentBuildingObj = buildingTree.find(
@@ -346,6 +359,18 @@ export default function ProcessRegistrationPage({
     if (!selectedBuilding || !selectedRoom || !selectedBed) {
       showToast(
         "Vui lòng chọn đầy đủ Tòa, Phòng và Giường trước khi duyệt.",
+        "error",
+      );
+      return;
+    }
+
+    const studentGender = requestData?.gioi_tinh || requestData?.gender || "";
+    const sNorm = normalizeGender(studentGender);
+    const studentGenderLabel = sNorm === "FEMALE" ? "Nữ" : (sNorm === "MALE" ? "Nam" : (studentGender || "sinh viên"));
+
+    if (!isGenderCompatible(studentGender, currentBuildingObj?.gioi_tinh)) {
+      showToast(
+        `Không thể phê duyệt: Sinh viên là ${studentGenderLabel} nhưng ${currentBuildingObj?.ten_toa || selectedBuilding} là tòa dành cho ${currentBuildingObj?.gioi_tinh || "khác"}.`,
         "error",
       );
       return;
@@ -407,7 +432,9 @@ export default function ProcessRegistrationPage({
           actionLabel: "Kiểm tra lịch sử phòng",
           msv: requestData?.msv,
         });
-      } catch (_) {}
+      } catch {
+        // ignore notification error
+      }
 
       showToast(`Duyệt thành công! Đã tạo hợp đồng ${contractCode}`, "success");
 
@@ -451,7 +478,9 @@ export default function ProcessRegistrationPage({
           actionLabel: "Kiểm tra lịch sử",
           msv: requestData?.msv,
         });
-      } catch (_) {}
+      } catch {
+        // ignore notification error
+      }
 
       setIsRejectModalOpen(false);
       showToast("Đã từ chối đơn yêu cầu thành công.", "success");
@@ -470,6 +499,21 @@ export default function ProcessRegistrationPage({
       setSubmitting(false);
     }
   };
+
+  const studentGender = requestData?.gioi_tinh || requestData?.gender || "";
+  const sNorm = normalizeGender(studentGender);
+  const studentGenderLabel = sNorm === "FEMALE" ? "Nữ" : (sNorm === "MALE" ? "Nam" : (studentGender || "sinh viên"));
+
+  const compatibleBuildings = buildingTree.filter((b) =>
+    isGenderCompatible(studentGender, b.gioi_tinh),
+  );
+  const hasCompatibleRooms = compatibleBuildings.some(
+    (b) => (b.rooms || []).length > 0,
+  );
+
+  const isCurrentSelectionCompatible = selectedBuilding
+    ? isGenderCompatible(studentGender, currentBuildingObj?.gioi_tinh)
+    : false;
 
   return (
     <AdminLayout activeTab="dashboard" userName="QL_Minh">
@@ -713,7 +757,7 @@ export default function ProcessRegistrationPage({
               </div>
             </div>
 
-            {/* 4. GỢI Ý XẾP CHỖ CỦA HỆ THỐNG (3 DROPDOWN LIÊN HOÀN) */}
+            {/* 4. GỢI Ý XẾP CHỖ CỦA HỆ THỐNG */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-base font-bold text-slate-900">
@@ -726,9 +770,53 @@ export default function ProcessRegistrationPage({
                   </span>
                 )}
               </div>
+
+              {/* THÔNG BÁO CẢNH BÁO KHI KHÔNG CÓ PHÒNG PHÙ HỢP GIỚI TÍNH */}
+              {!hasCompatibleRooms ? (
+                <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 flex items-start gap-3 shadow-2xs mb-4">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-bold text-amber-950">
+                      ⚠️ Không tìm thấy phòng khả dụng phù hợp với giới tính của sinh viên (Yêu cầu phòng {studentGenderLabel}).
+                    </p>
+                    <p className="text-amber-800 text-xs mt-1 leading-relaxed">
+                      Vui lòng kiểm tra lại quỹ phòng hoặc liên hệ điều phối.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* CẢNH BÁO NẾU QUẢN LÝ CHỌN NHẦM TÒA KHÁC GIỚI TÍNH */}
+              {selectedBuilding && !isCurrentSelectionCompatible ? (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-300 text-rose-900 flex items-start gap-2.5 shadow-2xs mb-4">
+                  <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <p className="font-bold text-rose-950">
+                      ❌ Cảnh báo vi phạm ràng buộc giới tính!
+                    </p>
+                    <p className="text-rose-800 mt-0.5">
+                      {currentBuildingObj?.ten_toa || selectedBuilding} là tòa quy định giới tính {currentBuildingObj?.gioi_tinh || "khác"}, không phù hợp với sinh viên {studentGenderLabel}.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* LÝ DO GỢI Ý CỦA AI NẾU CÓ */}
+              {aiRecommendation?.ai_reason && hasCompatibleRooms && selectedBuilding && (
+                <div className="flex items-center gap-2 text-xs text-blue-700 bg-blue-50/80 px-3 py-2 rounded-lg border border-blue-200 mb-4 shadow-2xs animate-in fade-in">
+                  <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />
+                  <span>{aiRecommendation.ai_reason}</span>
+                </div>
+              )}
+
+              {/* 3 DROPDOWN LIÊN HOÀN */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Dropdown 1: Tòa */}
-                <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg hover:border-slate-300 transition">
+                <div className={`flex items-center justify-between px-4 py-2 border rounded-lg transition ${
+                  selectedBuilding && !isCurrentSelectionCompatible
+                    ? "bg-rose-50/60 border-rose-300"
+                    : "bg-slate-50 border-slate-200 hover:border-slate-300"
+                }`}>
                   <span className="text-xs font-bold text-slate-700">Tòa</span>
                   <div className="relative flex items-center">
                     <select
@@ -736,11 +824,15 @@ export default function ProcessRegistrationPage({
                       onChange={handleBuildingChange}
                       className="appearance-none bg-transparent pr-7 pl-2 py-1 text-sm font-semibold text-slate-900 focus:outline-none cursor-pointer"
                     >
-                      {buildingTree.map((b) => (
-                        <option key={b.ma_toa} value={b.ma_toa}>
-                          {b.ten_toa || `Tòa ${b.ma_toa}`}
-                        </option>
-                      ))}
+                      <option value="">-- Chọn tòa --</option>
+                      {buildingTree.map((b) => {
+                        const isOk = isGenderCompatible(studentGender, b.gioi_tinh);
+                        return (
+                          <option key={b.ma_toa} value={b.ma_toa}>
+                            {b.ten_toa || `Tòa ${b.ma_toa}`} {isOk ? "" : `(Tòa ${b.gioi_tinh || 'Khác'})`}
+                          </option>
+                        );
+                      })}
                     </select>
                     <ChevronDown className="w-4 h-4 text-slate-500 absolute right-1 pointer-events-none" />
                   </div>
@@ -755,9 +847,10 @@ export default function ProcessRegistrationPage({
                     <select
                       value={selectedRoom}
                       onChange={handleRoomChange}
-                      disabled={availableRooms.length === 0}
+                      disabled={availableRooms.length === 0 || !selectedBuilding}
                       className="appearance-none bg-transparent pr-7 pl-2 py-1 text-sm font-semibold text-slate-900 focus:outline-none cursor-pointer disabled:text-slate-400"
                     >
+                      <option value="">-- Chọn phòng --</option>
                       {availableRooms.map((r) => (
                         <option key={r.ma_phong} value={r.ma_phong}>
                           {r.label || `Phòng ${r.so_phong}`}
@@ -777,9 +870,10 @@ export default function ProcessRegistrationPage({
                     <select
                       value={selectedBed}
                       onChange={(e) => setSelectedBed(e.target.value)}
-                      disabled={availableBeds.length === 0}
+                      disabled={availableBeds.length === 0 || !selectedRoom}
                       className="appearance-none bg-transparent pr-7 pl-2 py-1 text-sm font-semibold text-slate-900 focus:outline-none cursor-pointer disabled:text-slate-400"
                     >
+                      <option value="">-- Chọn giường --</option>
                       {availableBeds.map((bed) => (
                         <option key={bed.ma_giuong} value={bed.ma_giuong}>
                           {bed.label || `Giường ${bed.ma_giuong}`}
@@ -812,8 +906,13 @@ export default function ProcessRegistrationPage({
               <button
                 type="button"
                 onClick={handleApprove}
-                disabled={submitting || !selectedBed}
-                className="w-full py-3.5 px-6 rounded-xl bg-[#cde4fd] hover:bg-[#b9d9fc] text-[#1976d2] font-bold text-sm sm:text-base transition-colors duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-2xs disabled:opacity-50"
+                disabled={submitting || !selectedBed || !isCurrentSelectionCompatible}
+                title={
+                  selectedBuilding && !isCurrentSelectionCompatible
+                    ? "Không thể phê duyệt do giới tính phòng/tòa không phù hợp với sinh viên"
+                    : (!selectedBed ? "Vui lòng chọn Tòa, Phòng và Giường" : "Phê duyệt & xếp phòng")
+                }
+                className="w-full py-3.5 px-6 rounded-xl bg-[#cde4fd] hover:bg-[#b9d9fc] text-[#1976d2] font-bold text-sm sm:text-base transition-colors duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? (
                   <>

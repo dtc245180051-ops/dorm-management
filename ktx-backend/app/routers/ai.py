@@ -21,6 +21,8 @@ class RoomRecommendationResponse(BaseModel):
     giuong: Optional[Any] = None
     match_score: int = 0
     ai_reason: str = ""
+    suggestion: Optional[Dict[str, Any]] = None
+    message: Optional[str] = None
 
 
 class ChatRegulationRequest(BaseModel):
@@ -81,6 +83,7 @@ def api_chat_regulation(data: ChatRegulationRequest):
         )
         return result
     except Exception as e:
+        print(f"Lỗi Chatbot AI (Router /chat-regulation): {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi khi xử lý chatbot nội quy: {str(e)}",

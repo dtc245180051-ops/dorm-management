@@ -126,9 +126,19 @@ def get_request_detail(
                 pass
 
         # Tự động cập nhật hoặc sửa gợi ý nếu gợi ý chưa khớp giới tính
-        student_gender = stored.get("gioi_tinh", "Nam")
+        raw_gender = stored.get("gioi_tinh") or stored.get("gender") or "Nam"
+        s_lower = str(raw_gender).strip().lower()
+        student_gender = "Nữ" if any(w in s_lower for w in ["nữ", "nu", "female", "f"]) else "Nam"
+        stored["gioi_tinh"] = student_gender
+
         available_rooms = dorm_service.get_available_beds(db, gender=student_gender)
-        if available_rooms:
+        if not available_rooms:
+            stored["goi_y"] = None
+            stored["suggestion"] = None
+            not_found_msg = f"Không tìm thấy phòng phù hợp: Ký túc xá hiện không có phòng dành cho giới tính {student_gender} hoặc các phòng đã hết chỗ."
+            stored["message"] = not_found_msg
+            stored["suggestion_error"] = not_found_msg
+        else:
             # Phân tích nguyện vọng tự do về tầng cao / thấp
             raw_wish = (
                 (stored.get("tang_mong_muon") or "") + " " +
@@ -162,21 +172,25 @@ def get_request_detail(
                 "ma_phong": matched_r.ma_phong,
                 "ma_giuong": first_empty_bed,
             }
+            stored["suggestion"] = stored["goi_y"]
+            stored["message"] = None
+            stored["suggestion_error"] = None
         return stored
 
     # 2. Tìm kiếm sinh viên từ CSDL theo MSV
     student = db.query(SinhVien).filter(SinhVien.msv == clean_id).first()
     if not student:
-        raise HTTPException(status_code=404, detail="Kh?ng t?m th?y ??n ho?c h? s? sinh vi?n")
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn hoặc hồ sơ sinh viên")
 
-    student_gender = student.gioi_tinh
+    raw_sg = str(student.gioi_tinh or "").strip().lower()
+    student_gender = "Nữ" if any(w in raw_sg for w in ["nữ", "nu", "female", "f"]) else "Nam"
     available_rooms = dorm_service.get_available_beds(db, gender=student_gender)
-    if not available_rooms:
-        available_rooms = dorm_service.get_available_beds(db)
 
     suggested_building = None
     suggested_room = None
     suggested_bed = None
+    goi_y_data = None
+    not_found_msg = None
 
     if available_rooms:
         r = available_rooms[0]
@@ -184,6 +198,13 @@ def get_request_detail(
         suggested_room = r.ma_phong
         if r.danh_sach_giuong_trong:
             suggested_bed = r.danh_sach_giuong_trong[0].ma_giuong
+        goi_y_data = {
+            "ma_toa": suggested_building,
+            "ma_phong": suggested_room,
+            "ma_giuong": suggested_bed,
+        }
+    else:
+        not_found_msg = f"Không tìm thấy phòng phù hợp: Ký túc xá hiện không có phòng dành cho giới tính {student_gender} hoặc các phòng đã hết chỗ."
 
     email_display = (
         student.nguoi_dung.email
@@ -205,7 +226,7 @@ def get_request_detail(
         "id": clean_id,
         "msv": student.msv,
         "ho_ten": ho_ten_display,
-        "gioi_tinh": student.gioi_tinh,
+        "gioi_tinh": student_gender,
         "ngay_sinh": student.ngay_sinh or "",
         "cccd": student.cccd or "",
         "so_dien_thoai": phone_display,
@@ -219,6 +240,10 @@ def get_request_detail(
         "sdt_nguoi_giam_ho": student.sdt_nguoi_giam_ho or "",
         "nguyen_vong": "",
         "trang_thai": "NOT_REGISTERED",
+        "goi_y": goi_y_data,
+        "suggestion": goi_y_data,
+        "message": not_found_msg,
+        "suggestion_error": not_found_msg,
     }
 
 
@@ -399,6 +424,28 @@ def approve_request(
         )
         db.add(toa)
         db.flush()
+
+    # Kiểm tra ràng buộc cứng về giới tính giữa sinh viên và tòa nhà
+    student_gender_raw = (
+        (req_item.get("gioi_tinh") if req_item else None)
+        or (req_item.get("gender") if req_item else None)
+        or "Nam"
+    )
+    s_lower = str(student_gender_raw).strip().lower()
+    s_gender = "Nữ" if any(w in s_lower for w in ["nữ", "nu", "female", "f"]) else "Nam"
+
+    bld_gender_raw = str(toa.gioi_tinh or "").strip().lower()
+    if bld_gender_raw:
+        if s_gender == "Nữ" and "nữ" not in bld_gender_raw and "nu" not in bld_gender_raw and "nam &" not in bld_gender_raw and "cả" not in bld_gender_raw:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Không thể phê duyệt: Sinh viên là Nữ nhưng {toa.ten_toa or toa.ma_toa} là tòa dành cho Nam.",
+            )
+        if s_gender == "Nam" and "nam" not in bld_gender_raw and "cả" not in bld_gender_raw and ("nữ" in bld_gender_raw or "nu" in bld_gender_raw):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Không thể phê duyệt: Sinh viên là Nam nhưng {toa.ten_toa or toa.ma_toa} là tòa dành cho Nữ.",
+            )
 
     # Tầng: xác định từ số phòng (ví dụ P101 -> tầng 1, P205 -> tầng 2, P501 -> tầng 5)
     raw_phong = payload.phong_id.strip()

@@ -12,13 +12,14 @@ export function normalizeGender(gender = "") {
   if (g.includes("cả") || g.includes("all") || g.includes("tat ca")) return "ALL";
   if (g.includes("nữ") || g.includes("nu") || g.includes("female") || g === "f") return "FEMALE";
   if (g.includes("nam") || g.includes("male") || g === "m") return "MALE";
-  return "ALL";
+  return "UNKNOWN";
 }
 
 export function isGenderCompatible(studentGender, roomOrBuildingGender) {
   const sNorm = normalizeGender(studentGender);
   const rNorm = normalizeGender(roomOrBuildingGender);
-  if (rNorm === "ALL" || sNorm === "ALL") return true;
+  if (sNorm === "UNKNOWN" || rNorm === "UNKNOWN") return false;
+  if (rNorm === "ALL") return true;
   return sNorm === rNorm;
 }
 
@@ -27,8 +28,13 @@ export function isGenderCompatible(studentGender, roomOrBuildingGender) {
  * Kích hoạt khi mất kết nối mạng hoặc Backend AI tạm thời bảo trì.
  */
 function getSmartFallbackMatching(studentInfo, candidateRooms = []) {
+  const sGender = studentInfo?.gioi_tinh || studentInfo?.gender || "";
+  const sNorm = normalizeGender(sGender);
+  const genderLabel = sNorm === "FEMALE" ? "Nữ" : (sNorm === "MALE" ? "Nam" : (sGender || "sinh viên"));
+  const notFoundMessage = `Không tìm thấy phòng phù hợp: Ký túc xá hiện không có phòng dành cho giới tính ${genderLabel} hoặc các phòng đã hết chỗ.`;
+
   const eligibleRooms = (candidateRooms || []).filter((room) => {
-    const isGenderOk = isGenderCompatible(studentInfo.gioi_tinh, room.gioi_tinh);
+    const isGenderOk = isGenderCompatible(sGender, room.gioi_tinh);
     const hasSpace =
       (room.danh_sach_giuong && room.danh_sach_giuong.some((g) => !g.da_co_nguoi)) ||
       (room.suc_chua != null && room.thanh_vien_hien_tai != null
@@ -43,7 +49,9 @@ function getSmartFallbackMatching(studentInfo, candidateRooms = []) {
       toa: "",
       giuong: "",
       match_score: 0,
-      ai_reason: `Hiện không còn phòng trống phù hợp với giới tính ${studentInfo.gioi_tinh || ""} của sinh viên.`,
+      ai_reason: notFoundMessage,
+      suggestion: null,
+      message: notFoundMessage,
     };
   }
 
@@ -152,12 +160,21 @@ function getSmartFallbackMatching(studentInfo, candidateRooms = []) {
     bestRoom.beds?.[0]?.ma_giuong ||
     "Giường G01";
 
+  const bestRoomId = bestRoom.ma_phong || bestRoom.ten_phong || bestRoom.id;
+  const bestToa = bestRoom.toa;
+
   return {
-    best_room_id: bestRoom.ma_phong || bestRoom.ten_phong || bestRoom.id,
-    toa: bestRoom.toa,
+    best_room_id: bestRoomId,
+    toa: bestToa,
     giuong: availableBed,
     match_score: best.score,
     ai_reason: best.reason,
+    suggestion: {
+      ma_toa: bestToa,
+      ma_phong: bestRoomId,
+      ma_giuong: availableBed,
+    },
+    message: null,
   };
 }
 
@@ -166,19 +183,41 @@ function getSmartFallbackMatching(studentInfo, candidateRooms = []) {
  * POST /api/ai/recommend-room hoặc /api/v1/ai/recommend-room
  */
 export async function matchRoomWithGemini(studentInfo, candidateRooms = []) {
+  const sGender = studentInfo?.gioi_tinh || studentInfo?.gender || "";
+  const sNorm = normalizeGender(sGender);
+  const genderLabel = sNorm === "FEMALE" ? "Nữ" : (sNorm === "MALE" ? "Nam" : (sGender || "sinh viên"));
+  const notFoundMessage = `Không tìm thấy phòng phù hợp: Ký túc xá hiện không có phòng dành cho giới tính ${genderLabel} hoặc các phòng đã hết chỗ.`;
+
   try {
     const res = await api.post("/ai/recommend-room", {
       studentInfo,
       candidateRooms,
     });
 
-    if (res?.data && (res.data.best_room_id || res.data.ai_reason)) {
+    if (res?.data) {
+      if (!res.data.best_room_id && !res.data.suggestion) {
+        return {
+          best_room_id: "",
+          toa: "",
+          giuong: "",
+          match_score: 0,
+          ai_reason: res.data.message || res.data.ai_reason || notFoundMessage,
+          suggestion: null,
+          message: res.data.message || notFoundMessage,
+        };
+      }
       return {
         best_room_id: res.data.best_room_id ?? "",
         toa: res.data.toa ?? "",
         giuong: res.data.giuong ?? "",
         match_score: Number(res.data.match_score) || 90,
         ai_reason: res.data.ai_reason || "Gợi ý tự động từ hệ thống AI",
+        suggestion: res.data.suggestion || {
+          ma_toa: res.data.toa ?? "",
+          ma_phong: res.data.best_room_id ?? "",
+          ma_giuong: res.data.giuong ?? "",
+        },
+        message: null,
       };
     }
   } catch (error) {

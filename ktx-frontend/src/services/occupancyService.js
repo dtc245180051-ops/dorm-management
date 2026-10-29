@@ -395,6 +395,7 @@ export const occupancyService = {
               si_so: `${occupied}/${capacity} người`,
               gia_thue: room.gia_tien_nam == null ? '' : `${Number(room.gia_tien_nam).toLocaleString('vi-VN')} đ / năm`,
               trang_thai: occupied >= capacity ? 'DA_DAY' : 'CON_CHO',
+              gioi_tinh: room.gioi_tinh || building.gioi_tinh || 'Nam & Nữ',
               giuongs: beds,
               giuong_trong: beds.filter((bed) => bed.trang_thai === 'TRONG').map((bed) => bed.ma_giuong),
             };
