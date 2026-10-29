@@ -33,7 +33,7 @@ function getSmartFallbackMatching(studentInfo, candidateRooms = []) {
   const genderLabel = sNorm === "FEMALE" ? "Nữ" : (sNorm === "MALE" ? "Nam" : (sGender || "sinh viên"));
   const notFoundMessage = `Không tìm thấy phòng phù hợp: Ký túc xá hiện không có phòng dành cho giới tính ${genderLabel} hoặc các phòng đã hết chỗ.`;
 
-  const eligibleRooms = (candidateRooms || []).filter((room) => {
+  let eligibleRooms = (candidateRooms || []).filter((room) => {
     const isGenderOk = isGenderCompatible(sGender, room.gioi_tinh);
     const hasSpace =
       (room.danh_sach_giuong && room.danh_sach_giuong.some((g) => !g.da_co_nguoi)) ||

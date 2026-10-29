@@ -156,10 +156,13 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
   const loadData = async () => {
     setIsLoadingHistory(true);
     try {
-      const studentMsv =
+      const rawUser =
+        localStorage.getItem("ktx_student_msv") ||
+        localStorage.getItem("ktx_msv") ||
         localStorage.getItem("ktx_username") ||
         localStorage.getItem("ktx_email")?.split("@")[0] ||
         "";
+      const studentMsv = rawUser.trim().toUpperCase();
 
       const [roomData, historyData, availableOpts, statusRes] = await Promise.all([
         occupancyService.getCurrentRoomInfo?.(studentMsv),
@@ -217,10 +220,11 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
       }
 
       if (historyData && Array.isArray(historyData) && historyData.length > 0) {
-        const myRequests = historyData.filter(
-          (req) => !studentMsv || !req.msv || req.msv === studentMsv,
-        );
-        setHistoryList(isResident ? myRequests : []);
+        const myRequests = historyData.filter((req) => {
+          const reqMsv = String(req.msv || req.student_id || "").trim().toUpperCase();
+          return !studentMsv || !reqMsv || reqMsv === studentMsv;
+        });
+        setHistoryList(myRequests);
       } else {
         setHistoryList([]);
       }
@@ -1009,9 +1013,11 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
                   historyList.map((item, idx) => {
                     const isApproved =
                       item.trang_thai === "DA_DUYET" ||
+                      item.trang_thai === "APPROVED" ||
                       item.trang_thai_label === "Đã duyệt";
                     const isPending =
                       item.trang_thai === "CHO_DUYET" ||
+                      item.trang_thai === "PENDING" ||
                       item.trang_thai_label === "Chờ duyệt";
 
                     return (
@@ -1026,17 +1032,17 @@ export default function RoomTransferPage({ onSelectTab, onNavigate }) {
 
                         {/* Loại yêu cầu */}
                         <td className="py-3.5 px-4 font-bold text-slate-900">
-                          {item.loai_yeu_cau}
+                          {item.loai_yeu_cau || (item.loai_don === "TRA_PHONG" || item.request_type === "TRA_PHONG" ? "Trả phòng" : "Chuyển phòng")}
                         </td>
 
                         {/* Ngày gửi */}
                         <td className="py-3.5 px-4 text-slate-700 text-xs sm:text-sm">
-                          {item.ngay_gui}
+                          {item.ngay_gui || item.ngay_dang_ky || item.created_at || "—"}
                         </td>
 
                         {/* Phòng liên quan */}
                         <td className="py-3.5 px-4 text-slate-800 font-medium">
-                          {item.phong_lien_quan || item.phong_hien_tai}
+                          {item.phong_lien_quan || item.phong_dich || item.phong_mong_muon || item.phong_hien_tai || "—"}
                         </td>
 
                         {/* Trạng thái badge bo tròn */}
