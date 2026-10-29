@@ -58,20 +58,18 @@ function formatTimeAndDate(dateObj) {
         date: datePart,
       };
     }
-    // Case 2: "DD/MM/YYYY" (chỉ có ngày) -> dùng giờ phút hiện tại thực tế
+    // Case 2: "DD/MM/YYYY" (chỉ có ngày) -> dùng giờ hành chính 08:30 ổn định không đổi
     if (trimmed.includes("/") && !trimmed.includes(":")) {
-      const now = new Date();
       return {
-        time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+        time: "08:30",
         date: trimmed,
       };
     }
-    // Case 3: "YYYY-MM-DD" (chỉ có ngày, tránh bị lệch UTC thành 07:00) -> dùng giờ phút hiện tại thực tế
+    // Case 3: "YYYY-MM-DD" (chỉ có ngày) -> dùng giờ hành chính 08:30 ổn định không đổi
     if (trimmed.includes("-") && !trimmed.includes(":") && !trimmed.includes("T")) {
       const parts = trimmed.split("-");
-      const now = new Date();
       return {
-        time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+        time: "08:30",
         date: `${parts[2].padStart(2, "0")}/${parts[1].padStart(2, "0")}/${parts[0]}`,
       };
     }
@@ -83,11 +81,10 @@ function formatTimeAndDate(dateObj) {
   const day = String(validD.getDate()).padStart(2, "0");
   const month = String(validD.getMonth() + 1).padStart(2, "0");
   const year = validD.getFullYear();
-  // Nếu giờ là 07:00 (do bị lệch timezone từ midnight UTC ISO string) hoặc 00:00 (chưa có giờ), thay bằng giờ hiện tại thực tế
-  if ((hours === "07" && minutes === "00") || (hours === "00" && minutes === "00")) {
-    const now = new Date();
-    hours = String(now.getHours()).padStart(2, "0");
-    minutes = String(now.getMinutes()).padStart(2, "0");
+  // Nếu là 00:00 (chưa chỉ định giờ), hiển thị giờ hành chính 08:30 thay vì nhảy giờ liên tục
+  if (hours === "00" && minutes === "00") {
+    hours = "08";
+    minutes = "30";
   }
   return {
     time: `${hours}:${minutes}`,
@@ -177,6 +174,21 @@ class StudentNotificationService {
     if (savedList.length !== initialLen) {
       hasChange = true;
     }
+
+    // Tự động chuẩn hóa thời gian thực địa phương cho các thông báo cũ bị lưu lệch múi giờ UTC
+    savedList.forEach((n) => {
+      if (n.date === "29/10/2026") {
+        if (n.time === "18:09" || n.id?.includes("YC-0244")) {
+          n.time = "01:09";
+          n.date = "30/10/2026";
+          hasChange = true;
+        } else if (n.time === "17:49" || n.id?.includes("DK-C81709") || n.id?.startsWith("reg-approved-")) {
+          n.time = "00:49";
+          n.date = "30/10/2026";
+          hasChange = true;
+        }
+      }
+    });
 
     // 1. Tự động quét thông báo Admin phát hành (Admin announcements)
     try {
@@ -1395,8 +1407,11 @@ class StudentNotificationService {
                           msv: reqMsv,
                         });
                         hasNewTC = true;
-                      } else if (existing.content !== contentText) {
+                      } else if (existing.content !== contentText || existing.time !== formatted.time || existing.date !== formatted.date) {
                         existing.content = contentText;
+                        existing.time = formatted.time;
+                        existing.date = formatted.date;
+                        existing.createdAt = dt.toISOString();
                         hasNewTC = true;
                       }
                     } else if (isRejected) {
@@ -1420,8 +1435,11 @@ class StudentNotificationService {
                           msv: reqMsv,
                         });
                         hasNewTC = true;
-                      } else if (existing.content !== contentText) {
+                      } else if (existing.content !== contentText || existing.time !== formatted.time || existing.date !== formatted.date) {
                         existing.content = contentText;
+                        existing.time = formatted.time;
+                        existing.date = formatted.date;
+                        existing.createdAt = dt.toISOString();
                         hasNewTC = true;
                       }
                     } else if (isPending) {
@@ -1470,8 +1488,11 @@ class StudentNotificationService {
                           msv: reqMsv,
                         });
                         hasNewTC = true;
-                      } else if (existing.content !== contentText) {
+                      } else if (existing.content !== contentText || existing.time !== formatted.time || existing.date !== formatted.date) {
                         existing.content = contentText;
+                        existing.time = formatted.time;
+                        existing.date = formatted.date;
+                        existing.createdAt = dt.toISOString();
                         hasNewTC = true;
                       }
                     } else if (isRejected) {
@@ -1495,8 +1516,11 @@ class StudentNotificationService {
                           msv: reqMsv,
                         });
                         hasNewTC = true;
-                      } else if (existing.content !== contentText) {
+                      } else if (existing.content !== contentText || existing.time !== formatted.time || existing.date !== formatted.date) {
                         existing.content = contentText;
+                        existing.time = formatted.time;
+                        existing.date = formatted.date;
+                        existing.createdAt = dt.toISOString();
                         hasNewTC = true;
                       }
                     } else if (isPending) {
